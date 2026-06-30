@@ -1349,6 +1349,53 @@ function AutoKill.SetStandAttribute()
     end
 end
 
+function AutoKill.ForceResetCharacter()
+    local lp = game:GetService("Players").LocalPlayer
+    local ok = pcall(function()
+        lp:LoadCharacter()
+    end)
+    if not ok then
+        local char = lp.Character
+        if char then
+            pcall(function()
+                char:BreakJoints()
+            end)
+        end
+    end
+end
+
+function AutoKill.SetupStandCharacter(char)
+    AutoKill.SetStandAttribute()
+
+    if AutoKill.StandConfig.KnockResetConnection then
+        pcall(function() AutoKill.StandConfig.KnockResetConnection:Disconnect() end)
+        AutoKill.StandConfig.KnockResetConnection = nil
+    end
+
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        AutoKill.StandConfig.KnockResetConnection = humanoid.Died:Connect(function()
+            task.delay(0.1, function()
+                AutoKill.ForceResetCharacter()
+            end)
+        end)
+    end
+
+    local be = char:FindFirstChild("BodyEffects")
+    local ko = be and be:FindFirstChild("K.O")
+    if ko then
+        local conn = ko:GetPropertyChangedSignal("Value"):Connect(function()
+            if ko.Value == true then
+                AutoKill.ForceResetCharacter()
+            end
+        end)
+        if AutoKill.StandConfig.KnockResetConnection then
+            AutoKill.StandConfig.KnockResetConnection:Disconnect()
+        end
+        AutoKill.StandConfig.KnockResetConnection = conn
+    end
+end
+
 function AutoKill.IsStandPlayer(player)
     if not player then return false end
     if player == LocalPlayer then return true end
@@ -2116,6 +2163,7 @@ do
         FormationAngle = 0,
         StandNames = {},
         Whitelist = {},
+        KnockResetConnection = nil,
     }
 
     -- Give each stand a stable angle so multiple stands spread out automatically
@@ -2460,6 +2508,10 @@ do
             AutoKill.StandConfig.FollowConnection:Disconnect()
             AutoKill.StandConfig.FollowConnection = nil
         end
+        if AutoKill.StandConfig.KnockResetConnection then
+            pcall(function() AutoKill.StandConfig.KnockResetConnection:Disconnect() end)
+            AutoKill.StandConfig.KnockResetConnection = nil
+        end
     end
 
     MiscUseStand:AddToggle('UseStandEnabled', {
@@ -2471,13 +2523,13 @@ do
                 local ownerName = (Options.UseStandOwner and Options.UseStandOwner.Value) or AutoKill.StandConfig.OwnerName
                 AutoKill.StandConfig.OwnerPlayer = findStandPlayer(ownerName)
                 startStand()
-                AutoKill.SetStandAttribute()
+                AutoKill.SetupStandCharacter(LocalPlayer.Character)
                 if AutoKill.StandConfig.StandAttributeConnection then
                     pcall(function() AutoKill.StandConfig.StandAttributeConnection:Disconnect() end)
                 end
-                AutoKill.StandConfig.StandAttributeConnection = LocalPlayer.CharacterAdded:Connect(function()
+                AutoKill.StandConfig.StandAttributeConnection = LocalPlayer.CharacterAdded:Connect(function(char)
                     task.wait(0.5)
-                    AutoKill.SetStandAttribute()
+                    AutoKill.SetupStandCharacter(char)
                 end)
             else
                 stopStand()
