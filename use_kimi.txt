@@ -340,7 +340,9 @@ do
 end
 
 local MiscMovement = Tabs.Misc:AddLeftGroupbox('Movement')
-local MiscSkinChanger = Tabs.Misc:AddLeftGroupbox('Cosmetic Changer')
+local MiscCosmeticsTabbox = Tabs.Misc:AddLeftTabbox('Cosmetics')
+local MiscSkins = MiscCosmeticsTabbox:AddTab('Skins')
+local MiscShootSounds = MiscCosmeticsTabbox:AddTab('Shoot Sounds')
 local MiscAnimationPlayer = Tabs.Misc:AddLeftGroupbox('Animation Player')
 
 local MiscAutoFood = Tabs.Misc:AddRightGroupbox('Food')
@@ -399,10 +401,7 @@ local soundOptions = {
 local OriginalSoundIds = {}
 local getWeaponTool, changeWeaponSound, applyVolumeToAllSounds, applyAllShootSounds
 
-MiscSkinChanger:AddLabel('Custom Shoot Sounds')
-MiscSkinChanger:AddDivider()
-
-MiscSkinChanger:AddToggle('ShootSoundsUse', {
+MiscShootSounds:AddToggle('ShootSoundsUse', {
     Text = "Use",
     Default = false,
     Callback = function(Value)
@@ -425,7 +424,7 @@ MiscSkinChanger:AddToggle('ShootSoundsUse', {
     end
 })
 
-MiscSkinChanger:AddSlider('ShootSoundsVolume', {
+MiscShootSounds:AddSlider('ShootSoundsVolume', {
     Text = "Volume",
     Min = 0,
     Max = 100,
@@ -440,7 +439,7 @@ MiscSkinChanger:AddSlider('ShootSoundsVolume', {
 })
 
 for _, weapon in ipairs(weaponTypes) do
-    MiscSkinChanger:AddDropdown('ShootSound_' .. weapon, {
+    MiscShootSounds:AddDropdown('ShootSound_' .. weapon, {
         Text = weapon,
         Values = soundOptions,
         Default = "Mp40",
@@ -9792,10 +9791,7 @@ local AllGunSkinNames = {
 
 local KnifeSkinNames = {"None", "Beta", "Bitcoin", "Fishbone", "Nightblade"}
 
-MiscSkinChanger:AddLabel('Skins')
-MiscSkinChanger:AddDivider()
-
-MiscSkinChanger:AddToggle('SkinChangerEnabled', {
+MiscSkins:AddToggle('SkinChangerEnabled', {
     Text = "Use",
     Default = false,
     Callback = function(Value)
@@ -9824,7 +9820,7 @@ MiscSkinChanger:AddToggle('SkinChangerEnabled', {
     end
 })
 
-MiscSkinChanger:AddDropdown('SelectedRevolverSkin', {
+MiscSkins:AddDropdown('SelectedRevolverSkin', {
     Text = "Revolver Skin",
     Values = AllGunSkinNames,
     Default = "Candy Cane",
@@ -9838,7 +9834,7 @@ MiscSkinChanger:AddDropdown('SelectedRevolverSkin', {
     end
 })
 
-MiscSkinChanger:AddDropdown('SelectedDoubleBarrelSkin', {
+MiscSkins:AddDropdown('SelectedDoubleBarrelSkin', {
     Text = "Double Barrel Skin",
     Values = AllGunSkinNames,
     Default = "Candy Cane",
@@ -9852,7 +9848,7 @@ MiscSkinChanger:AddDropdown('SelectedDoubleBarrelSkin', {
     end
 })
 
-MiscSkinChanger:AddDropdown('SelectedShotgunSkin', {
+MiscSkins:AddDropdown('SelectedShotgunSkin', {
     Text = "Shotgun Skin",
     Values = AllGunSkinNames,
     Default = "Ascension",
@@ -9866,7 +9862,7 @@ MiscSkinChanger:AddDropdown('SelectedShotgunSkin', {
     end
 })
 
-MiscSkinChanger:AddDropdown('SelectedTacticalShotgunSkin', {
+MiscSkins:AddDropdown('SelectedTacticalShotgunSkin', {
     Text = "Tactical Shotgun Skin",
     Values = AllGunSkinNames,
     Default = "Ascension",
@@ -9880,7 +9876,7 @@ MiscSkinChanger:AddDropdown('SelectedTacticalShotgunSkin', {
     end
 })
 
-MiscSkinChanger:AddDropdown('SelectedSMGSkin', {
+MiscSkins:AddDropdown('SelectedSMGSkin', {
     Text = "SMG Skin",
     Values = AllGunSkinNames,
     Default = "Candy Cane",
@@ -9895,7 +9891,7 @@ MiscSkinChanger:AddDropdown('SelectedSMGSkin', {
 })
 
 -- KNIFE CHANGER - Visual clone parented to character to avoid server deletion
-MiscSkinChanger:AddDropdown('SelectedKnifeSkin', {
+MiscSkins:AddDropdown('SelectedKnifeSkin', {
     Text = "Knife Skin",
     Values = KnifeSkinNames,
     Default = "Fishbone",
@@ -9926,7 +9922,7 @@ end)
 
 local beamOptions = {"Red", "Blue", "Green", "Orange", "Lightning", "Beta", "Hallows", "Kitty", "Kirumi", "Rainbow"}
 
-MiscSkinChanger:AddDropdown('SelectedBeamSkin', {
+MiscSkins:AddDropdown('SelectedBeamSkin', {
     Text = "Beam",
     Values = beamOptions,
     Default = "Green",
