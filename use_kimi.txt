@@ -962,10 +962,11 @@ local AutoKill = {
     AttachPosition = "Behind",
     LockedOn = false,
     CycleActive = false,
-    KnifeExpander = {Enabled = false, Size = 40},
+    KnifeExpander = {Enabled = true, Size = 20},
     KnifeAura = false,
     AuraLockedTarget = nil,
     KnifeLoopConnection = nil,
+    LastKnifeStab = 0,
     GunMethod = {
         PlatformColor = Color3.fromRGB(255, 0, 255),
         PlatformMaterial = Enum.Material.Neon,
@@ -1104,9 +1105,12 @@ function AutoKill.KnifeAuraStep()
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return end
 
+    AutoKill.UnhideCharacter()
+    AutoKill.RemoveVoidPlatform()
+
     local owner = AutoKill.StandConfig and AutoKill.StandConfig.OwnerPlayer
     local function isBadTarget(p)
-        return not p or p == LocalPlayer or p == owner or AutoKill.IsStandPlayer(p)
+        return not p or p == LocalPlayer or p == owner or AutoKill.IsStandPlayer(p) or AutoKill.IsWhitelisted(p)
     end
 
     -- Respect manual target list first, then lock nearest by distance
@@ -1240,6 +1244,8 @@ function AutoKill.KnifeAttackStep(target)
     if not target or not target.Character then return end
     local char = LocalPlayer.Character
     if not char then return end
+    AutoKill.UnhideCharacter()
+    AutoKill.RemoveVoidPlatform()
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     local targetChar = target.Character
@@ -1492,6 +1498,10 @@ function AutoKill.TryEquipKnife()
 end
 
 function AutoKill.TryStab()
+    local now = tick()
+    if now - AutoKill.LastKnifeStab < 0.22 then return end
+    AutoKill.LastKnifeStab = now
+
     local char = LocalPlayer.Character
     if not char then return end
     local knife = char:FindFirstChild("[Knife]")
@@ -2137,7 +2147,7 @@ CombatAutoKill:AddDropdown('AutoKillManualTargets', {
 
 CombatAutoKill:AddToggle('KnifeHitboxToggle', {
     Text = "Knife Hitbox Expander",
-    Default = false,
+    Default = true,
     Callback = function(Value)
         AutoKill.KnifeExpander.Enabled = Value
     end
@@ -2147,7 +2157,7 @@ CombatAutoKill:AddSlider('KnifeHitboxSize', {
     Text = "Knife Hitbox Size",
     Min = 5,
     Max = 200,
-    Default = 40,
+    Default = 20,
     Rounding = 1,
     Callback = function(Value)
         AutoKill.KnifeExpander.Size = Value
@@ -2226,8 +2236,10 @@ do
             angle = angle + AutoKill.StandConfig.OrbitAngle
         end
         -- vary radius per stand so multiple accounts don't perfectly overlap
-        local dist = distance + math.sin(angle * 5) * 1.5
-        return ownerRoot.CFrame * getCircleOffset(angle, dist)
+        local dist = distance + math.sin(angle * 5) * 2.5
+        local offset = getCircleOffset(angle, dist)
+        -- keep the circle in world space so owner rotation doesn't clump stands
+        return CFrame.new(ownerRoot.Position) * offset
     end
 
     local function findStandPlayer(name)
@@ -2514,9 +2526,33 @@ do
 
             local targetCFrame
             if AutoKill.StandConfig.KillAuraMode then
-                targetCFrame = getOwnerCircleCFrame(14)
+                targetCFrame = getOwnerCircleCFrame(18)
             elseif AutoKill.StandConfig.KnifeAuraMode then
-                targetCFrame = getOwnerCircleCFrame(12)
+                -- Spread stands around the locked target so the knife can actually swing and hit.
+                -- The ring is tight enough to be in melee range but offset per-stand so they don't slash each other.
+                local auraTarget = AutoKill.AuraLockedTarget
+                if not auraTarget or not auraTarget.Character then
+                    auraTarget = AutoKill.GetNearestEnemyToOwner()
+                    if auraTarget then
+                        AutoKill.AuraLockedTarget = auraTarget
+                    end
+                end
+
+                if auraTarget and auraTarget.Character then
+                    local troot = auraTarget.Character:FindFirstChild("HumanoidRootPart")
+                    if troot then
+                        local angle = AutoKill.StandConfig.FormationAngle
+                        local dist = 7 + math.sin(angle * 5) * 1.5 -- 5.5 to 8.5, per-stand variance
+                        local yOff = math.sin(angle * 3) * 1.5
+                        local offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
+                        targetCFrame = troot.CFrame * offset
+                        targetCFrame = CFrame.lookAt(targetCFrame.Position, troot.Position)
+                    else
+                        targetCFrame = getOwnerCircleCFrame(12)
+                    end
+                else
+                    targetCFrame = getOwnerCircleCFrame(12)
+                end
             elseif AutoKill.StandConfig.FormationMode == "circle" then
                 if AutoKill.Enabled and AutoKill.Target then return end
                 targetCFrame = getOwnerCircleCFrame(10)
@@ -11863,3 +11899,8 @@ end
 InitializeESP()
 
 SaveManager:LoadAutoloadConfig()
+
+-- Force the knife hitbox expander on by default so aura modes don't whiff.
+if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then
+    Toggles.KnifeHitboxToggle:SetValue(true)
+end
