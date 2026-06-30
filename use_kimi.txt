@@ -1082,19 +1082,19 @@ function AutoKill.GetAttachOffset()
     local posMode = AutoKill.AttachPosition
     if posMode == "Random" then
         local angle = math.random() * 2 * math.pi
-        local dist = 2 + math.random() * 2.5
-        local height = -1 + math.random() * 3
+        local dist = 6 + math.random() * 4
+        local height = -2 + math.random() * 4
         return CFrame.new(math.cos(angle) * dist, height, math.sin(angle) * dist), true
     elseif posMode == "Inside" then
         return CFrame.new(0, 0, 0), false
     elseif posMode == "Left" then
-        return CFrame.new(-2, 0, 0), true
+        return CFrame.new(-6, 0, 0), true
     elseif posMode == "Right" then
-        return CFrame.new(2, 0, 0), true
+        return CFrame.new(6, 0, 0), true
     elseif posMode == "Below" then
-        return CFrame.new(0, -6, 0), true
+        return CFrame.new(0, -9, 0), true
     else
-        return CFrame.new(0, 0, 2), true
+        return CFrame.new(0, 0, 6), true
     end
 end
 
@@ -1267,8 +1267,10 @@ function AutoKill.KnifeAttackStep(target)
         local hitbox = handle and handle:FindFirstChild("HITBOX_PART")
         if hitbox then
             pcall(function()
-                local sz = math.max(AutoKill.KnifeExpander.Size, 15)
-                hitbox.Size = Vector3.new(sz, sz, sz)
+                if AutoKill.KnifeExpander.Enabled then
+                    local sz = math.max(AutoKill.KnifeExpander.Size, 1)
+                    hitbox.Size = Vector3.new(sz, sz, sz)
+                end
                 hitbox.Transparency = 1
                 hitbox.CanCollide = false
                 hitbox.Massless = true
@@ -2222,7 +2224,7 @@ do
             angle = angle + AutoKill.StandConfig.OrbitAngle
         end
         -- vary radius per stand so multiple accounts don't perfectly overlap
-        local dist = distance + math.sin(angle * 5) * 2
+        local dist = distance + math.sin(angle * 5) * 3
         return ownerRoot.CFrame * getCircleOffset(angle, dist)
     end
 
@@ -2510,18 +2512,18 @@ do
 
             local targetCFrame
             if AutoKill.StandConfig.KillAuraMode then
-                targetCFrame = getOwnerCircleCFrame(16)
+                targetCFrame = getOwnerCircleCFrame(22)
             elseif AutoKill.StandConfig.KnifeAuraMode then
-                targetCFrame = getOwnerCircleCFrame(14)
+                targetCFrame = getOwnerCircleCFrame(20)
             elseif AutoKill.StandConfig.FormationMode == "circle" then
                 if AutoKill.Enabled and AutoKill.Target then return end
-                targetCFrame = getOwnerCircleCFrame(12)
+                targetCFrame = getOwnerCircleCFrame(16)
             elseif AutoKill.StandConfig.FormationMode == "surround" then
                 if AutoKill.Enabled and AutoKill.Target then return end
-                targetCFrame = getOwnerCircleCFrame(14)
+                targetCFrame = getOwnerCircleCFrame(18)
             else -- follow
                 if AutoKill.Enabled and AutoKill.Target then return end
-                targetCFrame = ownerRoot.CFrame * CFrame.new(0, 0, 10)
+                targetCFrame = ownerRoot.CFrame * CFrame.new(0, 0, 12)
             end
 
             if targetCFrame then
