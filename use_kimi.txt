@@ -363,19 +363,6 @@ local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = Workspace.CurrentCamera
 
--- Auto-load protected.lua if this file is run directly without the loader (local testing only)
-if not getgenv().ForceHit then
-    local ok, err = pcall(function()
-        local path = "C:/Users/Adkin/Downloads/advanced/protected.lua"
-        local content = readfile(path)
-        if content then
-            loadstring(content)()
-        end
-    end)
-    -- silently ignore; loader.lua handles protected.lua properly
-end
-
-
 local SelectedShootSounds = {
     DoubleBarrel = "Mp40",
     Revolver = "Mp40",
