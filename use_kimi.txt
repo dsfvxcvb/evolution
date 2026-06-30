@@ -1102,23 +1102,32 @@ function AutoKill.KnifeAuraStep()
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum or hum.Health <= 0 then return end
 
+    local owner = AutoKill.StandConfig and AutoKill.StandConfig.OwnerPlayer
+    local function isBadTarget(p)
+        return not p or p == LocalPlayer or p == owner or AutoKill.IsStandPlayer(p)
+    end
+
     -- Respect manual target list first, then lock nearest by distance
     local target = AutoKill.Target
-    if target and (not AutoKill.IsValidTarget(target) or AutoKill.GetTargetStatus(target) ~= "alive") then
+    if target and (isBadTarget(target) or not AutoKill.IsValidTarget(target) or AutoKill.GetTargetStatus(target) ~= "alive") then
         target = nil
     end
     if not target and AutoKill.HasSelectedTargets() then
-        target = AutoKill.GetNextValidTarget()
+        for _ = 1, #AutoKill.Targets do
+            target = AutoKill.GetNextValidTarget()
+            if target and not isBadTarget(target) then break end
+            target = nil
+        end
     end
     if not target then
         target = AutoKill.AuraLockedTarget
-        if target and (not AutoKill.IsValidTarget(target) or AutoKill.GetTargetStatus(target) ~= "alive") then
+        if target and (isBadTarget(target) or not AutoKill.IsValidTarget(target) or AutoKill.GetTargetStatus(target) ~= "alive") then
             target = nil
             AutoKill.AuraLockedTarget = nil
         end
     end
     if not target and not AutoKill.HasSelectedTargets() then
-        target = AutoKill.GetNearestTargetByDistance()
+        target = AutoKill.GetNearestEnemyToOwner()
         AutoKill.AuraLockedTarget = target
     end
     if not target then
@@ -1151,6 +1160,66 @@ function AutoKill.KnifeAuraStep()
     end
 
     AutoKill.TryStab()
+end
+
+function AutoKill.KillAuraStep()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum or hum.Health <= 0 then return end
+
+    local owner = AutoKill.StandConfig and AutoKill.StandConfig.OwnerPlayer
+    local target = AutoKill.GetNearestEnemyToOwner()
+    if not target then
+        AutoKill.Target = nil
+        AutoKill.UpdateUI("waiting")
+        return
+    end
+
+    AutoKill.Target = target
+    local targetName = target.DisplayName or target.Name
+    AutoKill.UpdateUI("killing", targetName)
+
+    if not AutoKill.FastEquipDoubleBarrel() then
+        return
+    end
+
+    local ammo = AutoKill.GetDoubleBarrelAmmo()
+    if ammo <= 0 then
+        AutoKill.ReloadDoubleBarrel()
+        return
+    end
+
+    local targetChar = target.Character
+    if targetChar and AutoKill.HasForceField(targetChar) then
+        return
+    end
+
+    local cooldown = 0.4
+    if getgenv().FH_GetWeaponCooldown then
+        cooldown = getgenv().FH_GetWeaponCooldown()
+    end
+    local timeSince = tick() - (getgenv().ForceHit.LastShotTime or 0)
+    if timeSince < cooldown then
+        return
+    end
+
+    if targetChar and getgenv().FH_Fire then
+        pcall(function() getgenv().FH_Fire(target) end)
+    else
+        local tool = char:FindFirstChild("[DoubleBarrel]")
+        if tool then
+            pcall(function() tool:Activate() end)
+        end
+    end
+
+    local status = AutoKill.GetTargetStatus(target)
+    if status == "downed" then
+        task.spawn(function()
+            AutoKill.AutoStomp(target)
+            AutoKill.UnhideCharacter()
+        end)
+    end
 end
 
 function AutoKill.KnifeAttackStep(target)
@@ -1205,7 +1274,7 @@ function AutoKill.KnifeAttackStep(target)
         -- Spread multiple stands around the target when in surround formation
         if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
             local angle = AutoKill.StandConfig.FormationAngle
-            local dist = 4
+            local dist = 7
             offset = CFrame.new(math.sin(angle) * dist, 0, math.cos(angle) * dist)
             lookAt = true
         end
@@ -1256,6 +1325,47 @@ function AutoKill.GetTargetStatus(player)
         if ko and ko.Value == true then return "downed" end
     end
     return "alive"
+end
+
+function AutoKill.SetStandAttribute()
+    local char = LocalPlayer.Character
+    if char then
+        pcall(function() char:SetAttribute("IsStand", true) end)
+    end
+end
+
+function AutoKill.IsStandPlayer(player)
+    if not player then return false end
+    if player == LocalPlayer then return true end
+    local char = player.Character
+    if not char then return false end
+    return char:GetAttribute("IsStand") == true
+end
+
+function AutoKill.GetNearestEnemyToOwner()
+    local owner = AutoKill.StandConfig and AutoKill.StandConfig.OwnerPlayer
+    local originRoot = owner and owner.Character and owner.Character:FindFirstChild("HumanoidRootPart")
+    if not originRoot then
+        originRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    end
+    if not originRoot then return nil end
+
+    local closest, minDist = nil, math.huge
+    for _, player in ipairs(Players:GetPlayers()) do
+        if player ~= LocalPlayer and player ~= owner and not AutoKill.IsStandPlayer(player) then
+            if AutoKill.IsValidTarget(player) and AutoKill.GetTargetStatus(player) == "alive" then
+                local root = player.Character:FindFirstChild("HumanoidRootPart")
+                if root then
+                    local dist = (root.Position - originRoot.Position).Magnitude
+                    if dist < minDist then
+                        minDist = dist
+                        closest = player
+                    end
+                end
+            end
+        end
+    end
+    return closest
 end
 
 function AutoKill.HasForceField(char)
@@ -1615,7 +1725,8 @@ function AutoKill.StartCombatCycle()
     if AutoKill.CycleActive then return end
     AutoKill.CycleActive = true
 
-    if AutoKill.Method == "Gun" then
+    local isKillAura = AutoKill.StandConfig and AutoKill.StandConfig.KillAuraMode
+    if AutoKill.Method == "Gun" or isKillAura then
         if getgenv().ForceHit then
             AutoKill.ForceHitWasEnabled = getgenv().ForceHit.Enabled
             AutoKill.ForceHitOriginal = {
@@ -1634,10 +1745,28 @@ function AutoKill.StartCombatCycle()
             getgenv().ForceHit.PrefireForceField = false
             getgenv().ForceHit.HitPart = "UpperTorso"
         end
-        AutoKill.CreateVoidPlatform()
+        if not isKillAura then
+            AutoKill.CreateVoidPlatform()
+        end
     end
 
     task.spawn(function()
+        -- Kill aura: stands near owner shoot the closest enemy with double barrel
+        if isKillAura then
+            while AutoKill.Enabled do
+                AutoKill.KillAuraStep()
+                RunService.Heartbeat:Wait()
+            end
+            AutoKill.CycleActive = false
+            AutoKill.GunMethod.IsWaiting = false
+            AutoKill.GunMethod.IsKilling = false
+            AutoKill.StopAutoStomp()
+            AutoKill.UnhideCharacter()
+            AutoKill.RemoveVoidPlatform()
+            AutoKill.UpdateUI("off")
+            return
+        end
+
         -- Dedicated aura loop: no teleport, no target required, just swing at anyone nearby
         if AutoKill.Method == "Knife" and AutoKill.KnifeAura then
             while AutoKill.Enabled do
@@ -1819,8 +1948,9 @@ function AutoKill.StartCycle()
     if not AutoKill.Target then
         AutoKill.AdvanceTarget()
     end
-    -- Knife aura doesn't need a pre-selected target; it hits anyone nearby
-    if not AutoKill.Target and not (AutoKill.Method == "Knife" and AutoKill.KnifeAura) then
+    -- Aura modes don't need a pre-selected target; they pick the nearest enemy
+    local isAura = (AutoKill.Method == "Knife" and AutoKill.KnifeAura) or (AutoKill.StandConfig and AutoKill.StandConfig.KillAuraMode)
+    if not AutoKill.Target and not isAura then
         return
     end
     AutoKill.LockedOn = true
@@ -1957,10 +2087,14 @@ do
         OwnerPlayer = nil,
         FollowConnection = nil,
         ChatConnection = nil,
+        StandAttributeConnection = nil,
         IsVanished = false,
         BringRunning = false,
         FormationMode = "follow",
         KnifeAuraMode = false,
+        KillAuraMode = false,
+        OrbitMode = false,
+        OrbitAngle = 0,
         FormationAngle = 0,
     }
 
@@ -1983,6 +2117,9 @@ do
         local ownerRoot = owner.Character:FindFirstChild("HumanoidRootPart")
         if not ownerRoot then return nil end
         local angle = AutoKill.StandConfig.FormationAngle
+        if AutoKill.StandConfig.OrbitMode then
+            angle = angle + AutoKill.StandConfig.OrbitAngle
+        end
         return ownerRoot.CFrame * getCircleOffset(angle, distance)
     end
 
@@ -2149,6 +2286,7 @@ do
         elseif cmd == ".knifeaura" then
             local enabled = not AutoKill.StandConfig.KnifeAuraMode
             AutoKill.StandConfig.KnifeAuraMode = enabled
+            AutoKill.StandConfig.KillAuraMode = false
             AutoKill.StandConfig.IsVanished = false
             AutoKill.UnhideCharacter()
             if enabled then
@@ -2162,12 +2300,33 @@ do
                 AutoKill.Enabled = false
                 AutoKill.StopCycle()
             end
+        elseif cmd == ".killaura" then
+            local enabled = not AutoKill.StandConfig.KillAuraMode
+            AutoKill.StandConfig.KillAuraMode = enabled
+            AutoKill.StandConfig.KnifeAuraMode = false
+            AutoKill.KnifeAura = false
+            AutoKill.StandConfig.IsVanished = false
+            AutoKill.UnhideCharacter()
+            if enabled then
+                AutoKill.Method = "Gun"
+                AutoKill.Enabled = true
+                AutoKill.StopCycle()
+                AutoKill.StartCycle()
+            else
+                AutoKill.Enabled = false
+                AutoKill.Target = nil
+                AutoKill.StopCycle()
+            end
+        elseif cmd == ".orbit" then
+            AutoKill.StandConfig.OrbitMode = not AutoKill.StandConfig.OrbitMode
         elseif cmd == ".stop" then
             AutoKill.Enabled = false
             AutoKill.Target = nil
             AutoKill.KnifeAura = false
             AutoKill.StopCycle()
+            AutoKill.UnhideCharacter()
             AutoKill.StandConfig.KnifeAuraMode = false
+            AutoKill.StandConfig.KillAuraMode = false
             if Toggles.AutoKillEnabled then
                 Toggles.AutoKillEnabled:SetValue(false)
             end
@@ -2190,10 +2349,11 @@ do
         end)
 
         if AutoKill.StandConfig.FollowConnection then return end
-        AutoKill.StandConfig.FollowConnection = RunService.Heartbeat:Connect(function()
+        AutoKill.StandConfig.FollowConnection = RunService.Heartbeat:Connect(function(dt)
             if not AutoKill.StandConfig.Enabled then return end
             if AutoKill.StandConfig.IsVanished then return end
             if AutoKill.StandConfig.BringRunning then return end
+            if AutoKill.GunMethod.StompRunning then return end
             if not AutoKill.StandConfig.OwnerPlayer then
                 AutoKill.StandConfig.OwnerPlayer = findStandPlayer(AutoKill.StandConfig.OwnerName)
             end
@@ -2204,18 +2364,25 @@ do
             local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
             if not ownerRoot or not myRoot then return end
 
+            if AutoKill.StandConfig.OrbitMode then
+                dt = dt or (1 / 60)
+                AutoKill.StandConfig.OrbitAngle = (AutoKill.StandConfig.OrbitAngle + 2 * dt) % (math.pi * 2)
+            end
+
             local targetCFrame
-            if AutoKill.StandConfig.KnifeAuraMode then
-                targetCFrame = getOwnerCircleCFrame(6)
+            if AutoKill.StandConfig.KillAuraMode then
+                targetCFrame = getOwnerCircleCFrame(14)
+            elseif AutoKill.StandConfig.KnifeAuraMode then
+                targetCFrame = getOwnerCircleCFrame(12)
             elseif AutoKill.StandConfig.FormationMode == "circle" then
                 if AutoKill.Enabled and AutoKill.Target then return end
-                targetCFrame = getOwnerCircleCFrame(5)
+                targetCFrame = getOwnerCircleCFrame(10)
             elseif AutoKill.StandConfig.FormationMode == "surround" then
                 if AutoKill.Enabled and AutoKill.Target then return end
-                targetCFrame = getOwnerCircleCFrame(7)
+                targetCFrame = getOwnerCircleCFrame(12)
             else -- follow
                 if AutoKill.Enabled and AutoKill.Target then return end
-                targetCFrame = ownerRoot.CFrame * CFrame.new(0, 0, 5)
+                targetCFrame = ownerRoot.CFrame * CFrame.new(0, 0, 8)
             end
 
             if targetCFrame then
@@ -2246,8 +2413,20 @@ do
                 local ownerName = (Options.UseStandOwner and Options.UseStandOwner.Value) or AutoKill.StandConfig.OwnerName
                 AutoKill.StandConfig.OwnerPlayer = findStandPlayer(ownerName)
                 startStand()
+                AutoKill.SetStandAttribute()
+                if AutoKill.StandConfig.StandAttributeConnection then
+                    pcall(function() AutoKill.StandConfig.StandAttributeConnection:Disconnect() end)
+                end
+                AutoKill.StandConfig.StandAttributeConnection = LocalPlayer.CharacterAdded:Connect(function()
+                    task.wait(0.5)
+                    AutoKill.SetStandAttribute()
+                end)
             else
                 stopStand()
+                if AutoKill.StandConfig.StandAttributeConnection then
+                    pcall(function() AutoKill.StandConfig.StandAttributeConnection:Disconnect() end)
+                    AutoKill.StandConfig.StandAttributeConnection = nil
+                end
             end
         end
     })
@@ -2269,6 +2448,8 @@ do
     MiscUseStand:AddLabel('.method knife / .method gun')
     MiscUseStand:AddLabel('.formation follow/circle/surround')
     MiscUseStand:AddLabel('.knifeaura - circle owner & stab near')
+    MiscUseStand:AddLabel('.killaura - circle owner & DB closest')
+    MiscUseStand:AddLabel('.orbit - spin around owner')
     MiscUseStand:AddLabel('.vanish - hide on void platform')
     MiscUseStand:AddLabel('.unvanish - leave void platform')
     MiscUseStand:AddLabel('.bring <user> - bring player to owner')
