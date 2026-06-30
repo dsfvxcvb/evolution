@@ -1478,7 +1478,9 @@ function AutoKill.TryEquipKnife()
     if not char then return false end
     local humanoid = char:FindFirstChildOfClass("Humanoid")
     if not humanoid then return false end
-    for _, tool in ipairs(LocalPlayer.Backpack:GetChildren()) do
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not backpack then return false end
+    for _, tool in ipairs(backpack:GetChildren()) do
         if tool:IsA("Tool") and string.find(string.lower(tool.Name), "knife") then
             pcall(function()
                 humanoid:EquipTool(tool)
