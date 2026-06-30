@@ -52,7 +52,6 @@ local CombatAutoKill = Tabs.Combat:AddRightGroupbox('Auto Kill')
 local CombatAntiAim = Tabs.Combat:AddRightGroupbox('Anti-Aim')
 local CombatStrafe = Tabs.Combat:AddRightGroupbox('Target Strafe')
 local CombatHitsound = Tabs.Combat:AddRightGroupbox('Hitsounds')
-local CombatStandaloneDesync = Tabs.Combat:AddRightGroupbox('Standalone Desync')
 
 local VisualsESP = Tabs.Visuals:AddLeftGroupbox('ESP')
 local VisualsTracers = Tabs.Visuals:AddLeftGroupbox('Visualize Bullets')
@@ -811,7 +810,7 @@ DesyncSection:AddToggle('DesyncToggle',{Text = "desynchronization",
     Mode = 'Toggle'})
 
 DesyncSection:AddDropdown('DesyncMethodDropdown',{Text = "Method",
-    Values = {"Destroy Cheaters", "Rotation", "Custom", "Underground", "Void Spam", "Raining", "Teleport Maze", "Void", "UnderGroundV2"},
+    Values = {"Destroy Cheaters", "Rotation", "Custom", "Underground", "Void Spam", "Raining", "Teleport Maze", "Void", "UnderGroundV2", "Standalone Void"},
     Default = "Void",
     Callback = function(Value)
         setDesyncMode(Options.DesyncMethodDropdown.Value)
@@ -877,6 +876,13 @@ RunService.Heartbeat:Connect(function()
                         rootPart.Position.Z + math.random(-44444, 44444)
                     )
 
+                elseif desync.mode == "Standalone Void" then
+                    desync.teleportPosition = Vector3.new(
+                        rootPart.Position.X + math.random(-444444, 444444),
+                        rootPart.Position.Y + math.random(-444444, 444444),
+                        rootPart.Position.Z + math.random(-44444, 44444)
+                    )
+
                 elseif desync.mode == "Raining" then
                     desync.teleportPosition = Vector3.new(
                         rootPart.Position.X + math.random(-10, 10),
@@ -918,172 +924,6 @@ RunService.Heartbeat:Connect(function()
             end
         end
     end)
-end
-
-
-do
-    local standalone_setback = Instance.new("Part")
-    standalone_setback.Name = "Standalone Desync Setback"
-    standalone_setback.Parent = Workspace
-    standalone_setback.Size = Vector3.new(2, 2, 1)
-    standalone_setback.CanCollide = false
-    standalone_setback.Anchored = true
-    standalone_setback.Transparency = 1
-    standalone_setback.Massless = true
-
-    local standaloneDesync = {
-        enabled = false,
-        mode = "Void",
-        customOffset = Vector3.new(10, 10, 10),
-        busy = false,
-    }
-
-    local function resetStandaloneCamera()
-        if LocalPlayer.Character then
-            local humanoid = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                Camera.CameraSubject = humanoid
-            end
-        end
-    end
-
-    local function computeStandaloneTeleport(rootPart)
-        local pos = rootPart.Position
-        local mode = standaloneDesync.mode
-
-        if mode == "Destroy Cheaters" then
-            return Vector3.new(11223344556677889900, 1, 1)
-
-        elseif mode == "Underground" then
-            return pos - Vector3.new(0, 9, 0)
-
-        elseif mode == "UnderGroundV2" then
-            return pos - Vector3.new(0, 11, 0)
-
-        elseif mode == "Custom" then
-            return pos - standaloneDesync.customOffset
-
-        elseif mode == "Void Spam" then
-            if math.random(1, 2) == 1 then
-                return rootPart.CFrame.Position
-            else
-                return Vector3.new(
-                    math.random(10000, 50000),
-                    math.random(10000, 50000),
-                    math.random(10000, 50000)
-                )
-            end
-
-        elseif mode == "Raining" then
-            return Vector3.new(
-                pos.X + math.random(-10, 10),
-                pos.Y + math.random(2, 5),
-                pos.Z + math.random(-10, 10)
-            )
-
-        elseif mode == "Teleport Maze" then
-            return Vector3.new(
-                math.random(-100, 100),
-                math.random(5, 50),
-                math.random(-100, 100)
-            )
-
-        else -- default "Void"
-            return Vector3.new(
-                pos.X + math.random(-444444, 444444),
-                pos.Y + math.random(-444444, 444444),
-                pos.Z + math.random(-44444, 44444)
-            )
-        end
-    end
-
-    local function onStandaloneHeartbeat()
-        if not standaloneDesync.enabled or standaloneDesync.busy then return end
-
-        local char = LocalPlayer.Character
-        if not char then return end
-
-        local rootPart = char:FindFirstChild("HumanoidRootPart")
-        if not rootPart then return end
-
-        standaloneDesync.busy = true
-
-        local oldCFrame = rootPart.CFrame
-        local teleportPosition = computeStandaloneTeleport(rootPart)
-
-        if standaloneDesync.mode ~= "Rotation" then
-            rootPart.CFrame = CFrame.new(teleportPosition)
-            Camera.CameraSubject = standalone_setback
-
-            RunService.RenderStepped:Wait()
-
-            standalone_setback.CFrame = oldCFrame * CFrame.new(0, rootPart.Size.Y / 2 + 0.5, 0)
-            rootPart.CFrame = oldCFrame
-        end
-
-        standaloneDesync.busy = false
-    end
-
-    RunService.Heartbeat:Connect(onStandaloneHeartbeat)
-
-    local function setStandaloneEnabled(state)
-        standaloneDesync.enabled = state
-        if state then
-            Camera.CameraSubject = standalone_setback
-            Notify("Notification", "Standalone Desync: " .. standaloneDesync.mode, 2)
-        else
-            resetStandaloneCamera()
-            Notify("Notification", "Standalone Desync: Disabled", 2)
-        end
-    end
-
-    local StandaloneDesyncSection = CombatStandaloneDesync
-
-    StandaloneDesyncSection:AddToggle('StandaloneDesyncEnabled', {Text = "standalone desync",
-        Default = false,
-        Callback = function(Value)
-            setStandaloneEnabled(Value)
-        end}):AddKeyPicker('StandaloneDesyncKeybind', {Text = "standalone desync",
-        Default = 'None',
-        Callback = function(Value)
-            if not (Toggles.StandaloneDesyncEnabled and Toggles.StandaloneDesyncEnabled.Value) or UserInputService:GetFocusedTextBox() then return end
-            setStandaloneEnabled(not standaloneDesync.enabled)
-        end,
-        Mode = 'Toggle'})
-
-    StandaloneDesyncSection:AddDropdown('StandaloneDesyncMode', {Text = "Method",
-        Values = {"Void", "Destroy Cheaters", "Underground", "UnderGroundV2", "Custom", "Void Spam", "Raining", "Teleport Maze", "Rotation"},
-        Default = "Void",
-        Callback = function(Value)
-            standaloneDesync.mode = Value
-        end})
-
-    StandaloneDesyncSection:AddSlider('StandaloneCustomX', {Text = "Custom Offset X",
-        Min = -30,
-        Max = 30,
-        Default = 10,
-        Rounding = 1,
-        Callback = function(Value)
-            standaloneDesync.customOffset = Vector3.new(Value, standaloneDesync.customOffset.Y, standaloneDesync.customOffset.Z)
-        end})
-
-    StandaloneDesyncSection:AddSlider('StandaloneCustomY', {Text = "Custom Offset Y",
-        Min = -30,
-        Max = 30,
-        Default = 10,
-        Rounding = 1,
-        Callback = function(Value)
-            standaloneDesync.customOffset = Vector3.new(standaloneDesync.customOffset.X, Value, standaloneDesync.customOffset.Z)
-        end})
-
-    StandaloneDesyncSection:AddSlider('StandaloneCustomZ', {Text = "Custom Offset Z",
-        Min = -30,
-        Max = 30,
-        Default = 10,
-        Rounding = 1,
-        Callback = function(Value)
-            standaloneDesync.customOffset = Vector3.new(standaloneDesync.customOffset.X, standaloneDesync.customOffset.Y, Value)
-        end})
 end
 
 
