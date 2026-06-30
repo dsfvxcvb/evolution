@@ -2135,7 +2135,7 @@ CombatAutoKill:AddDropdown('AutoKillManualTargets', {
     end
 })
 
-CombatAutoKill:AddToggle('AutoKillKnifeExpander', {
+CombatAutoKill:AddToggle('KnifeHitboxToggle', {
     Text = "Knife Hitbox Expander",
     Default = false,
     Callback = function(Value)
@@ -2143,7 +2143,7 @@ CombatAutoKill:AddToggle('AutoKillKnifeExpander', {
     end
 })
 
-CombatAutoKill:AddSlider('AutoKillKnifeSize', {
+CombatAutoKill:AddSlider('KnifeHitboxSize', {
     Text = "Knife Hitbox Size",
     Min = 5,
     Max = 200,
@@ -2549,6 +2549,19 @@ do
             pcall(function() c:Disconnect() end)
         end
         AutoKill.StandConfig.KnockResetConnections = {}
+    end
+
+    -- Clean up old stand connections/cycles when the script is reloaded
+    local oldUnloadStand = Library.Unload
+    Library.Unload = function()
+        stopStand()
+        AutoKill.Enabled = false
+        AutoKill.Target = nil
+        AutoKill.KnifeAura = false
+        AutoKill.StopCycle()
+        if oldUnloadStand then
+            oldUnloadStand()
+        end
     end
 
     MiscUseStand:AddToggle('UseStandEnabled', {
