@@ -1082,19 +1082,19 @@ function AutoKill.GetAttachOffset()
     local posMode = AutoKill.AttachPosition
     if posMode == "Random" then
         local angle = math.random() * 2 * math.pi
-        local dist = 6 + math.random() * 4
-        local height = -2 + math.random() * 4
+        local dist = 4 + math.random() * 3
+        local height = -1.5 + math.random() * 3
         return CFrame.new(math.cos(angle) * dist, height, math.sin(angle) * dist), true
     elseif posMode == "Inside" then
         return CFrame.new(0, 0, 0), false
     elseif posMode == "Left" then
-        return CFrame.new(-6, 0, 0), true
+        return CFrame.new(-4, 0, 0), true
     elseif posMode == "Right" then
-        return CFrame.new(6, 0, 0), true
+        return CFrame.new(4, 0, 0), true
     elseif posMode == "Below" then
-        return CFrame.new(0, -9, 0), true
+        return CFrame.new(0, -6, 0), true
     else
-        return CFrame.new(0, 0, 6), true
+        return CFrame.new(0, 0, 4), true
     end
 end
 
@@ -1285,8 +1285,8 @@ function AutoKill.KnifeAttackStep(target)
         -- Spread multiple stands around the target when in surround formation
         if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
             local angle = AutoKill.StandConfig.FormationAngle
-            local dist = 9 + (math.sin(angle * 7) + 1) * 3 -- 9 to 15 based on stand
-            local yOff = math.sin(angle * 3) * 2
+            local dist = 5 + (math.sin(angle * 7) + 1) * 2 -- 5 to 9 based on stand
+            local yOff = math.sin(angle * 3) * 1.5
             offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
             lookAt = true
         end
@@ -2226,7 +2226,7 @@ do
             angle = angle + AutoKill.StandConfig.OrbitAngle
         end
         -- vary radius per stand so multiple accounts don't perfectly overlap
-        local dist = distance + math.sin(angle * 5) * 3
+        local dist = distance + math.sin(angle * 5) * 1.5
         return ownerRoot.CFrame * getCircleOffset(angle, dist)
     end
 
@@ -2514,18 +2514,18 @@ do
 
             local targetCFrame
             if AutoKill.StandConfig.KillAuraMode then
-                targetCFrame = getOwnerCircleCFrame(22)
+                targetCFrame = getOwnerCircleCFrame(14)
             elseif AutoKill.StandConfig.KnifeAuraMode then
-                targetCFrame = getOwnerCircleCFrame(20)
+                targetCFrame = getOwnerCircleCFrame(12)
             elseif AutoKill.StandConfig.FormationMode == "circle" then
                 if AutoKill.Enabled and AutoKill.Target then return end
-                targetCFrame = getOwnerCircleCFrame(16)
+                targetCFrame = getOwnerCircleCFrame(10)
             elseif AutoKill.StandConfig.FormationMode == "surround" then
                 if AutoKill.Enabled and AutoKill.Target then return end
-                targetCFrame = getOwnerCircleCFrame(18)
+                targetCFrame = getOwnerCircleCFrame(10)
             else -- follow
                 if AutoKill.Enabled and AutoKill.Target then return end
-                targetCFrame = ownerRoot.CFrame * CFrame.new(0, 0, 12)
+                targetCFrame = ownerRoot.CFrame * CFrame.new(0, 0, 8)
             end
 
             if targetCFrame then
