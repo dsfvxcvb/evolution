@@ -2500,6 +2500,26 @@ do
         end
     })
 
+    MiscUseStand:AddDropdown('UseStandWhitelist', {
+        Text = "Whitelist",
+        SpecialType = 'Player',
+        Multi = true,
+        AllowNull = true,
+        Callback = function(Value)
+            local list = {}
+            if type(Value) == "table" then
+                for name, active in pairs(Value) do
+                    if active then
+                        list[name:lower()] = true
+                    end
+                end
+            elseif Value and Value ~= "" then
+                list[tostring(Value):lower()] = true
+            end
+            AutoKill.StandConfig.Whitelist = list
+        end
+    })
+
     MiscUseStand:AddLabel('Commands:')
     MiscUseStand:AddLabel('.godmode - toggle anim godmode')
     MiscUseStand:AddLabel('.ak <user> - auto kill target')
