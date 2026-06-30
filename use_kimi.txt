@@ -1180,6 +1180,21 @@ function AutoKill.KillAuraStep()
     local targetName = target.DisplayName or target.Name
     AutoKill.UpdateUI("killing", targetName)
 
+    local status = AutoKill.GetTargetStatus(target)
+    if status == "dead" then
+        return
+    end
+
+    if status == "downed" then
+        if not AutoKill.GunMethod.StompRunning then
+            task.spawn(function()
+                AutoKill.AutoStomp(target)
+                AutoKill.UnhideCharacter()
+            end)
+        end
+        return
+    end
+
     if not AutoKill.FastEquipDoubleBarrel() then
         return
     end
@@ -1211,14 +1226,6 @@ function AutoKill.KillAuraStep()
         if tool then
             pcall(function() tool:Activate() end)
         end
-    end
-
-    local status = AutoKill.GetTargetStatus(target)
-    if status == "downed" then
-        task.spawn(function()
-            AutoKill.AutoStomp(target)
-            AutoKill.UnhideCharacter()
-        end)
     end
 end
 
@@ -1302,8 +1309,15 @@ function AutoKill.IsValidPlayer(player)
     return false
 end
 
+function AutoKill.IsWhitelisted(player)
+    if not player then return false end
+    local list = AutoKill.StandConfig and AutoKill.StandConfig.Whitelist
+    return list and list[player.Name:lower()] == true
+end
+
 function AutoKill.IsValidTarget(player)
     if not AutoKill.IsValidPlayer(player) then return false end
+    if AutoKill.IsWhitelisted(player) then return false end
     local char = player.Character
     if not char then return false end
     local root = char:FindFirstChild("HumanoidRootPart")
@@ -2101,6 +2115,7 @@ do
         OrbitAngle = 0,
         FormationAngle = 0,
         StandNames = {},
+        Whitelist = {},
     }
 
     -- Give each stand a stable angle so multiple stands spread out automatically
@@ -2342,6 +2357,26 @@ do
             if AutoKill.StandConfig.OwnerName ~= "" then
                 AutoKill.StandConfig.OwnerPlayer = findStandPlayer(AutoKill.StandConfig.OwnerName)
             end
+        elseif cmd == ".whitelist" then
+            local list = AutoKill.StandConfig.Whitelist
+            for i = 2, #args do
+                for name in args[i]:gmatch("([^,]+)") do
+                    name = name:match("^%s*(.-)%s*$")
+                    if name ~= "" then
+                        list[name:lower()] = true
+                    end
+                end
+            end
+        elseif cmd == ".unwhitelist" then
+            local list = AutoKill.StandConfig.Whitelist
+            for i = 2, #args do
+                for name in args[i]:gmatch("([^,]+)") do
+                    name = name:match("^%s*(.-)%s*$")
+                    if name ~= "" then
+                        list[name:lower()] = nil
+                    end
+                end
+            end
         elseif cmd == ".stop" then
             AutoKill.Enabled = false
             AutoKill.Target = nil
@@ -2473,7 +2508,9 @@ do
     MiscUseStand:AddLabel('.knifeaura - circle owner & stab near')
     MiscUseStand:AddLabel('.killaura - circle owner & DB closest')
     MiscUseStand:AddLabel('.orbit - spin around owner')
-    MiscUseStand:AddLabel('.stands name1,name2 - whitelist')
+    MiscUseStand:AddLabel('.stands name1,name2 - stand list')
+    MiscUseStand:AddLabel('.whitelist name1,name2 - never target')
+    MiscUseStand:AddLabel('.unwhitelist name1,name2')
     MiscUseStand:AddLabel('.vanish - hide on void platform')
     MiscUseStand:AddLabel('.unvanish - leave void platform')
     MiscUseStand:AddLabel('.bring <user> - bring player to owner')
