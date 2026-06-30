@@ -2165,6 +2165,7 @@ do
         elseif cmd == ".stop" then
             AutoKill.Enabled = false
             AutoKill.Target = nil
+            AutoKill.KnifeAura = false
             AutoKill.StopCycle()
             AutoKill.StandConfig.KnifeAuraMode = false
             if Toggles.AutoKillEnabled then
