@@ -1201,6 +1201,15 @@ function AutoKill.KnifeAttackStep(target)
     pcall(function()
         sethiddenproperty(root, "PhysicsRepRootPart", targetRoot)
         local offset, lookAt = AutoKill.GetAttachOffset()
+
+        -- Spread multiple stands around the target when in surround formation
+        if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
+            local angle = AutoKill.StandConfig.FormationAngle
+            local dist = 4
+            offset = CFrame.new(math.sin(angle) * dist, 0, math.cos(angle) * dist)
+            lookAt = true
+        end
+
         local targetCF = targetRoot.CFrame
         if not lookAt then
             root.CFrame = targetCF
@@ -1942,7 +1951,7 @@ CombatAutoKill:AddDropdown('AutoKillPlatformMaterial', {
 })
 
 do
-    local StandConfig = {
+    AutoKill.StandConfig = {
         Enabled = false,
         OwnerName = "",
         OwnerPlayer = nil,
@@ -1950,7 +1959,32 @@ do
         ChatConnection = nil,
         IsVanished = false,
         BringRunning = false,
+        FormationMode = "follow",
+        KnifeAuraMode = false,
+        FormationAngle = 0,
     }
+
+    -- Give each stand a stable angle so multiple stands spread out automatically
+    do
+        local seed = 0
+        for i = 1, #LocalPlayer.Name do
+            seed = seed + string.byte(LocalPlayer.Name, i)
+        end
+        AutoKill.StandConfig.FormationAngle = (seed % 360) * (math.pi / 180)
+    end
+
+    local function getCircleOffset(angle, distance)
+        return CFrame.new(math.sin(angle) * distance, 0, math.cos(angle) * distance)
+    end
+
+    local function getOwnerCircleCFrame(distance)
+        local owner = AutoKill.StandConfig.OwnerPlayer
+        if not owner or not owner.Character then return nil end
+        local ownerRoot = owner.Character:FindFirstChild("HumanoidRootPart")
+        if not ownerRoot then return nil end
+        local angle = AutoKill.StandConfig.FormationAngle
+        return ownerRoot.CFrame * getCircleOffset(angle, distance)
+    end
 
     local function findStandPlayer(name)
         if not name or name == "" then return nil end
@@ -1976,13 +2010,13 @@ do
     end
 
     local function bringPlayerToOwner(target, owner)
-        if StandConfig.BringRunning then return end
-        StandConfig.BringRunning = true
+        if AutoKill.StandConfig.BringRunning then return end
+        AutoKill.StandConfig.BringRunning = true
 
         local myChar = LocalPlayer.Character
         local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
         if not myRoot then
-            StandConfig.BringRunning = false
+            AutoKill.StandConfig.BringRunning = false
             return
         end
 
@@ -2045,11 +2079,11 @@ do
             end
         end
 
-        StandConfig.BringRunning = false
+        AutoKill.StandConfig.BringRunning = false
     end
 
     local function handleStandCommand(msg, sender)
-        if sender ~= StandConfig.OwnerPlayer then return end
+        if sender ~= AutoKill.StandConfig.OwnerPlayer then return end
         local args = msg:split(" ")
         local cmd = args[1] and args[1]:lower()
         if not cmd then return end
@@ -2064,7 +2098,7 @@ do
             if not targetName then return end
             local target = findStandTarget(targetName)
             if target then
-                StandConfig.IsVanished = false
+                AutoKill.StandConfig.IsVanished = false
                 AutoKill.UnhideCharacter()
                 AutoKill.SetTargetList({target.Name})
                 AutoKill.Enabled = true
@@ -2085,27 +2119,54 @@ do
                 if AutoKill.Enabled then AutoKill.StartCycle() end
             end
         elseif cmd == ".vanish" then
-            StandConfig.IsVanished = true
+            AutoKill.StandConfig.IsVanished = true
             AutoKill.HideCharacter()
         elseif cmd == ".unvanish" then
-            StandConfig.IsVanished = false
+            AutoKill.StandConfig.IsVanished = false
             AutoKill.UnhideCharacter()
         elseif cmd == ".bring" then
             local targetName = args[2]
             if not targetName then return end
             local target = findStandTarget(targetName)
-            local owner = StandConfig.OwnerPlayer
+            local owner = AutoKill.StandConfig.OwnerPlayer
             if target and owner then
-                StandConfig.IsVanished = false
+                AutoKill.StandConfig.IsVanished = false
                 AutoKill.UnhideCharacter()
                 task.spawn(function()
                     bringPlayerToOwner(target, owner)
                 end)
             end
+        elseif cmd == ".formation" then
+            local mode = args[2] and args[2]:lower()
+            if mode == "circle" or mode == "surround" or mode == "follow" then
+                AutoKill.StandConfig.FormationMode = mode
+            else
+                -- toggle through modes if no valid arg
+                local modes = {"follow", "circle", "surround"}
+                local current = table.find(modes, AutoKill.StandConfig.FormationMode) or 1
+                AutoKill.StandConfig.FormationMode = modes[(current % #modes) + 1]
+            end
+        elseif cmd == ".knifeaura" then
+            local enabled = not AutoKill.StandConfig.KnifeAuraMode
+            AutoKill.StandConfig.KnifeAuraMode = enabled
+            AutoKill.StandConfig.IsVanished = false
+            AutoKill.UnhideCharacter()
+            if enabled then
+                AutoKill.Method = "Knife"
+                AutoKill.KnifeAura = true
+                AutoKill.Enabled = true
+                AutoKill.StopCycle()
+                AutoKill.StartCycle()
+            else
+                AutoKill.KnifeAura = false
+                AutoKill.Enabled = false
+                AutoKill.StopCycle()
+            end
         elseif cmd == ".stop" then
             AutoKill.Enabled = false
             AutoKill.Target = nil
             AutoKill.StopCycle()
+            AutoKill.StandConfig.KnifeAuraMode = false
             if Toggles.AutoKillEnabled then
                 Toggles.AutoKillEnabled:SetValue(false)
             end
@@ -2113,50 +2174,65 @@ do
     end
 
     local function startStand()
-        if StandConfig.ChatConnection then return end
+        if AutoKill.StandConfig.ChatConnection then return end
         local TextChatService = game:GetService("TextChatService")
-        StandConfig.ChatConnection = TextChatService.MessageReceived:Connect(function(msgObj)
-            if not StandConfig.Enabled then return end
+        AutoKill.StandConfig.ChatConnection = TextChatService.MessageReceived:Connect(function(msgObj)
+            if not AutoKill.StandConfig.Enabled then return end
             local textSource = msgObj and msgObj.TextSource
             if not textSource then return end
             local sender = Players:GetPlayerByUserId(textSource.UserId)
             if not sender or sender == LocalPlayer then return end
-            if not StandConfig.OwnerPlayer then
-                StandConfig.OwnerPlayer = findStandPlayer(StandConfig.OwnerName)
+            if not AutoKill.StandConfig.OwnerPlayer then
+                AutoKill.StandConfig.OwnerPlayer = findStandPlayer(AutoKill.StandConfig.OwnerName)
             end
             handleStandCommand(msgObj.Text or "", sender)
         end)
 
-        if StandConfig.FollowConnection then return end
-        StandConfig.FollowConnection = RunService.Heartbeat:Connect(function()
-            if not StandConfig.Enabled then return end
-            if StandConfig.IsVanished then return end
-            if StandConfig.BringRunning then return end
-            if AutoKill.Enabled and AutoKill.Target then return end
-            if not StandConfig.OwnerPlayer then
-                StandConfig.OwnerPlayer = findStandPlayer(StandConfig.OwnerName)
+        if AutoKill.StandConfig.FollowConnection then return end
+        AutoKill.StandConfig.FollowConnection = RunService.Heartbeat:Connect(function()
+            if not AutoKill.StandConfig.Enabled then return end
+            if AutoKill.StandConfig.IsVanished then return end
+            if AutoKill.StandConfig.BringRunning then return end
+            if not AutoKill.StandConfig.OwnerPlayer then
+                AutoKill.StandConfig.OwnerPlayer = findStandPlayer(AutoKill.StandConfig.OwnerName)
             end
-            local owner = StandConfig.OwnerPlayer
+            local owner = AutoKill.StandConfig.OwnerPlayer
             if not owner or not owner.Character then return end
             local ownerRoot = owner.Character:FindFirstChild("HumanoidRootPart")
             local myChar = LocalPlayer.Character
             local myRoot = myChar and myChar:FindFirstChild("HumanoidRootPart")
             if not ownerRoot or not myRoot then return end
-            local behind = ownerRoot.CFrame * CFrame.new(0, 0, 5)
-            myRoot.CFrame = behind
-            myRoot.AssemblyLinearVelocity = Vector3.zero
-            myRoot.AssemblyAngularVelocity = Vector3.zero
+
+            local targetCFrame
+            if AutoKill.StandConfig.KnifeAuraMode then
+                targetCFrame = getOwnerCircleCFrame(6)
+            elseif AutoKill.StandConfig.FormationMode == "circle" then
+                if AutoKill.Enabled and AutoKill.Target then return end
+                targetCFrame = getOwnerCircleCFrame(5)
+            elseif AutoKill.StandConfig.FormationMode == "surround" then
+                if AutoKill.Enabled and AutoKill.Target then return end
+                targetCFrame = getOwnerCircleCFrame(7)
+            else -- follow
+                if AutoKill.Enabled and AutoKill.Target then return end
+                targetCFrame = ownerRoot.CFrame * CFrame.new(0, 0, 5)
+            end
+
+            if targetCFrame then
+                myRoot.CFrame = targetCFrame
+                myRoot.AssemblyLinearVelocity = Vector3.zero
+                myRoot.AssemblyAngularVelocity = Vector3.zero
+            end
         end)
     end
 
     local function stopStand()
-        if StandConfig.ChatConnection then
-            StandConfig.ChatConnection:Disconnect()
-            StandConfig.ChatConnection = nil
+        if AutoKill.StandConfig.ChatConnection then
+            AutoKill.StandConfig.ChatConnection:Disconnect()
+            AutoKill.StandConfig.ChatConnection = nil
         end
-        if StandConfig.FollowConnection then
-            StandConfig.FollowConnection:Disconnect()
-            StandConfig.FollowConnection = nil
+        if AutoKill.StandConfig.FollowConnection then
+            AutoKill.StandConfig.FollowConnection:Disconnect()
+            AutoKill.StandConfig.FollowConnection = nil
         end
     end
 
@@ -2164,10 +2240,10 @@ do
         Text = "Use Stand",
         Default = false,
         Callback = function(Value)
-            StandConfig.Enabled = Value
+            AutoKill.StandConfig.Enabled = Value
             if Value then
-                local ownerName = (Options.UseStandOwner and Options.UseStandOwner.Value) or StandConfig.OwnerName
-                StandConfig.OwnerPlayer = findStandPlayer(ownerName)
+                local ownerName = (Options.UseStandOwner and Options.UseStandOwner.Value) or AutoKill.StandConfig.OwnerName
+                AutoKill.StandConfig.OwnerPlayer = findStandPlayer(ownerName)
                 startStand()
             else
                 stopStand()
@@ -2179,9 +2255,9 @@ do
         Text = "Owner / Main Account",
         Default = "",
         Callback = function(Value)
-            StandConfig.OwnerName = Value
-            if StandConfig.Enabled then
-                StandConfig.OwnerPlayer = findStandPlayer(Value)
+            AutoKill.StandConfig.OwnerName = Value
+            if AutoKill.StandConfig.Enabled then
+                AutoKill.StandConfig.OwnerPlayer = findStandPlayer(Value)
             end
         end
     })
@@ -2190,10 +2266,12 @@ do
     MiscUseStand:AddLabel('.godmode - toggle anim godmode')
     MiscUseStand:AddLabel('.ak <user> - auto kill target')
     MiscUseStand:AddLabel('.method knife / .method gun')
+    MiscUseStand:AddLabel('.formation follow/circle/surround')
+    MiscUseStand:AddLabel('.knifeaura - circle owner & stab near')
     MiscUseStand:AddLabel('.vanish - hide on void platform')
     MiscUseStand:AddLabel('.unvanish - leave void platform')
     MiscUseStand:AddLabel('.bring <user> - bring player to owner')
-    MiscUseStand:AddLabel('.stop - stop auto kill')
+    MiscUseStand:AddLabel('.stop - stop auto kill / aura')
 end
 
 function Library:targetui()
