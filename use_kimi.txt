@@ -1352,7 +1352,8 @@ function AutoKill.GetTargetRealRoot(target)
         return best
     end
 
-    return root
+    -- No usable real position found; don't fall back to the spoofed void root.
+    return nil
 end
 
 -- Connection bypass helpers (WorldStepMax fast-flag desync)
@@ -1425,18 +1426,13 @@ function AutoKill.ConnectionStep(target)
 
     pcall(function()
         -- The target's real position is either their root (not desynced) or the
-        -- anchored "Desync Setback" part their anti-aim leaves behind. Move our
-        -- character to that real position instead of following the spoofed void
-        -- root, which is what was killing us when they moved.
+        -- anchored "Desync Setback" part their anti-aim leaves behind.
         local realPos = targetReal.Position
-        if (realPos - targetRoot.Position).Magnitude > 10000 then
-            AutoKill.LastRealPositions = AutoKill.LastRealPositions or {}
-            local last = AutoKill.LastRealPositions[target]
-            if last and (last - realPos).Magnitude > 500 then
-                realPos = last
-            end
-            AutoKill.LastRealPositions[target] = realPos
-        end
+
+        -- Safety: never teleport into the void. If the resolved position is
+        -- outside the map or suddenly very far from us, bail out this frame.
+        if math.abs(realPos.Y) > 5000 or realPos.Magnitude > 50000 then return end
+        if (realPos - root.Position).Magnitude > 2000 then return end
 
         -- Keep our physics rep on our own root. Mapping it to the target's far
         -- spoofed root is what teleports us into the void on our screen/server.
