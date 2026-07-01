@@ -1306,6 +1306,33 @@ function AutoKill.KnifeAttackStep(target)
     AutoKill.TryStab()
 end
 
+function AutoKill.GetTargetRealRoot(target)
+    local targetChar = target and target.Character
+    if not targetChar then return nil end
+    local special = targetChar:FindFirstChild("SpecialParts")
+    if special then
+        local hrp = special:FindFirstChild("HumanoidRootPart")
+        if hrp then return hrp end
+    end
+    local root = targetChar:FindFirstChild("HumanoidRootPart")
+    if root then
+        local rootPos = root.Position
+        local best = nil
+        local bestDist = math.huge
+        for _, p in ipairs(workspace:GetChildren()) do
+            if p.Name == "Desync Setback" and p:IsA("BasePart") then
+                local dist = (p.Position - rootPos).Magnitude
+                if dist < bestDist and dist < 100 then
+                    best = p
+                    bestDist = dist
+                end
+            end
+        end
+        if best then return best end
+    end
+    return root
+end
+
 function AutoKill.ConnectionStep(target)
     if AutoKill.KnifeAura then
         AutoKill.KnifeAuraStep()
@@ -1320,7 +1347,7 @@ function AutoKill.ConnectionStep(target)
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     local targetChar = target.Character
-    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+    local targetRoot = AutoKill.GetTargetRealRoot(target)
     if not targetRoot then return end
 
     AutoKill.OwnPart(root)
