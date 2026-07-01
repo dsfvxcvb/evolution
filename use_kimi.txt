@@ -1306,6 +1306,81 @@ function AutoKill.KnifeAttackStep(target)
     AutoKill.TryStab()
 end
 
+function AutoKill.ConnectionStep(target)
+    if AutoKill.KnifeAura then
+        AutoKill.KnifeAuraStep()
+        return
+    end
+
+    if not target or not target.Character then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    AutoKill.UnhideCharacter()
+    AutoKill.RemoveVoidPlatform()
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local targetChar = target.Character
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+
+    AutoKill.OwnPart(root)
+    AutoKill.OwnPart(targetRoot)
+
+    local knifeTool = char:FindFirstChild("[Knife]")
+    if not knifeTool then
+        AutoKill.TryEquipKnife()
+        knifeTool = char:FindFirstChild("[Knife]")
+    end
+
+    if knifeTool then
+        local scriptObj = knifeTool:FindFirstChild("Script")
+        if scriptObj then
+            local can1 = scriptObj:FindFirstChild("CanHitPlayer")
+            local can2 = scriptObj:FindFirstChild("CanHitPlayer2")
+            if can1 then pcall(function() can1.Value = targetChar end) end
+            if can2 then pcall(function() can2.Value = targetChar end) end
+        end
+        local handle = knifeTool:FindFirstChild("Handle")
+        local hitbox = handle and handle:FindFirstChild("HITBOX_PART")
+        if hitbox then
+            pcall(function()
+                if AutoKill.KnifeExpander.Enabled then
+                    local sz = math.max(AutoKill.KnifeExpander.Size, 1)
+                    hitbox.Size = Vector3.new(sz, sz, sz)
+                end
+                hitbox.Transparency = 1
+                hitbox.CanCollide = false
+                hitbox.Massless = true
+            end)
+        end
+    end
+
+    pcall(function()
+        sethiddenproperty(root, "PhysicsRepRootPart", nil)
+        local offset, lookAt = AutoKill.GetAttachOffset()
+
+        if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
+            local angle = AutoKill.StandConfig.FormationAngle
+            local dist = 5 + (math.sin(angle * 7) + 1) * 2
+            local yOff = math.sin(angle * 3) * 1.5
+            offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
+            lookAt = true
+        end
+
+        local targetCF = targetRoot.CFrame
+        if not lookAt then
+            root.CFrame = targetCF
+        else
+            local attachCF = targetCF * offset
+            root.CFrame = CFrame.lookAt(attachCF.Position, targetCF.Position)
+        end
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end)
+
+    AutoKill.TryStab()
+end
+
 function AutoKill.IsValidPlayer(player)
     if not player or player == LocalPlayer then return false end
     for _, p in ipairs(Players:GetPlayers()) do
@@ -2003,6 +2078,9 @@ function AutoKill.StartCombatCycle()
                     else
                         RunService.Heartbeat:Wait()
                     end
+                elseif AutoKill.Method == "Connection" then
+                    AutoKill.ConnectionStep(target)
+                    RunService.Heartbeat:Wait()
                 else
                     AutoKill.KnifeAttackStep(target)
                     RunService.Heartbeat:Wait()
@@ -2034,6 +2112,13 @@ function AutoKill.StopCycle()
     AutoKill.StopAutoStomp()
     AutoKill.UnhideCharacter()
     AutoKill.RemoveVoidPlatform()
+    pcall(function()
+        local char = LocalPlayer.Character
+        local root = char and char:FindFirstChild("HumanoidRootPart")
+        if root then
+            sethiddenproperty(root, "PhysicsRepRootPart", root)
+        end
+    end)
     if getgenv().ForceHit then
         getgenv().ForceHit.Enabled = AutoKill.ForceHitWasEnabled or false
         if AutoKill.ForceHitOriginal then
@@ -2081,7 +2166,7 @@ CombatAutoKill:AddToggle('AutoKillEnabled', {
 
 CombatAutoKill:AddDropdown('AutoKillMethod', {
     Text = "Method",
-    Values = {"Knife", "Gun"},
+    Values = {"Knife", "Gun", "Connection"},
     Default = "Knife",
     Callback = function(Value)
         AutoKill.Method = Value
