@@ -981,6 +981,7 @@ local AutoKill = {
     UI = nil,
     ForceHitWasEnabled = false,
     ForceHitOriginal = nil,
+    ConnectionDesync = false,
 }
 
 function AutoKill.CreateUI()
@@ -1315,22 +1316,60 @@ function AutoKill.GetTargetRealRoot(target)
         if hrp then return hrp end
     end
     local root = targetChar:FindFirstChild("HumanoidRootPart")
-    if root then
-        local rootPos = root.Position
-        local best = nil
-        local bestDist = math.huge
-        for _, p in ipairs(workspace:GetChildren()) do
-            if p.Name == "Desync Setback" and p:IsA("BasePart") then
-                local dist = (p.Position - rootPos).Magnitude
-                if dist < bestDist and dist < 100 then
+    if not root then return nil end
+
+    -- If the target is not desynced, their root is the real position.
+    local rootPos = root.Position
+    if math.abs(rootPos.Y) < 5000 and rootPos.Magnitude < 50000 then
+        AutoKill.LastRealPositions = AutoKill.LastRealPositions or {}
+        AutoKill.LastRealPositions[target] = rootPos
+        return root
+    end
+
+    -- The target is desynced (root is in the void). Hood Customs anti-aim
+    -- scripts leave an anchored "Desync Setback" part at the real position.
+    -- Find the one closest to the target's last known real position.
+    local last = AutoKill.LastRealPositions and AutoKill.LastRealPositions[target]
+    local best = nil
+    local bestScore = math.huge
+    for _, p in ipairs(workspace:GetChildren()) do
+        if p.Name == "Desync Setback" and p:IsA("BasePart") then
+            local pos = p.Position
+            -- Only consider parts inside the normal map bounds.
+            if math.abs(pos.Y) < 5000 and pos.Magnitude < 50000 then
+                local score = (last and (pos - last).Magnitude) or 0
+                if score < bestScore then
                     best = p
-                    bestDist = dist
+                    bestScore = score
                 end
             end
         end
-        if best then return best end
     end
+
+    if best then
+        AutoKill.LastRealPositions = AutoKill.LastRealPositions or {}
+        AutoKill.LastRealPositions[target] = best.Position
+        return best
+    end
+
     return root
+end
+
+-- Connection bypass helpers (WorldStepMax fast-flag desync)
+function AutoKill.EnableConnectionDesync()
+    if AutoKill.ConnectionDesync then return end
+    AutoKill.ConnectionDesync = true
+    pcall(function()
+        setfflag("WorldStepMax", "-99999999999999")
+    end)
+end
+
+function AutoKill.DisableConnectionDesync()
+    if not AutoKill.ConnectionDesync then return end
+    AutoKill.ConnectionDesync = false
+    pcall(function()
+        setfflag("WorldStepMax", "-1")
+    end)
 end
 
 function AutoKill.ConnectionStep(target)
@@ -1347,8 +1386,10 @@ function AutoKill.ConnectionStep(target)
     local root = char:FindFirstChild("HumanoidRootPart")
     if not root then return end
     local targetChar = target.Character
-    local targetRoot = AutoKill.GetTargetRealRoot(target)
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
     if not targetRoot then return end
+    local targetReal = AutoKill.GetTargetRealRoot(target)
+    if not targetReal then return end
 
     AutoKill.OwnPart(root)
     AutoKill.OwnPart(targetRoot)
@@ -1383,9 +1424,12 @@ function AutoKill.ConnectionStep(target)
     end
 
     pcall(function()
-        sethiddenproperty(root, "PhysicsRepRootPart", nil)
-        local offset, lookAt = AutoKill.GetAttachOffset()
+        -- Map our physics rep to the target's actual HumanoidRootPart. This is
+        -- what lets the server treat us as being at the target's position even
+        -- when they have anti-connection desync active.
+        sethiddenproperty(root, "PhysicsRepRootPart", targetRoot)
 
+        local offset, lookAt = AutoKill.GetAttachOffset()
         if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
             local angle = AutoKill.StandConfig.FormationAngle
             local dist = 5 + (math.sin(angle * 7) + 1) * 2
@@ -1394,12 +1438,15 @@ function AutoKill.ConnectionStep(target)
             lookAt = true
         end
 
-        local targetCF = targetRoot.CFrame
+        -- Use the target's real (non-desynced) position for our local character
+        -- so we don't get thrown into the void when they move.
+        local realPos = targetReal.Position
+        local realCF = CFrame.new(realPos) * CFrame.Angles(0, math.atan2(targetRoot.CFrame.LookVector.X, targetRoot.CFrame.LookVector.Z), 0)
         if not lookAt then
-            root.CFrame = targetCF
+            root.CFrame = realCF
         else
-            local attachCF = targetCF * offset
-            root.CFrame = CFrame.lookAt(attachCF.Position, targetCF.Position)
+            local attachCF = realCF * offset
+            root.CFrame = CFrame.lookAt(attachCF.Position, realPos)
         end
         root.AssemblyLinearVelocity = Vector3.zero
         root.AssemblyAngularVelocity = Vector3.zero
@@ -2139,6 +2186,7 @@ function AutoKill.StopCycle()
     AutoKill.StopAutoStomp()
     AutoKill.UnhideCharacter()
     AutoKill.RemoveVoidPlatform()
+    AutoKill.DisableConnectionDesync()
     pcall(function()
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
