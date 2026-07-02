@@ -3293,15 +3293,18 @@ function Library:targetui_modern()
     end
     Content.Parent = main
 
-    -- === Glow: procedurally generated from concentric rounded frames ===
-    -- The old 9-slice image was painted with a square corner falloff, so it
-    -- could never match the rounded panel. Real UICorner arcs always match.
+    -- === Glow: concentric rounded frames, transparency solved so the
+    -- combined (fully-stacked) result matches the original image's look ===
 
     local glowColor = getgenv().TargetUIColor or Color3.fromRGB(27, 206, 203)
-    local glowLayers = 10
+    local glowLayers = 8
     local glowMaxInset = 22
-    local glowInnerTransparency = 0.55
-    local glowOuterTransparency = 0.97
+
+    -- This matches the original 9-slice image's ImageTransparency (0.85).
+    -- Because all layers overlap near the panel edge, each layer must be much
+    -- more transparent so the stack compounds back to this target value.
+    local targetCombinedTransparency = 0.85
+    local perLayerTransparency = targetCombinedTransparency ^ (1 / glowLayers)
 
     local GlowHolder = Instance.new("Frame")
     GlowHolder.Name = "GlowHolder"
@@ -3314,14 +3317,11 @@ function Library:targetui_modern()
     for i = 1, glowLayers do
         local t = i / glowLayers
         local inset = glowMaxInset * t
-        local eased = t * t
-        local transparency = glowInnerTransparency
-            + (glowOuterTransparency - glowInnerTransparency) * eased
 
         local layer = Instance.new("Frame")
         layer.Name = "GlowLayer" .. i
         layer.BackgroundColor3 = glowColor
-        layer.BackgroundTransparency = transparency
+        layer.BackgroundTransparency = perLayerTransparency
         layer.BorderSizePixel = 0
         layer.Position = UDim2.new(0, -inset, 0, -inset)
         layer.Size = UDim2.new(1, inset * 2, 1, inset * 2)
