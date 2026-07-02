@@ -3239,7 +3239,6 @@ function Library:targetui_old()
 end
 
 function Library:targetui_modern()
-    -- Build the exact same layout as the old style, then round the corners.
     local IndicatorUI = Library:targetui_old()
     if not IndicatorUI then return nil end
 
@@ -3249,10 +3248,41 @@ function Library:targetui_modern()
     local oldGlow = main:FindFirstChildOfClass("ImageLabel")
     if oldGlow then oldGlow:Destroy() end
 
-    -- The 9-slice glow image has square corners. To make it follow the rounded
-    -- frame, put it inside a rounded Frame with ClipsDescendants so the image is
-    -- cropped along the curve.
+    local mainRadius = 12
+
+    -- Round the main panel itself.
+    local mainCorner = main:FindFirstChildOfClass("UICorner")
+    if not mainCorner then
+        mainCorner = Instance.new("UICorner")
+        mainCorner.Parent = main
+    end
+    mainCorner.CornerRadius = UDim.new(0, mainRadius)
+
+    -- Move all existing content into a clipping wrapper so nothing square can
+    -- poke out past the rounded silhouette. The glow is added afterwards as an
+    -- unclipped sibling, so it can still spread past the panel edge.
+    local Content = Instance.new("Frame")
+    Content.Name = "Content"
+    Content.BackgroundTransparency = 1
+    Content.Size = UDim2.new(1, 0, 1, 0)
+    Content.Position = UDim2.new(0, 0, 0, 0)
+    Content.ClipsDescendants = true
+    Content.ZIndex = main.ZIndex
+
+    local contentCorner = Instance.new("UICorner")
+    contentCorner.CornerRadius = UDim.new(0, mainRadius)
+    contentCorner.Parent = Content
+
+    for _, child in ipairs(main:GetChildren()) do
+        if child ~= mainCorner and not child:IsA("UICorner") then
+            child.Parent = Content
+        end
+    end
+    Content.Parent = main
+
+    -- === Glow: sibling of Content, NOT clipped by it ===
     local glowInset = 20
+    local glowRadius = mainRadius + glowInset
 
     local GlowHolder = Instance.new("Frame")
     GlowHolder.Name = "GlowHolder"
@@ -3264,7 +3294,7 @@ function Library:targetui_modern()
     GlowHolder.Parent = main
 
     local holderCorner = Instance.new("UICorner")
-    holderCorner.CornerRadius = UDim.new(0, 12 + glowInset)
+    holderCorner.CornerRadius = UDim.new(0, glowRadius)
     holderCorner.Parent = GlowHolder
 
     local Glow = Instance.new("ImageLabel")
@@ -3281,6 +3311,7 @@ function Library:targetui_modern()
     Glow.Parent = GlowHolder
 
     Library._targetUIGlow = Glow
+    -- === end glow ===
 
     local function round(frame, radius)
         if not frame or not frame:IsA("GuiObject") then return end
@@ -3294,7 +3325,7 @@ function Library:targetui_modern()
 
     local function roundDescendants(obj, depth)
         for _, child in ipairs(obj:GetChildren()) do
-            if child:IsA("Frame") and child ~= GlowHolder then
+            if child:IsA("Frame") then
                 -- Leave the thin top accent bar and bar fills sharp.
                 local name = child.Name
                 if name ~= "bar" and name ~= "healthbarvalue" and name ~= "armorbarvalue" then
@@ -3309,19 +3340,7 @@ function Library:targetui_modern()
         end
     end
 
-    -- Round the main panel first and force it to clip to its rounded silhouette.
-    round(main, 12)
-    main.ClipsDescendants = true
-
-    -- Read the radius that was actually applied so the glow holder can stay concentric.
-    local mainCorner = main:FindFirstChildOfClass("UICorner")
-    local mainRadius = mainCorner and mainCorner.CornerRadius.Offset or 12
-    if holderCorner then
-        holderCorner.CornerRadius = UDim.new(0, mainRadius + glowInset)
-    end
-
-    roundDescendants(main, 1)
-
+    roundDescendants(Content, 1)
     return IndicatorUI
 end
 
