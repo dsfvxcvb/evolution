@@ -3293,22 +3293,18 @@ function Library:targetui_modern()
     end
     Content.Parent = main
 
-    -- === Glow: sibling of Content, NOT clipped by it ===
+    -- === Glow: sibling of Content, unclipped so its natural soft corner bulb shows fully ===
     local glowInset = 20
-    local glowRadius = mainRadius + glowInset
 
     local GlowHolder = Instance.new("Frame")
     GlowHolder.Name = "GlowHolder"
     GlowHolder.BackgroundTransparency = 1
-    GlowHolder.ClipsDescendants = true
+    -- No ClipsDescendants/UICorner here — the 9-slice glow image's own falloff
+    -- provides the softness, and clipping was cutting the corner bulb off.
     GlowHolder.Position = UDim2.new(0, -glowInset, 0, -glowInset)
     GlowHolder.Size = UDim2.new(1, glowInset * 2, 1, glowInset * 2)
     GlowHolder.ZIndex = main.ZIndex - 1
     GlowHolder.Parent = main
-
-    local holderCorner = Instance.new("UICorner")
-    holderCorner.CornerRadius = UDim.new(0, glowRadius)
-    holderCorner.Parent = GlowHolder
 
     local Glow = Instance.new("ImageLabel")
     Glow.Name = "Glow"
