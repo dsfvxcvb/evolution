@@ -49,10 +49,10 @@ local CombatTargetAim = Tabs.Combat:AddLeftGroupbox('Target Aim')
 local CombatFOV = Tabs.Combat:AddLeftGroupbox('FOV Circle')
 local CombatTargetIndicators = Tabs.Combat:AddLeftGroupbox('Target Indicators')
 local CombatAutoKill = Tabs.Combat:AddRightGroupbox('Auto Kill')
+local CombatKnifeHitbox = Tabs.Combat:AddRightGroupbox('Knife Hitbox Expander')
 local CombatAntiAim = Tabs.Combat:AddRightGroupbox('Anti-Aim')
 local CombatStrafe = Tabs.Combat:AddRightGroupbox('Target Strafe')
 local CombatHitsound = Tabs.Combat:AddRightGroupbox('Hitsounds')
-local CombatKnifeHitbox = Tabs.Combat:AddRightGroupbox('Knife Hitbox')
 
 local VisualsESP = Tabs.Visuals:AddLeftGroupbox('ESP')
 local VisualsTracers = Tabs.Visuals:AddLeftGroupbox('Visualize Bullets')
@@ -962,8 +962,9 @@ local AutoKill = {
         Enabled = true,
         Size = 20,
         Fill = true,
+        FillTransparency = 0.5,
         Outline = true,
-        Transparency = 0.5,
+        OutlineTransparency = 0.5,
         Color = Color3.fromRGB(255, 0, 0),
     },
     KnifeAura = false,
@@ -1532,7 +1533,7 @@ RunService.Heartbeat:Connect(function()
             hitbox.Color = AutoKill.KnifeExpander.Color
 
             if AutoKill.KnifeExpander.Fill then
-                hitbox.Transparency = math.clamp(AutoKill.KnifeExpander.Transparency, 0, 1)
+                hitbox.Transparency = math.clamp(AutoKill.KnifeExpander.FillTransparency, 0, 1)
                 hitbox.Material = Enum.Material.Neon
             else
                 hitbox.Transparency = 1
@@ -1554,7 +1555,7 @@ RunService.Heartbeat:Connect(function()
                 outline.Parent = hitbox
             end
             outline.Color3 = AutoKill.KnifeExpander.Color
-            outline.Transparency = 1 - math.clamp(AutoKill.KnifeExpander.Transparency, 0, 1)
+            outline.Transparency = 1 - math.clamp(AutoKill.KnifeExpander.OutlineTransparency, 0, 1)
             outline.Visible = true
         elseif outline then
             outline.Visible = false
@@ -2196,14 +2197,25 @@ CombatKnifeHitbox:AddSlider('KnifeHitboxSize', {
     end
 })
 
-CombatKnifeHitbox:AddSlider('KnifeHitboxTransparency', {
-    Text = "Transparency",
+CombatKnifeHitbox:AddSlider('KnifeHitboxFillTransparency', {
+    Text = "Fill Transparency",
     Min = 0,
     Max = 1,
     Default = 0.5,
     Rounding = 2,
     Callback = function(Value)
-        AutoKill.KnifeExpander.Transparency = Value
+        AutoKill.KnifeExpander.FillTransparency = Value
+    end
+})
+
+CombatKnifeHitbox:AddSlider('KnifeHitboxOutlineTransparency', {
+    Text = "Outline Transparency",
+    Min = 0,
+    Max = 1,
+    Default = 0.5,
+    Rounding = 2,
+    Callback = function(Value)
+        AutoKill.KnifeExpander.OutlineTransparency = Value
     end
 })
 
