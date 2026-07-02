@@ -3239,238 +3239,40 @@ function Library:targetui_old()
 end
 
 function Library:targetui_modern()
-    if Library._targetUIInstance then
-        Library._targetUIInstance:Destroy()
-        Library._targetUIInstance = nil
+    -- Build the exact same layout as the old style, then round the corners.
+    local IndicatorUI = Library:targetui_old()
+    if not IndicatorUI then return nil end
+
+    local main = IndicatorUI:FindFirstChildOfClass("Frame")
+    if not main then return IndicatorUI end
+
+    local function round(frame, radius)
+        if not frame or not frame:IsA("GuiObject") then return end
+        if frame:FindFirstChildOfClass("UICorner") then return end
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, radius)
+        corner.Parent = frame
     end
 
-    local IndicatorUI = Instance.new("ScreenGui")
-    IndicatorUI.Name = "NebulaIndicator"
-    IndicatorUI.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-    IndicatorUI.Parent = gethui() or CoreGui
-    IndicatorUI.Enabled = false
-
-    Library._targetUIInstance = IndicatorUI
-
-    local MainFrame = Instance.new("Frame")
-    MainFrame.AnchorPoint = Vector2.new(0.5, 0)
-    MainFrame.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    MainFrame.BorderSizePixel = 0
-    MainFrame.Position = UDim2.new(0.5, 0, 1, -250)
-    MainFrame.Size = UDim2.new(0, 320, 0, 145)
-    MainFrame.Parent = IndicatorUI
-    MainFrame.Active = true
-    MainFrame.Draggable = true
-
-    local MainCorner = Instance.new("UICorner")
-    MainCorner.CornerRadius = UDim.new(0, 10)
-    MainCorner.Parent = MainFrame
-
-    local Stroke = Instance.new("UIStroke")
-    Stroke.Color = getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
-    Stroke.Thickness = 1.5
-    Stroke.Parent = MainFrame
-    Library._targetUIOuterBorder = Stroke
-
-    local Glow = Instance.new("ImageLabel")
-    Glow.BackgroundTransparency = 1
-    Glow.Image = "http://www.roblox.com/asset/?id=18245826428"
-    Glow.ScaleType = Enum.ScaleType.Slice
-    Glow.SliceCenter = Rect.new(Vector2.new(21, 21), Vector2.new(79, 79))
-    Glow.ImageColor3 = getgenv().TargetUIGlowColor or Color3.fromRGB(27, 206, 203)
-    Glow.ImageTransparency = 0.75
-    Glow.Position = UDim2.new(0, -18, 0, -18)
-    Glow.Size = UDim2.new(1, 36, 1, 36)
-    Glow.ZIndex = MainFrame.ZIndex - 1
-    Glow.Parent = MainFrame
-    Library._targetUIGlow = Glow
-
-    local Header = Instance.new("TextLabel")
-    Header.Text = "Info"
-    Header.Font = Enum.Font.GothamBold
-    Header.TextSize = 14
-    Header.TextColor3 = Color3.fromRGB(200, 200, 200)
-    Header.BackgroundTransparency = 1
-    Header.Size = UDim2.new(1, -16, 0, 20)
-    Header.Position = UDim2.new(0, 8, 0, 6)
-    Header.TextXAlignment = Enum.TextXAlignment.Left
-    Header.Parent = MainFrame
-
-    local Content = Instance.new("Frame")
-    Content.BackgroundColor3 = Color3.fromRGB(22, 22, 22)
-    Content.BorderSizePixel = 0
-    Content.Position = UDim2.new(0, 8, 0, 30)
-    Content.Size = UDim2.new(1, -16, 1, -40)
-    Content.Parent = MainFrame
-
-    local ContentCorner = Instance.new("UICorner")
-    ContentCorner.CornerRadius = UDim.new(0, 8)
-    ContentCorner.Parent = Content
-
-    local Avatar = Instance.new("ImageLabel")
-    Avatar.Name = "Avatar"
-    Avatar.BackgroundTransparency = 1
-    Avatar.Size = UDim2.new(0, 62, 0, 62)
-    Avatar.Position = UDim2.new(0, 8, 0, 8)
-    Avatar.Image = "rbxthumb://type=AvatarHeadShot&id=1&w=420&h=420"
-    Avatar.Parent = Content
-
-    local AvatarCorner = Instance.new("UICorner")
-    AvatarCorner.CornerRadius = UDim.new(1, 0)
-    AvatarCorner.Parent = Avatar
-
-    local InfoFrame = Instance.new("Frame")
-    InfoFrame.BackgroundTransparency = 1
-    InfoFrame.Position = UDim2.new(0, 78, 0, 8)
-    InfoFrame.Size = UDim2.new(1, -86, 0, 62)
-    InfoFrame.Parent = Content
-
-    local NameLabel = Instance.new("TextLabel")
-    NameLabel.Name = "Name"
-    NameLabel.Text = "Player (@username)"
-    NameLabel.Font = Enum.Font.Gotham
-    NameLabel.TextSize = 13
-    NameLabel.TextColor3 = Color3.fromRGB(230, 230, 230)
-    NameLabel.BackgroundTransparency = 1
-    NameLabel.Size = UDim2.new(1, 0, 0, 18)
-    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    NameLabel.Parent = InfoFrame
-
-    local DistanceLabel = Instance.new("TextLabel")
-    DistanceLabel.Name = "Distance"
-    DistanceLabel.Text = "0 studs"
-    DistanceLabel.Font = Enum.Font.Gotham
-    DistanceLabel.TextSize = 12
-    DistanceLabel.TextColor3 = Color3.fromRGB(160, 160, 160)
-    DistanceLabel.BackgroundTransparency = 1
-    DistanceLabel.Position = UDim2.new(0, 0, 0, 18)
-    DistanceLabel.Size = UDim2.new(1, 0, 0, 16)
-    DistanceLabel.TextXAlignment = Enum.TextXAlignment.Left
-    DistanceLabel.Parent = InfoFrame
-
-    local BarsFrame = Instance.new("Frame")
-    BarsFrame.BackgroundTransparency = 1
-    BarsFrame.Position = UDim2.new(0, 8, 0, 78)
-    BarsFrame.Size = UDim2.new(1, -16, 0, 42)
-    BarsFrame.Parent = Content
-
-    local function createBar(name, color, yPos)
-        local bg = Instance.new("Frame")
-        bg.Name = name .. "Bg"
-        bg.BackgroundColor3 = Color3.fromRGB(40, 40, 40)
-        bg.BorderSizePixel = 0
-        bg.Position = UDim2.new(0, 0, 0, yPos)
-        bg.Size = UDim2.new(1, 0, 0, 16)
-        bg.Parent = BarsFrame
-
-        local bgCorner = Instance.new("UICorner")
-        bgCorner.CornerRadius = UDim.new(0, 4)
-        bgCorner.Parent = bg
-
-        local fill = Instance.new("Frame")
-        fill.Name = name .. "Fill"
-        fill.BackgroundColor3 = color
-        fill.BorderSizePixel = 0
-        fill.Size = UDim2.new(1, 0, 1, 0)
-        fill.Parent = bg
-
-        local fillCorner = Instance.new("UICorner")
-        fillCorner.CornerRadius = UDim.new(0, 4)
-        fillCorner.Parent = fill
-
-        local text = Instance.new("TextLabel")
-        text.Name = name .. "Text"
-        text.Text = "0/0"
-        text.Font = Enum.Font.Gotham
-        text.TextSize = 11
-        text.TextColor3 = Color3.fromRGB(255, 255, 255)
-        text.BackgroundTransparency = 1
-        text.Size = UDim2.new(1, 0, 1, 0)
-        text.Parent = bg
-
-        return fill, text
-    end
-
-    local ArmorFill, ArmorText = createBar("Armor", Color3.fromRGB(180, 180, 180), 0)
-    local HealthFill, HealthText = createBar("Health", Color3.fromRGB(45, 195, 45), 22)
-
-    local targetPlayer = nil
-    local lastTarget = nil
-
-    local function getTargetAmmo(character)
-        if not character then return 0, 0 end
-        local tool = character:FindFirstChildOfClass("Tool")
-        if not tool then return 0, 0 end
-        local script = tool:FindFirstChild("Script")
-        if not script then return 0, 0 end
-        local ammo = script:FindFirstChild("Ammo")
-        local maxAmmo = script:FindFirstChild("MaxAmmo")
-        if ammo and maxAmmo and ammo:IsA("IntValue") and maxAmmo:IsA("IntValue") then
-            return ammo.Value, maxAmmo.Value
-        end
-        return 0, 0
-    end
-
-    local connection
-    connection = RunService.RenderStepped:Connect(function()
-        if not IndicatorUI or not IndicatorUI.Parent then
-            if connection then connection:Disconnect() end
-            return
-        end
-
-        if Targeting.LockedOn and Targeting.Target then
-            targetPlayer = Targeting.Target
-        elseif AutoKill.Enabled and AutoKill.Target then
-            targetPlayer = AutoKill.Target
-        else
-            if IndicatorUI.Enabled then
-                IndicatorUI.Enabled = false
-            end
-            return
-        end
-
-        if targetPlayer and targetPlayer.Character then
-            IndicatorUI.Enabled = true
-
-            local humanoid = targetPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if humanoid then
-                local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
-                HealthFill.Size = UDim2.new(healthPercent, 0, 1, 0)
-                HealthText.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
-            end
-
-            if targetPlayer ~= lastTarget then
-                Avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. targetPlayer.UserId .. "&w=420&h=420"
-                NameLabel.Text = targetPlayer.DisplayName .. " (@" .. targetPlayer.Name .. ")"
-                lastTarget = targetPlayer
-            end
-
-            local lpChar = LocalPlayer.Character
-            local targetHrp = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
-            if lpChar and lpChar:FindFirstChild("HumanoidRootPart") and targetHrp then
-                local dist = (lpChar.HumanoidRootPart.Position - targetHrp.Position).Magnitude
-                DistanceLabel.Text = math.floor(dist) .. " studs"
+    local function roundDescendants(obj, depth)
+        for _, child in ipairs(obj:GetChildren()) do
+            if child:IsA("Frame") then
+                -- Leave the thin top accent bar and bar fills sharp.
+                local name = child.Name
+                if name ~= "bar" and name ~= "healthbarvalue" and name ~= "armorbarvalue" then
+                    round(child, math.max(2, 10 - depth))
+                end
+                roundDescendants(child, depth + 1)
+            elseif child:IsA("ImageLabel") and child.Parent and child.Parent.Name == "icon" then
+                round(child, 32)
             else
-                DistanceLabel.Text = "N/A studs"
+                roundDescendants(child, depth)
             end
-
-            local ammoCurrent, ammoMax = getTargetAmmo(targetPlayer.Character)
-            local ammoPercent = (ammoMax > 0) and math.clamp(ammoCurrent / ammoMax, 0, 1) or 0
-            ArmorFill.Size = UDim2.new(ammoPercent, 0, 1, 0)
-            ArmorText.Text = math.floor(ammoCurrent) .. "/" .. math.floor(ammoMax)
-        else
-            IndicatorUI.Enabled = false
         end
-    end)
+    end
 
-    IndicatorUI.Destroying:Connect(function()
-        if connection then connection:Disconnect() end
-        Library._targetUIInstance = nil
-        Library._targetUIOuterBorder = nil
-        Library._targetUITopBar = nil
-        Library._targetUIGlow = nil
-        lastTarget = nil
-    end)
+    round(main, 12)
+    roundDescendants(main, 1)
 
     return IndicatorUI
 end
