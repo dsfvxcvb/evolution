@@ -1005,6 +1005,12 @@ local ProtectPlayer = {
     LastHealth = nil,
     BulletConnection = nil,
     LoopConnection = nil,
+    BulletHistory = {},
+    LastGlobalShooter = nil,
+    LastGlobalShotTime = 0,
+    RayThreshold = 10,
+    BulletWindow = 1.5,
+    GlobalShotWindow = 0.6,
 }
 
 local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent")
@@ -1078,6 +1084,58 @@ function ProtectPlayer.GetNearestEnemyAround(pos, ignorePlayer)
         end
     end
     return closestGun or closestAny
+end
+
+function ProtectPlayer.IsAimingAt(enemy, selected, maxAngle)
+    local eChar = enemy.Character
+    local sChar = selected.Character
+    if not eChar or not sChar then return false end
+    local eRoot = eChar:FindFirstChild("HumanoidRootPart")
+    local sRoot = sChar:FindFirstChild("HumanoidRootPart")
+    if not eRoot or not sRoot then return false end
+    local dir = (sRoot.Position - eRoot.Position).Unit
+    local look = eRoot.CFrame.LookVector
+    local dot = dir:Dot(look)
+    local angle = math.deg(math.acos(math.clamp(dot, -1, 1)))
+    return angle <= maxAngle
+end
+
+function ProtectPlayer.GetLikelyShooter(selected, pos)
+    local now = tick()
+
+    -- 1) A bullet ray recently passed close to the protected player.
+    for i = #ProtectPlayer.BulletHistory, 1, -1 do
+        local entry = ProtectPlayer.BulletHistory[i]
+        if now - entry.Time > ProtectPlayer.BulletWindow then
+            table.remove(ProtectPlayer.BulletHistory, i)
+        elseif entry.Shooter ~= selected and ProtectPlayer.IsValidTarget(entry.Shooter) then
+            return entry.Shooter
+        end
+    end
+
+    -- 2) The most recent player to fire any bullet (only trust briefly).
+    if now - ProtectPlayer.LastGlobalShotTime <= ProtectPlayer.GlobalShotWindow
+        and ProtectPlayer.IsValidTarget(ProtectPlayer.LastGlobalShooter)
+        and ProtectPlayer.HasGunEquipped(ProtectPlayer.LastGlobalShooter) then
+        return ProtectPlayer.LastGlobalShooter
+    end
+
+    -- 3) Someone with a gun out who is currently facing the protected player.
+    local aimed = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p ~= selected and ProtectPlayer.IsValidTarget(p)
+            and ProtectPlayer.HasGunEquipped(p) and ProtectPlayer.IsAimingAt(p, selected, 35) then
+            local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                table.insert(aimed, {Player = p, Dist = (root.Position - pos).Magnitude})
+            end
+        end
+    end
+    table.sort(aimed, function(a, b) return a.Dist < b.Dist end)
+    if aimed[1] then return aimed[1].Player end
+
+    -- 4) Last resort: closest enemy with a gun, then closest enemy.
+    return ProtectPlayer.GetNearestEnemyAround(pos, selected)
 end
 
 function ProtectPlayer.TryEquip(toolName)
@@ -1239,7 +1297,7 @@ function ProtectPlayer.Start()
                 if root and hum then
                     local health = hum.Health
                     if ProtectPlayer.LastHealth and health < ProtectPlayer.LastHealth then
-                        ProtectPlayer.Shooter = ProtectPlayer.GetNearestEnemyAround(root.Position, selected)
+                        ProtectPlayer.Shooter = ProtectPlayer.GetLikelyShooter(selected, root.Position)
                     end
                     ProtectPlayer.LastHealth = health
                 end
@@ -1280,20 +1338,38 @@ function ProtectPlayer.Start()
             return (startPos + segment * t - point).Magnitude
         end
 
+        local function ResolveShooter(arg)
+            if typeof(arg) == "Instance" and arg:IsA("Player") then
+                return arg
+            elseif typeof(arg) == "string" then
+                return Players:FindFirstChild(arg)
+            elseif typeof(arg) == "table" then
+                for _, v in pairs(arg) do
+                    local p = ResolveShooter(v)
+                    if p then return p end
+                end
+            end
+            return nil
+        end
+
         ProtectPlayer.BulletConnection = UnreliableMainEvent.OnClientEvent:Connect(function(...)
             if not ProtectPlayer.Enabled then return end
             local args = {...}
             if args[1] ~= "ReplicateBulletRay" then return end
 
-            -- Actual payload: {"ReplicateBulletRay", {startPos, endPos}, shooterPlayer, gunName, bool}
+            -- Payload order: {"ReplicateBulletRay", {startPos, endPos}, shooter, gunName, bool}
             local positions = args[2]
-            local shooter = args[3]
-            if typeof(positions) ~= "table" or typeof(shooter) ~= "Instance" or not shooter:IsA("Player") then return end
+            local shooter = ResolveShooter(args[3])
+            if typeof(positions) ~= "table" or not shooter then return end
             if shooter == LocalPlayer then return end
 
             local startPos = positions[1]
             local endPos = positions[2]
             if typeof(startPos) ~= "Vector3" or typeof(endPos) ~= "Vector3" then return end
+
+            -- Always remember the last player to fire a bullet (for fallback).
+            ProtectPlayer.LastGlobalShooter = shooter
+            ProtectPlayer.LastGlobalShotTime = tick()
 
             local selected = ProtectPlayer.GetSelectedPlayer()
             if not selected or not selected.Character then return end
@@ -1309,8 +1385,12 @@ function ProtectPlayer.Start()
                     end
                 end
             end
-            if closestDist < 6 then
+            if closestDist < ProtectPlayer.RayThreshold then
                 ProtectPlayer.Shooter = shooter
+                table.insert(ProtectPlayer.BulletHistory, {Shooter = shooter, Time = tick()})
+                if #ProtectPlayer.BulletHistory > 20 then
+                    table.remove(ProtectPlayer.BulletHistory, 1)
+                end
             end
         end)
     end
@@ -1328,6 +1408,9 @@ function ProtectPlayer.Stop()
     ProtectPlayer.Shooter = nil
     ProtectPlayer.Active = false
     ProtectPlayer.LastHealth = nil
+    ProtectPlayer.BulletHistory = {}
+    ProtectPlayer.LastGlobalShooter = nil
+    ProtectPlayer.LastGlobalShotTime = 0
     ProtectPlayer.SetSpectate(nil)
 end
 
