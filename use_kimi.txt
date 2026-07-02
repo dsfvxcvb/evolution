@@ -3246,16 +3246,34 @@ function Library:targetui_modern()
     local main = IndicatorUI:FindFirstChildOfClass("Frame")
     if not main then return IndicatorUI end
 
-    -- Use a UIStroke for the glow so it cleanly follows the rounded corners.
+    -- Put a larger rounded frame behind the UI with a soft stroke so the glow
+    -- wraps around the rounded corners instead of clipping.
     local oldGlow = main:FindFirstChildOfClass("ImageLabel")
     if oldGlow then oldGlow:Destroy() end
 
+    local glowFrame = Instance.new("Frame")
+    glowFrame.Name = "RoundedGlow"
+    glowFrame.AnchorPoint = main.AnchorPoint
+    glowFrame.Position = main.Position
+    glowFrame.Size = UDim2.new(
+        main.Size.Width.Scale,
+        main.Size.Width.Offset + 24,
+        main.Size.Height.Scale,
+        main.Size.Height.Offset + 24
+    )
+    glowFrame.BackgroundTransparency = 1
+    glowFrame.BorderSizePixel = 0
+    glowFrame.ZIndex = main.ZIndex - 1
+    glowFrame.Parent = IndicatorUI
+
+    Instance.new("UICorner", glowFrame).CornerRadius = UDim.new(0, 14)
+
     local glowStroke = Instance.new("UIStroke")
     glowStroke.Color = getgenv().TargetUIGlowColor or Color3.fromRGB(27, 206, 203)
-    glowStroke.Thickness = 4
-    glowStroke.Transparency = 0.75
+    glowStroke.Thickness = 8
+    glowStroke.Transparency = 0.85
     glowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    glowStroke.Parent = main
+    glowStroke.Parent = glowFrame
     Library._targetUIGlow = glowStroke
 
     local function round(frame, radius)
