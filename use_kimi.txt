@@ -1151,13 +1151,15 @@ function ProtectPlayer.GunAttack(target)
     end
     ProtectPlayer.TeleportTo(target, CFrame.new(0, 0, 2))
     if getgenv().FH_Fire then
+        local useForcehit = GetFlag("UseForcehit")
         local wasEnabled = getgenv().ForceHit and getgenv().ForceHit.Enabled
         if getgenv().ForceHit then
             getgenv().ForceHit.Enabled = true
         end
         pcall(function() getgenv().FH_Fire(target) end)
         if getgenv().ForceHit and wasEnabled ~= nil then
-            getgenv().ForceHit.Enabled = wasEnabled
+            -- If the user wants ForceHit on, don't let this temporary override turn it back off.
+            getgenv().ForceHit.Enabled = useForcehit or wasEnabled
         end
     else
         local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("[DoubleBarrel]")
@@ -1272,30 +1274,42 @@ function ProtectPlayer.Start()
     end)
 
     if UnreliableMainEvent and not ProtectPlayer.BulletConnection then
+        local function PointSegmentDist(point, startPos, endPos)
+            local segment = endPos - startPos
+            local t = math.clamp((point - startPos):Dot(segment) / math.max(segment:Dot(segment), 1e-6), 0, 1)
+            return (startPos + segment * t - point).Magnitude
+        end
+
         ProtectPlayer.BulletConnection = UnreliableMainEvent.OnClientEvent:Connect(function(...)
             if not ProtectPlayer.Enabled then return end
             local args = {...}
             if args[1] ~= "ReplicateBulletRay" then return end
-            local endPos = args[3]
-            local shooterTbl = args[4]
-            local shooter = shooterTbl and shooterTbl[1]
-            if not endPos or not shooter or typeof(shooter) ~= "Instance" or not shooter:IsA("Player") then return end
+
+            -- Actual payload: {"ReplicateBulletRay", {startPos, endPos}, shooterPlayer, gunName, bool}
+            local positions = args[2]
+            local shooter = args[3]
+            if typeof(positions) ~= "table" or typeof(shooter) ~= "Instance" or not shooter:IsA("Player") then return end
             if shooter == LocalPlayer then return end
+
+            local startPos = positions[1]
+            local endPos = positions[2]
+            if typeof(startPos) ~= "Vector3" or typeof(endPos) ~= "Vector3" then return end
 
             local selected = ProtectPlayer.GetSelectedPlayer()
             if not selected or not selected.Character then return end
 
-            -- Check if the bullet landed close to any part of the selected player.
+            -- Check if the bullet ray passed close to any part of the selected player.
             local closestDist = math.huge
             for _, part in ipairs(selected.Character:GetDescendants()) do
                 if part:IsA("BasePart") then
-                    local d = (part.Position - endPos).Magnitude
-                    if d < closestDist then
-                        closestDist = d
+                    local d = PointSegmentDist(part.Position, startPos, endPos)
+                    local radius = math.max(part.Size.X, part.Size.Y, part.Size.Z) / 2
+                    if d - radius < closestDist then
+                        closestDist = d - radius
                     end
                 end
             end
-            if closestDist < 8 then
+            if closestDist < 6 then
                 ProtectPlayer.Shooter = shooter
             end
         end)
@@ -2392,7 +2406,9 @@ function AutoKill.StopCycle()
         end
     end)
     if getgenv().ForceHit then
-        getgenv().ForceHit.Enabled = AutoKill.ForceHitWasEnabled or false
+        -- Respect the user's ForceHit toggle instead of blindly restoring a stale value.
+        local desired = (Toggles.UseForcehit and Toggles.UseForcehit.Value) or AutoKill.ForceHitWasEnabled or false
+        getgenv().ForceHit.Enabled = desired
         if AutoKill.ForceHitOriginal then
             local orig = AutoKill.ForceHitOriginal
             getgenv().ForceHit.MaxDistance = orig.MaxDistance
@@ -4674,7 +4690,7 @@ Mt.__index = function(Self, Index)
     if not checkcaller() and Self == Mouse and Index == "Hit" then
         local Target = Targeting.Target
 
-        if getgenv().ForceHit and getgenv().ForceHit.Enabled then
+        if getgenv().ForceHit and GetFlag("UseForcehit") then
             if Target and Target.Character and IsValidTarget(Target) then
                 local Part = Target.Character:FindFirstChild(Targeting.TargetAimbotPart)
                 if Part then
@@ -4682,6 +4698,9 @@ Mt.__index = function(Self, Index)
                     if Targeting.PredictionEnabled and GetFlag("PredictionToggle") then
                         local predictionValue = GetFlag("PredictionValue") or Targeting.Prediction
                         Position = Position + (Part.Velocity * predictionValue)
+                    end
+                    if not getgenv().ForceHit.Enabled then
+                        getgenv().ForceHit.Enabled = true
                     end
                     task.spawn(function()
                         getgenv().FH_Fire(Target)
@@ -4832,6 +4851,20 @@ TargetAimSection:AddToggle('UseForcehit',{Text = "Use Forcehit",
             getgenv().ForceHit.Enabled = Value
         end
     end})
+
+-- Keep ForceHit.Enabled in sync with the UI toggle so it doesn't silently desync
+-- (some features temporarily disable it; this reapplies the user's intent).
+task.spawn(function()
+    while true do
+        if getgenv().ForceHit and Toggles.UseForcehit and not getgenv().ForceHit._InternalOverride then
+            local desired = Toggles.UseForcehit.Value
+            if getgenv().ForceHit.Enabled ~= desired then
+                getgenv().ForceHit.Enabled = desired
+            end
+        end
+        task.wait(0.2)
+    end
+end)
 
 TargetAimSection:AddToggle('AutoStompEnabled',{Text = "Auto Stomp",
     Default = false,
