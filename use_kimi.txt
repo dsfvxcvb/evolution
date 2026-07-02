@@ -3229,6 +3229,10 @@ function Library:targetui_old()
             ArmorText.Text = math.floor(ammoCurrent) .. "/" .. math.floor(ammoMax)
 
             -- Position handling: Free (draggable) or Follow Target.
+            -- Re-assert fixed size every frame so nothing else can drift it.
+            MainFrame.Size = UDim2.new(0, 322, 0, 147)
+            MainUIScale.Scale = 1
+
             local positionMode = (Options.TargetUIPosition and Options.TargetUIPosition.Value) or getgenv().TargetUIPosition or "Free"
             if positionMode == "Follow Target" then
                 local head = targetPlayer.Character:FindFirstChild("Head")
@@ -3249,13 +3253,11 @@ function Library:targetui_old()
                         posX = math.clamp(posX, absSize.X * 0.5, math.max(absSize.X * 0.5, viewportSize.X - absSize.X * 0.5))
                         posY = math.clamp(posY, 0, math.max(0, viewportSize.Y - absSize.Y))
 
-                        MainUIScale.Scale = 1
                         MainFrame.Draggable = false
                         MainFrame.Position = UDim2.new(0, posX, 0, posY)
                     end
                 end
             else
-                MainUIScale.Scale = 1
                 if not MainFrame.Draggable then
                     MainFrame.Draggable = true
                 end
