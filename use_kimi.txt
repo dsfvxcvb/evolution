@@ -47,7 +47,7 @@ local Tabs = {
 
 local CombatTargetAim = Tabs.Combat:AddLeftGroupbox('Target Aim')
 local CombatFOV = Tabs.Combat:AddLeftGroupbox('FOV Circle')
-local CombatTargetIndicators = Tabs.Combat:AddLeftGroupbox('Target Indicators')
+local CombatTargetIndicators = Tabs.Combat:AddLeftTabbox('Target Indicators')
 local CombatAutoKill = Tabs.Combat:AddRightGroupbox('Auto Kill')
 local CombatKnifeHitbox = Tabs.Combat:AddRightGroupbox('Knife Hitbox Expander')
 local CombatAntiAim = Tabs.Combat:AddRightGroupbox('Anti-Aim')
@@ -4527,9 +4527,11 @@ TargetAimSection:AddToggle('LookAtTarget',{Text = "Look At Target",
 
 
 
-local TargetVizSection = CombatTargetIndicators
+local CombatTracerTab = CombatTargetIndicators:AddTab('Tracer')
+local CombatTargetUITab = CombatTargetIndicators:AddTab('Target UI')
+local CombatHighlightTab = CombatTargetIndicators:AddTab('Highlight')
 
-CombatTargetIndicators:AddToggle('TargetUI', {
+CombatTargetUITab:AddToggle('TargetUI', {
     Text = "Target UI",
     Default = false,
     Callback = function(Value)
@@ -4591,7 +4593,7 @@ CombatTargetIndicators:AddToggle('TargetUI', {
     end
 })
 
-CombatTargetIndicators:AddDropdown('TargetUIStyle', {
+CombatTargetUITab:AddDropdown('TargetUIStyle', {
     Text = "Style",
     Values = {"Old", "Modern"},
     Default = "Old",
@@ -4603,7 +4605,18 @@ CombatTargetIndicators:AddDropdown('TargetUIStyle', {
     end
 })
 
-TargetVizSection:AddToggle('HighlightToggle',{Text = "Highlight",
+CombatTargetUITab:AddToggle('DotToggle',{Text = "Dot",
+    Default = true,
+    Callback = function(Value)
+        Targeting.DotEnabled = (Toggles.DotToggle and Toggles.DotToggle.Value)
+        if not Targeting.DotEnabled then
+            dot.Visible = false
+        end
+    end}):AddColorPicker('DotColor',{Title = "Dot Color",
+    Default = Color3.fromRGB(27, 206, 203),
+    Callback = function(Value) end})
+
+CombatHighlightTab:AddToggle('HighlightToggle',{Text = "Highlight",
     Default = true,
     Callback = function(Value)
         Targeting.HighlightEnabled = (Toggles.HighlightToggle and Toggles.HighlightToggle.Value)
@@ -4620,18 +4633,7 @@ TargetVizSection:AddToggle('HighlightToggle',{Text = "Highlight",
         end
     end})
 
-TargetVizSection:AddToggle('DotToggle',{Text = "Dot",
-    Default = true,
-    Callback = function(Value)
-        Targeting.DotEnabled = (Toggles.DotToggle and Toggles.DotToggle.Value)
-        if not Targeting.DotEnabled then
-            dot.Visible = false
-        end
-    end}):AddColorPicker('DotColor',{Title = "Dot Color",
-    Default = Color3.fromRGB(27, 206, 203),
-    Callback = function(Value) end})
-
-TargetVizSection:AddToggle('TracerToggle',{Text = "Tracer",
+CombatTracerTab:AddToggle('TracerToggle',{Text = "Tracer",
     Default = true,
     Callback = function(Value)
         Targeting.TracerEnabled = (Toggles.TracerToggle and Toggles.TracerToggle.Value)
@@ -4645,7 +4647,7 @@ TargetVizSection:AddToggle('TracerToggle',{Text = "Tracer",
         tracer.Color = Value and Value or Targeting.TracerColor
     end})
 
-TargetVizSection:AddSlider('TracerThickness',{Text = "Tracer Thickness",
+CombatTracerTab:AddSlider('TracerThickness',{Text = "Tracer Thickness",
     Min = 1,
     Max = 10,
     Default = 2,
@@ -4654,7 +4656,7 @@ TargetVizSection:AddSlider('TracerThickness',{Text = "Tracer Thickness",
         tracer.Thickness = (Options.TracerThickness and Options.TracerThickness.Value) or Targeting.TracerThickness
     end})
 
-TargetVizSection:AddSlider('TracerOutlineThickness',{Text = "Outline Thickness",
+CombatTracerTab:AddSlider('TracerOutlineThickness',{Text = "Outline Thickness",
     Min = 1,
     Max = 15,
     Default = 4,
