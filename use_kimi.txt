@@ -3246,16 +3246,17 @@ function Library:targetui_modern()
     local main = IndicatorUI:FindFirstChildOfClass("Frame")
     if not main then return IndicatorUI end
 
-    -- Round the existing glow image so it follows the rounded main frame.
+    -- Use a UIStroke for the glow so it cleanly follows the rounded corners.
     local oldGlow = main:FindFirstChildOfClass("ImageLabel")
-    if oldGlow then
-        local glowCorner = oldGlow:FindFirstChildOfClass("UICorner")
-        if not glowCorner then
-            glowCorner = Instance.new("UICorner")
-            glowCorner.Parent = oldGlow
-        end
-        glowCorner.CornerRadius = UDim.new(0, 32)
-    end
+    if oldGlow then oldGlow:Destroy() end
+
+    local glowStroke = Instance.new("UIStroke")
+    glowStroke.Color = getgenv().TargetUIGlowColor or Color3.fromRGB(27, 206, 203)
+    glowStroke.Thickness = 4
+    glowStroke.Transparency = 0.75
+    glowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    glowStroke.Parent = main
+    Library._targetUIGlow = glowStroke
 
     local function round(frame, radius)
         if not frame or not frame:IsA("GuiObject") then return end
@@ -4503,6 +4504,8 @@ CombatTargetIndicators:AddToggle('TargetUI', {
         if Library._targetUIGlow then
             if Library._targetUIGlow:IsA("ImageLabel") then
                 Library._targetUIGlow.ImageColor3 = Value
+            elseif Library._targetUIGlow:IsA("UIStroke") then
+                Library._targetUIGlow.Color = Value
             else
                 Library._targetUIGlow.BackgroundColor3 = Value
             end
