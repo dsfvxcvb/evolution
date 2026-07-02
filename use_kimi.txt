@@ -46,9 +46,9 @@ local Tabs = {
 }
 
 local CombatTargetAim = Tabs.Combat:AddLeftGroupbox('Target Aim')
+local CombatProtectPlayer = Tabs.Combat:AddLeftGroupbox('Protect Player')
 local CombatFOV = Tabs.Combat:AddLeftGroupbox('FOV Circle')
 local CombatTargetIndicators = Tabs.Combat:AddLeftTabbox('Target Indicators')
-local CombatProtectPlayer = Tabs.Combat:AddLeftGroupbox('Protect Player')
 local CombatAutoKill = Tabs.Combat:AddRightGroupbox('Auto Kill')
 local CombatKnifeHitbox = Tabs.Combat:AddRightGroupbox('Knife Hitbox Expander')
 local CombatAntiAim = Tabs.Combat:AddRightGroupbox('Anti-Aim')
@@ -4893,7 +4893,7 @@ CombatProtectPlayer:AddDropdown('ProtectPlayerMethod', {Text = "Mode",
 
 CombatProtectPlayer:AddDropdown('ProtectPlayerPlayers', {Text = "Players",
     Values = {},
-    Default = nil,
+    AllowNull = true,
     Callback = function(Value)
         ProtectPlayer.SelectedName = Value
         ProtectPlayer.LastHealth = nil
