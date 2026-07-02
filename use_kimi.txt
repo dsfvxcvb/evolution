@@ -3246,18 +3246,43 @@ function Library:targetui_modern()
     local main = IndicatorUI:FindFirstChildOfClass("Frame")
     if not main then return IndicatorUI end
 
-    -- The glow image can't be cleanly rounded, so use a UIStroke glow that
-    -- follows the rounded main frame instead.
     local oldGlow = main:FindFirstChildOfClass("ImageLabel")
     if oldGlow then oldGlow:Destroy() end
 
-    local glowStroke = Instance.new("UIStroke")
-    glowStroke.Color = getgenv().TargetUIGlowColor or getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
-    glowStroke.Thickness = 12
-    glowStroke.Transparency = 0.7
-    glowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    glowStroke.Parent = main
-    Library._targetUIGlow = glowStroke
+    -- The 9-slice glow image has square corners. To make it follow the rounded
+    -- frame, put it inside a rounded Frame with ClipsDescendants so the image is
+    -- cropped along the curve.
+    local mainRadius = 12
+    local glowInset = 20
+    local glowRadius = mainRadius + glowInset
+
+    local GlowHolder = Instance.new("Frame")
+    GlowHolder.Name = "GlowHolder"
+    GlowHolder.BackgroundTransparency = 1
+    GlowHolder.ClipsDescendants = true
+    GlowHolder.Position = UDim2.new(0, -glowInset, 0, -glowInset)
+    GlowHolder.Size = UDim2.new(1, glowInset * 2, 1, glowInset * 2)
+    GlowHolder.ZIndex = main.ZIndex - 1
+    GlowHolder.Parent = main
+
+    local holderCorner = Instance.new("UICorner")
+    holderCorner.CornerRadius = UDim.new(0, glowRadius)
+    holderCorner.Parent = GlowHolder
+
+    local Glow = Instance.new("ImageLabel")
+    Glow.Name = "Glow"
+    Glow.BackgroundTransparency = 1
+    Glow.Image = "http://www.roblox.com/asset/?id=18245826428"
+    Glow.ScaleType = Enum.ScaleType.Slice
+    Glow.SliceCenter = Rect.new(Vector2.new(21, 21), Vector2.new(79, 79))
+    Glow.ImageColor3 = getgenv().TargetUIColor or Color3.fromRGB(27, 206, 203)
+    Glow.ImageTransparency = 0.85
+    Glow.Position = UDim2.new(0, 0, 0, 0)
+    Glow.Size = UDim2.new(1, 0, 1, 0)
+    Glow.ZIndex = GlowHolder.ZIndex
+    Glow.Parent = GlowHolder
+
+    Library._targetUIGlow = Glow
 
     local function round(frame, radius)
         if not frame or not frame:IsA("GuiObject") then return end
@@ -3269,7 +3294,7 @@ function Library:targetui_modern()
 
     local function roundDescendants(obj, depth)
         for _, child in ipairs(obj:GetChildren()) do
-            if child:IsA("Frame") then
+            if child:IsA("Frame") and child ~= GlowHolder then
                 -- Leave the thin top accent bar and bar fills sharp.
                 local name = child.Name
                 if name ~= "bar" and name ~= "healthbarvalue" and name ~= "armorbarvalue" then
@@ -3284,7 +3309,7 @@ function Library:targetui_modern()
         end
     end
 
-    round(main, 12)
+    round(main, mainRadius)
     roundDescendants(main, 1)
 
     return IndicatorUI
