@@ -3229,16 +3229,20 @@ function Library:targetui_old()
             if positionMode == "Follow Target" then
                 local head = targetPlayer.Character:FindFirstChild("Head")
                 if head then
-                    local headScreen, headOnScreen = Camera:WorldToViewportPoint(head.Position)
-                    if headOnScreen then
+                    local headTop = head.Position + head.CFrame.UpVector * (head.Size.Y * 0.5)
+                    local headRight = head.Position + head.CFrame.RightVector * (head.Size.X * 0.5)
+                    local topScreen, topOnScreen = Camera:WorldToViewportPoint(headTop)
+                    local rightScreen, rightOnScreen = Camera:WorldToViewportPoint(headRight)
+                    if topOnScreen and rightOnScreen then
                         local absSize = MainFrame.AbsoluteSize
                         local viewportSize = Camera.ViewportSize
-                        local offsetX, offsetY = 15, -15
+                        local paddingX, paddingY = 8, 8
 
-                        local posX = headScreen.X + offsetX
-                        local posY = headScreen.Y - absSize.Y + offsetY
+                        -- MainFrame.AnchorPoint is (0.5, 0), so offset by half width horizontally.
+                        local posX = rightScreen.X + absSize.X * 0.5 + paddingX
+                        local posY = topScreen.Y - absSize.Y - paddingY
 
-                        posX = math.clamp(posX, 0, math.max(0, viewportSize.X - absSize.X))
+                        posX = math.clamp(posX, absSize.X * 0.5, math.max(absSize.X * 0.5, viewportSize.X - absSize.X * 0.5))
                         posY = math.clamp(posY, 0, math.max(0, viewportSize.Y - absSize.Y))
 
                         MainFrame.Draggable = false
