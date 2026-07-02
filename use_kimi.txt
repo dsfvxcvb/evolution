@@ -3261,7 +3261,8 @@ function Library:targetui_modern()
         main.Size.Height.Scale,
         main.Size.Height.Offset + 24
     )
-    glowFrame.BackgroundTransparency = 1
+    glowFrame.BackgroundColor3 = getgenv().TargetUIGlowColor or Color3.fromRGB(27, 206, 203)
+    glowFrame.BackgroundTransparency = 0.92
     glowFrame.BorderSizePixel = 0
     glowFrame.ZIndex = main.ZIndex - 1
     glowFrame.Parent = IndicatorUI
@@ -3270,11 +3271,11 @@ function Library:targetui_modern()
 
     local glowStroke = Instance.new("UIStroke")
     glowStroke.Color = getgenv().TargetUIGlowColor or Color3.fromRGB(27, 206, 203)
-    glowStroke.Thickness = 8
-    glowStroke.Transparency = 0.85
+    glowStroke.Thickness = 10
+    glowStroke.Transparency = 0.7
     glowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
     glowStroke.Parent = glowFrame
-    Library._targetUIGlow = glowStroke
+    Library._targetUIGlow = glowFrame
 
     local function round(frame, radius)
         if not frame or not frame:IsA("GuiObject") then return end
@@ -4522,10 +4523,12 @@ CombatTargetIndicators:AddToggle('TargetUI', {
         if Library._targetUIGlow then
             if Library._targetUIGlow:IsA("ImageLabel") then
                 Library._targetUIGlow.ImageColor3 = Value
-            elseif Library._targetUIGlow:IsA("UIStroke") then
-                Library._targetUIGlow.Color = Value
             else
                 Library._targetUIGlow.BackgroundColor3 = Value
+                local stroke = Library._targetUIGlow:FindFirstChildOfClass("UIStroke")
+                if stroke then
+                    stroke.Color = Value
+                end
             end
         end
     end
