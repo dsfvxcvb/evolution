@@ -3247,7 +3247,13 @@ function Library:targetui_modern()
     if not main then return IndicatorUI end
 
     -- The old glow image is already a soft rounded rectangle, so just leave it
-    -- in place behind the rounded main frame. It naturally wraps the corners.
+    -- in place behind the rounded main frame. Force it to match the border
+    -- accent color so the corners glow instead of going dark.
+    local oldGlow = main:FindFirstChildOfClass("ImageLabel")
+    if oldGlow then
+        oldGlow.ImageColor3 = getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
+        oldGlow.ImageTransparency = 0.8
+    end
 
     local function round(frame, radius)
         if not frame or not frame:IsA("GuiObject") then return end
