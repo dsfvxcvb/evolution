@@ -3255,17 +3255,22 @@ function Library:targetui_modern()
     end
 
     local function roundDescendants(obj, depth)
-        if depth > 5 then return end
         for _, child in ipairs(obj:GetChildren()) do
             if child:IsA("Frame") then
                 -- Leave the thin top accent bar and bar fills sharp.
                 local name = child.Name
                 if name ~= "bar" and name ~= "healthbarvalue" and name ~= "armorbarvalue" then
-                    round(child, math.max(2, 12 - depth * 2))
+                    round(child, math.max(2, 12 - depth))
                 end
                 roundDescendants(child, depth + 1)
-            elseif child:IsA("ImageLabel") and child.Parent and child.Parent.Name == "icon" then
-                round(child, 32)
+            elseif child:IsA("ImageLabel") then
+                -- Glow behind the main frame, or the avatar inside the icon.
+                if child.Parent == main then
+                    round(child, 28)
+                elseif child.Parent and child.Parent.Name == "icon" then
+                    round(child, 32)
+                end
+                roundDescendants(child, depth)
             else
                 roundDescendants(child, depth)
             end
