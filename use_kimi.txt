@@ -3246,31 +3246,16 @@ function Library:targetui_modern()
     local main = IndicatorUI:FindFirstChildOfClass("Frame")
     if not main then return IndicatorUI end
 
-    -- Replace the square glow image with a rounded glow frame so the corners
-    -- actually glow instead of showing black square edges behind the UI.
+    -- Round the existing glow image so it follows the rounded main frame.
     local oldGlow = main:FindFirstChildOfClass("ImageLabel")
-    if oldGlow then oldGlow:Destroy() end
-
-    local glow = Instance.new("Frame")
-    glow.Name = "RoundedGlow"
-    glow.AnchorPoint = main.AnchorPoint
-    glow.Position = main.Position
-    glow.Size = UDim2.new(
-        main.Size.Width.Scale,
-        main.Size.Width.Offset + 60,
-        main.Size.Height.Scale,
-        main.Size.Height.Offset + 60
-    )
-    glow.BackgroundColor3 = getgenv().TargetUIGlowColor or Color3.fromRGB(27, 206, 203)
-    glow.BackgroundTransparency = 0.65
-    glow.BorderSizePixel = 0
-    glow.ZIndex = main.ZIndex - 1
-    glow.Parent = IndicatorUI
-
-    local glowCorner = Instance.new("UICorner")
-    glowCorner.CornerRadius = UDim.new(0, 20)
-    glowCorner.Parent = glow
-    Library._targetUIGlow = glow
+    if oldGlow then
+        local glowCorner = oldGlow:FindFirstChildOfClass("UICorner")
+        if not glowCorner then
+            glowCorner = Instance.new("UICorner")
+            glowCorner.Parent = oldGlow
+        end
+        glowCorner.CornerRadius = UDim.new(0, 32)
+    end
 
     local function round(frame, radius)
         if not frame or not frame:IsA("GuiObject") then return end
