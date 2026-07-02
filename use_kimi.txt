@@ -3642,30 +3642,7 @@ FOVCircleSection:AddSlider('FOVCircleOutlineTransparency',{Text = "Outline Trans
         FOVCircleConfig.OutlineTransparency = (Options.FOVCircleOutlineTransparency and Options.FOVCircleOutlineTransparency.Value) or 0.5
     end})
 
-FOVCircleSection:AddToggle('FOVCircleRainbow',{Text = "Rainbow",
-    Default = false,
-    Callback = function(Value)
-        FOVCircleConfig.RainbowEnabled = (Toggles.FOVCircleRainbow and Toggles.FOVCircleRainbow.Value)
-    end})
 
-FOVCircleSection:AddToggle('FOVCircleDot',{Text = "Center Dot",
-    Default = false,
-    Callback = function(Value)
-        FOVCircleConfig.DotCenter = (Toggles.FOVCircleDot and Toggles.FOVCircleDot.Value)
-    end}):AddColorPicker('FOVCircleDotColor',{Title = "Dot Color",
-    Default = Color3.fromRGB(255, 255, 255),
-    Callback = function(Value)
-        FOVCircleConfig.DotColor = (Value and Value) or Color3.fromRGB(255, 255, 255)
-    end})
-
-FOVCircleSection:AddSlider('FOVCircleDotSize',{Text = "Dot Size",
-    Min = 1,
-    Max = 10,
-    Default = 3,
-    Rounding = 1,
-    Callback = function(Value)
-        FOVCircleConfig.DotRadius = (Options.FOVCircleDotSize and Options.FOVCircleDotSize.Value) or 3
-    end})
 
 local Script = {
     Functions = {},
@@ -4573,12 +4550,6 @@ TargetAimSection:AddInput('JumpOffsetTextbox',{Text = "Jump Offset", Default = "
         if num then
             Targeting.JumpOffset = math.clamp(num, 0, 2)
         end
-    end})
-
-TargetAimSection:AddToggle('AntiGroundShot',{Text = "Anti Ground Shot",
-    Default = false,
-    Callback = function(Value)
-        Targeting.AntiGroundShot = (Toggles.AntiGroundShot and Toggles.AntiGroundShot.Value)
     end})
 
 TargetAimSection:AddToggle('SpectateTarget',{Text = "Spectate Target",
