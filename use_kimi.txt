@@ -3250,13 +3250,26 @@ function Library:targetui_modern()
 
     local mainRadius = 12
 
-    -- Round the main panel itself.
-    local mainCorner = main:FindFirstChildOfClass("UICorner")
-    if not mainCorner then
-        mainCorner = Instance.new("UICorner")
-        mainCorner.Parent = main
+    local function round(frame, radius)
+        if not frame or not frame:IsA("GuiObject") then return end
+        local corner = frame:FindFirstChildOfClass("UICorner")
+        if not corner then
+            corner = Instance.new("UICorner")
+            corner.Parent = frame
+        end
+        corner.CornerRadius = UDim.new(0, radius)
     end
-    mainCorner.CornerRadius = UDim.new(0, mainRadius)
+
+    -- Round every top-level frame. If there are sibling panels (title bar, etc.)
+    -- they would otherwise stay square and poke through the corners.
+    for _, sibling in ipairs(IndicatorUI:GetChildren()) do
+        if sibling:IsA("Frame") then
+            round(sibling, mainRadius)
+            if sibling ~= main then
+                sibling.ClipsDescendants = true
+            end
+        end
+    end
 
     -- Move all existing content into a clipping wrapper so nothing square can
     -- poke out past the rounded silhouette. The glow is added afterwards as an
@@ -3274,7 +3287,7 @@ function Library:targetui_modern()
     contentCorner.Parent = Content
 
     for _, child in ipairs(main:GetChildren()) do
-        if child ~= mainCorner and not child:IsA("UICorner") then
+        if not child:IsA("UICorner") then
             child.Parent = Content
         end
     end
@@ -3312,16 +3325,6 @@ function Library:targetui_modern()
 
     Library._targetUIGlow = Glow
     -- === end glow ===
-
-    local function round(frame, radius)
-        if not frame or not frame:IsA("GuiObject") then return end
-        local corner = frame:FindFirstChildOfClass("UICorner")
-        if not corner then
-            corner = Instance.new("UICorner")
-            corner.Parent = frame
-        end
-        corner.CornerRadius = UDim.new(0, radius)
-    end
 
     local function roundDescendants(obj, depth)
         for _, child in ipairs(obj:GetChildren()) do
