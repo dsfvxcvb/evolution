@@ -1010,7 +1010,7 @@ local ProtectPlayer = {
     LastGlobalShotTime = 0,
     RayThreshold = 10,
     BulletWindow = 1.5,
-    GlobalShotWindow = 0.6,
+    GlobalShotWindow = 0.3,
 }
 
 local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent")
@@ -1114,9 +1114,9 @@ function ProtectPlayer.GetLikelyShooter(selected, pos)
     end
 
     -- 2) The most recent player to fire any bullet (only trust briefly).
+    -- They just shot something, so don't require them to have a gun in our whitelist.
     if now - ProtectPlayer.LastGlobalShotTime <= ProtectPlayer.GlobalShotWindow
-        and ProtectPlayer.IsValidTarget(ProtectPlayer.LastGlobalShooter)
-        and ProtectPlayer.HasGunEquipped(ProtectPlayer.LastGlobalShooter) then
+        and ProtectPlayer.IsValidTarget(ProtectPlayer.LastGlobalShooter) then
         return ProtectPlayer.LastGlobalShooter
     end
 
