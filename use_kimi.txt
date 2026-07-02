@@ -3293,33 +3293,47 @@ function Library:targetui_modern()
     end
     Content.Parent = main
 
-    -- === Glow: sibling of Content, unclipped so its natural soft corner bulb shows fully ===
-    local glowInset = 20
+    -- === Glow: procedurally generated from concentric rounded frames ===
+    -- The old 9-slice image was painted with a square corner falloff, so it
+    -- could never match the rounded panel. Real UICorner arcs always match.
+
+    local glowColor = getgenv().TargetUIColor or Color3.fromRGB(27, 206, 203)
+    local glowLayers = 10
+    local glowMaxInset = 22
+    local glowInnerTransparency = 0.55
+    local glowOuterTransparency = 0.97
 
     local GlowHolder = Instance.new("Frame")
     GlowHolder.Name = "GlowHolder"
     GlowHolder.BackgroundTransparency = 1
-    -- No ClipsDescendants/UICorner here — the 9-slice glow image's own falloff
-    -- provides the softness, and clipping was cutting the corner bulb off.
-    GlowHolder.Position = UDim2.new(0, -glowInset, 0, -glowInset)
-    GlowHolder.Size = UDim2.new(1, glowInset * 2, 1, glowInset * 2)
+    GlowHolder.Position = UDim2.new(0, 0, 0, 0)
+    GlowHolder.Size = UDim2.new(1, 0, 1, 0)
     GlowHolder.ZIndex = main.ZIndex - 1
     GlowHolder.Parent = main
 
-    local Glow = Instance.new("ImageLabel")
-    Glow.Name = "Glow"
-    Glow.BackgroundTransparency = 1
-    Glow.Image = "http://www.roblox.com/asset/?id=18245826428"
-    Glow.ScaleType = Enum.ScaleType.Slice
-    Glow.SliceCenter = Rect.new(Vector2.new(21, 21), Vector2.new(79, 79))
-    Glow.ImageColor3 = getgenv().TargetUIColor or Color3.fromRGB(27, 206, 203)
-    Glow.ImageTransparency = 0.85
-    Glow.Position = UDim2.new(0, 0, 0, 0)
-    Glow.Size = UDim2.new(1, 0, 1, 0)
-    Glow.ZIndex = GlowHolder.ZIndex
-    Glow.Parent = GlowHolder
+    for i = 1, glowLayers do
+        local t = i / glowLayers
+        local inset = glowMaxInset * t
+        local eased = t * t
+        local transparency = glowInnerTransparency
+            + (glowOuterTransparency - glowInnerTransparency) * eased
 
-    Library._targetUIGlow = Glow
+        local layer = Instance.new("Frame")
+        layer.Name = "GlowLayer" .. i
+        layer.BackgroundColor3 = glowColor
+        layer.BackgroundTransparency = transparency
+        layer.BorderSizePixel = 0
+        layer.Position = UDim2.new(0, -inset, 0, -inset)
+        layer.Size = UDim2.new(1, inset * 2, 1, inset * 2)
+        layer.ZIndex = GlowHolder.ZIndex - (glowLayers - i)
+        layer.Parent = GlowHolder
+
+        local layerCorner = Instance.new("UICorner")
+        layerCorner.CornerRadius = UDim.new(0, mainRadius + inset)
+        layerCorner.Parent = layer
+    end
+
+    Library._targetUIGlow = GlowHolder
     -- === end glow ===
 
     local function roundDescendants(obj, depth)
@@ -4560,6 +4574,12 @@ CombatTargetIndicators:AddToggle('TargetUI', {
                 Library._targetUIGlow.ImageColor3 = Value
             elseif Library._targetUIGlow:IsA("UIStroke") then
                 Library._targetUIGlow.Color = Value
+            elseif Library._targetUIGlow:IsA("Frame") and Library._targetUIGlow.Name == "GlowHolder" then
+                for _, child in ipairs(Library._targetUIGlow:GetChildren()) do
+                    if child:IsA("Frame") and child.Name:sub(1, 9) == "GlowLayer" then
+                        child.BackgroundColor3 = Value
+                    end
+                end
             else
                 Library._targetUIGlow.BackgroundColor3 = Value
                 local stroke = Library._targetUIGlow:FindFirstChildOfClass("UIStroke")
