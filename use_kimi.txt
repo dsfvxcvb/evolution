@@ -4606,20 +4606,7 @@ CombatTargetUITab:AddToggle('TargetUI', {
             end
         end
     end
-})
-
-CombatTargetUITab:AddToggle('UseGlow', {
-    Text = "Use Glow",
-    Default = true,
-    Callback = function(Value)
-        getgenv().TargetUIUseGlow = Value
-        if Library._targetUIGlow then
-            Library._targetUIGlow.Visible = Value
-        end
-    end
-})
-
-CombatTargetUITab:AddColorPicker('TargetUIBorderColor', {
+}):AddColorPicker('TargetUIBorderColor', {
     Title = "Border Accent Color",
     Default = Color3.fromRGB(27, 206, 203),
     Callback = function(Value)
@@ -4661,6 +4648,17 @@ CombatTargetUITab:AddColorPicker('TargetUIBorderColor', {
                     stroke.Color = Value
                 end
             end
+        end
+    end
+})
+
+CombatTargetUITab:AddToggle('UseGlow', {
+    Text = "Use Glow",
+    Default = true,
+    Callback = function(Value)
+        getgenv().TargetUIUseGlow = Value
+        if Library._targetUIGlow then
+            Library._targetUIGlow.Visible = Value
         end
     end
 })
