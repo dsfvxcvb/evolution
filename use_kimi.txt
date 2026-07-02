@@ -52,6 +52,7 @@ local CombatAutoKill = Tabs.Combat:AddRightGroupbox('Auto Kill')
 local CombatAntiAim = Tabs.Combat:AddRightGroupbox('Anti-Aim')
 local CombatStrafe = Tabs.Combat:AddRightGroupbox('Target Strafe')
 local CombatHitsound = Tabs.Combat:AddRightGroupbox('Hitsounds')
+local CombatKnifeHitbox = Tabs.Combat:AddRightGroupbox('Knife Hitbox')
 
 local VisualsESP = Tabs.Visuals:AddLeftGroupbox('ESP')
 local VisualsTracers = Tabs.Visuals:AddLeftGroupbox('Visualize Bullets')
@@ -947,7 +948,7 @@ local Targeting = {
 }
 
 -- ============================================
--- AUTO KILL (Connection Exploit + Gun Method)
+-- AUTO KILL (Knife + Gun Method)
 -- Independent of Target Aim
 -- ============================================
 local AutoKill = {
@@ -957,7 +958,14 @@ local AutoKill = {
     AttachPosition = "Behind",
     LockedOn = false,
     CycleActive = false,
-    KnifeExpander = {Enabled = true, Size = 20},
+    KnifeExpander = {
+        Enabled = true,
+        Size = 20,
+        Fill = true,
+        Outline = true,
+        Transparency = 0.5,
+        Color = Color3.fromRGB(255, 0, 0),
+    },
     KnifeAura = false,
     AuraLockedTarget = nil,
     KnifeLoopConnection = nil,
@@ -981,7 +989,6 @@ local AutoKill = {
     UI = nil,
     ForceHitWasEnabled = false,
     ForceHitOriginal = nil,
-    ConnectionDesync = false,
 }
 
 function AutoKill.CreateUI()
@@ -1265,19 +1272,6 @@ function AutoKill.KnifeAttackStep(target)
             if can1 then pcall(function() can1.Value = targetChar end) end
             if can2 then pcall(function() can2.Value = targetChar end) end
         end
-        local handle = knifeTool:FindFirstChild("Handle")
-        local hitbox = handle and handle:FindFirstChild("HITBOX_PART")
-        if hitbox then
-            pcall(function()
-                if AutoKill.KnifeExpander.Enabled then
-                    local sz = math.max(AutoKill.KnifeExpander.Size, 1)
-                    hitbox.Size = Vector3.new(sz, sz, sz)
-                end
-                hitbox.Transparency = 1
-                hitbox.CanCollide = false
-                hitbox.Massless = true
-            end)
-        end
     end
 
     pcall(function()
@@ -1299,160 +1293,6 @@ function AutoKill.KnifeAttackStep(target)
         else
             local attachCF = targetCF * offset
             root.CFrame = CFrame.lookAt(attachCF.Position, targetCF.Position)
-        end
-        root.AssemblyLinearVelocity = Vector3.zero
-        root.AssemblyAngularVelocity = Vector3.zero
-    end)
-
-    AutoKill.TryStab()
-end
-
-function AutoKill.GetTargetRealRoot(target)
-    local targetChar = target and target.Character
-    if not targetChar then return nil end
-    local special = targetChar:FindFirstChild("SpecialParts")
-    if special then
-        local hrp = special:FindFirstChild("HumanoidRootPart")
-        if hrp then return hrp end
-    end
-    local root = targetChar:FindFirstChild("HumanoidRootPart")
-    if not root then return nil end
-
-    -- If the target is not desynced, their root is the real position.
-    local rootPos = root.Position
-    if math.abs(rootPos.Y) < 5000 and rootPos.Magnitude < 50000 then
-        AutoKill.LastRealPositions = AutoKill.LastRealPositions or {}
-        AutoKill.LastRealPositions[target] = rootPos
-        return root
-    end
-
-    -- The target is desynced (root is in the void). Hood Customs anti-aim
-    -- scripts leave an anchored "Desync Setback" part at the real position.
-    -- Find the one closest to the target's last known real position.
-    local last = AutoKill.LastRealPositions and AutoKill.LastRealPositions[target]
-    local best = nil
-    local bestScore = math.huge
-    for _, p in ipairs(workspace:GetChildren()) do
-        if p.Name == "Desync Setback" and p:IsA("BasePart") then
-            local pos = p.Position
-            -- Only consider parts inside the normal map bounds.
-            if math.abs(pos.Y) < 5000 and pos.Magnitude < 50000 then
-                local score = (last and (pos - last).Magnitude) or 0
-                if score < bestScore then
-                    best = p
-                    bestScore = score
-                end
-            end
-        end
-    end
-
-    if best then
-        AutoKill.LastRealPositions = AutoKill.LastRealPositions or {}
-        AutoKill.LastRealPositions[target] = best.Position
-        return best
-    end
-
-    -- No usable real position found; don't fall back to the spoofed void root.
-    return nil
-end
-
--- Connection bypass helpers (WorldStepMax fast-flag desync)
-function AutoKill.EnableConnectionDesync()
-    if AutoKill.ConnectionDesync then return end
-    AutoKill.ConnectionDesync = true
-    pcall(function()
-        setfflag("WorldStepMax", "-99999999999999")
-    end)
-end
-
-function AutoKill.DisableConnectionDesync()
-    if not AutoKill.ConnectionDesync then return end
-    AutoKill.ConnectionDesync = false
-    pcall(function()
-        setfflag("WorldStepMax", "-1")
-    end)
-end
-
-function AutoKill.ConnectionStep(target)
-    if AutoKill.KnifeAura then
-        AutoKill.KnifeAuraStep()
-        return
-    end
-
-    if not target or not target.Character then return end
-    local char = LocalPlayer.Character
-    if not char then return end
-    AutoKill.UnhideCharacter()
-    AutoKill.RemoveVoidPlatform()
-    local root = char:FindFirstChild("HumanoidRootPart")
-    if not root then return end
-    local targetChar = target.Character
-    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-    if not targetRoot then return end
-    local targetReal = AutoKill.GetTargetRealRoot(target)
-    if not targetReal then return end
-
-    AutoKill.OwnPart(root)
-    AutoKill.OwnPart(targetRoot)
-
-    local knifeTool = char:FindFirstChild("[Knife]")
-    if not knifeTool then
-        AutoKill.TryEquipKnife()
-        knifeTool = char:FindFirstChild("[Knife]")
-    end
-
-    if knifeTool then
-        local scriptObj = knifeTool:FindFirstChild("Script")
-        if scriptObj then
-            local can1 = scriptObj:FindFirstChild("CanHitPlayer")
-            local can2 = scriptObj:FindFirstChild("CanHitPlayer2")
-            if can1 then pcall(function() can1.Value = targetChar end) end
-            if can2 then pcall(function() can2.Value = targetChar end) end
-        end
-        local handle = knifeTool:FindFirstChild("Handle")
-        local hitbox = handle and handle:FindFirstChild("HITBOX_PART")
-        if hitbox then
-            pcall(function()
-                if AutoKill.KnifeExpander.Enabled then
-                    local sz = math.max(AutoKill.KnifeExpander.Size, 1)
-                    hitbox.Size = Vector3.new(sz, sz, sz)
-                end
-                hitbox.Transparency = 1
-                hitbox.CanCollide = false
-                hitbox.Massless = true
-            end)
-        end
-    end
-
-    pcall(function()
-        -- The target's real position is either their root (not desynced) or the
-        -- anchored "Desync Setback" part their anti-aim leaves behind.
-        local realPos = targetReal.Position
-
-        -- Safety: never teleport into the void. If the resolved position is
-        -- outside the map or suddenly very far from us, bail out this frame.
-        if math.abs(realPos.Y) > 5000 or realPos.Magnitude > 50000 then return end
-        if (realPos - root.Position).Magnitude > 2000 then return end
-
-        -- Keep our physics rep on our own root. Mapping it to the target's far
-        -- spoofed root is what teleports us into the void on our screen/server.
-        sethiddenproperty(root, "PhysicsRepRootPart", root)
-
-        local offset, lookAt = AutoKill.GetAttachOffset()
-        if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
-            local angle = AutoKill.StandConfig.FormationAngle
-            local dist = 5 + (math.sin(angle * 7) + 1) * 2
-            local yOff = math.sin(angle * 3) * 1.5
-            offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
-            lookAt = true
-        end
-
-        local realCF = CFrame.new(realPos) * CFrame.Angles(0, math.atan2(targetRoot.CFrame.LookVector.X, targetRoot.CFrame.LookVector.Z), 0)
-        if not lookAt then
-            root.CFrame = realCF
-        else
-            local attachCF = realCF * offset
-            root.CFrame = CFrame.lookAt(attachCF.Position, realPos)
         end
         root.AssemblyLinearVelocity = Vector3.zero
         root.AssemblyAngularVelocity = Vector3.zero
@@ -1672,9 +1512,8 @@ end
 
 -- Knife attach/stab is now handled inside the unified AutoKill combat cycle.
 
--- Knife hitbox expander
+-- Knife hitbox expander + visualizer
 RunService.Heartbeat:Connect(function()
-    if not AutoKill.KnifeExpander.Enabled then return end
     local char = LocalPlayer.Character
     if not char then return end
     local knife = char:FindFirstChild("[Knife]") or LocalPlayer.Backpack:FindFirstChild("[Knife]")
@@ -1682,15 +1521,42 @@ RunService.Heartbeat:Connect(function()
     local handle = knife:FindFirstChild("Handle")
     if not handle then return end
     local hitbox = handle:FindFirstChild("HITBOX_PART")
-    if hitbox then
-        pcall(function()
-            local sz = AutoKill.KnifeExpander.Size
+    if not hitbox then return end
+
+    pcall(function()
+        if AutoKill.KnifeExpander.Enabled then
+            local sz = math.max(AutoKill.KnifeExpander.Size, 1)
             hitbox.Size = Vector3.new(sz, sz, sz)
-            hitbox.Transparency = 1
             hitbox.CanCollide = false
             hitbox.Massless = true
-        end)
-    end
+            hitbox.Color = AutoKill.KnifeExpander.Color
+
+            if AutoKill.KnifeExpander.Fill then
+                hitbox.Transparency = math.clamp(AutoKill.KnifeExpander.Transparency, 0, 1)
+                hitbox.Material = Enum.Material.Neon
+            else
+                hitbox.Transparency = 1
+            end
+        end
+
+        local outline = hitbox:FindFirstChild("KnifeHitboxOutline")
+        if AutoKill.KnifeExpander.Enabled and AutoKill.KnifeExpander.Outline then
+            if not outline then
+                outline = Instance.new("BoxHandleAdornment")
+                outline.Name = "KnifeHitboxOutline"
+                outline.Adornee = hitbox
+                outline.AlwaysOnTop = true
+                outline.ZIndex = 10
+                outline.Parent = hitbox
+            end
+            outline.Size = hitbox.Size
+            outline.Color3 = AutoKill.KnifeExpander.Color
+            outline.Transparency = math.clamp(AutoKill.KnifeExpander.Transparency, 0, 1)
+            outline.Visible = true
+        elseif outline then
+            outline.Visible = false
+        end
+    end)
 end)
 
 -- Gun method helpers
@@ -2158,9 +2024,6 @@ function AutoKill.StartCombatCycle()
                     else
                         RunService.Heartbeat:Wait()
                     end
-                elseif AutoKill.Method == "Connection" then
-                    AutoKill.ConnectionStep(target)
-                    RunService.Heartbeat:Wait()
                 else
                     AutoKill.KnifeAttackStep(target)
                     RunService.Heartbeat:Wait()
@@ -2192,7 +2055,6 @@ function AutoKill.StopCycle()
     AutoKill.StopAutoStomp()
     AutoKill.UnhideCharacter()
     AutoKill.RemoveVoidPlatform()
-    AutoKill.DisableConnectionDesync()
     pcall(function()
         local char = LocalPlayer.Character
         local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -2247,7 +2109,7 @@ CombatAutoKill:AddToggle('AutoKillEnabled', {
 
 CombatAutoKill:AddDropdown('AutoKillMethod', {
     Text = "Method",
-    Values = {"Knife", "Gun", "Connection"},
+    Values = {"Knife", "Gun"},
     Default = "Knife",
     Callback = function(Value)
         AutoKill.Method = Value
@@ -2306,22 +2168,55 @@ CombatAutoKill:AddDropdown('AutoKillManualTargets', {
     end
 })
 
-CombatAutoKill:AddToggle('KnifeHitboxToggle', {
-    Text = "Knife Hitbox Expander",
+CombatKnifeHitbox:AddToggle('KnifeHitboxToggle', {
+    Text = "Enabled",
     Default = true,
     Callback = function(Value)
         AutoKill.KnifeExpander.Enabled = Value
     end
+}):AddColorPicker('KnifeHitboxColor', {
+    Title = "Color",
+    Default = AutoKill.KnifeExpander.Color,
+    Callback = function(Value)
+        AutoKill.KnifeExpander.Color = Value
+    end
 })
 
-CombatAutoKill:AddSlider('KnifeHitboxSize', {
-    Text = "Knife Hitbox Size",
+CombatKnifeHitbox:AddSlider('KnifeHitboxSize', {
+    Text = "Size",
     Min = 5,
     Max = 200,
     Default = 20,
     Rounding = 1,
     Callback = function(Value)
         AutoKill.KnifeExpander.Size = Value
+    end
+})
+
+CombatKnifeHitbox:AddSlider('KnifeHitboxTransparency', {
+    Text = "Transparency",
+    Min = 0,
+    Max = 1,
+    Default = 0.5,
+    Rounding = 2,
+    Callback = function(Value)
+        AutoKill.KnifeExpander.Transparency = Value
+    end
+})
+
+CombatKnifeHitbox:AddToggle('KnifeHitboxFill', {
+    Text = "Fill",
+    Default = true,
+    Callback = function(Value)
+        AutoKill.KnifeExpander.Fill = Value
+    end
+})
+
+CombatKnifeHitbox:AddToggle('KnifeHitboxOutline', {
+    Text = "Outline",
+    Default = true,
+    Callback = function(Value)
+        AutoKill.KnifeExpander.Outline = Value
     end
 })
 
