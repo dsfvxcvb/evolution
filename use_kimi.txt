@@ -1540,16 +1540,20 @@ RunService.Heartbeat:Connect(function()
         end
 
         local outline = hitbox:FindFirstChild("KnifeHitboxOutline")
+        if outline and not outline:IsA("SelectionBox") then
+            outline:Destroy()
+            outline = nil
+        end
         if AutoKill.KnifeExpander.Enabled and AutoKill.KnifeExpander.Outline then
             if not outline then
                 outline = Instance.new("SelectionBox")
                 outline.Name = "KnifeHitboxOutline"
                 outline.Adornee = hitbox
                 outline.LineThickness = 0.03
+                outline.SurfaceTransparency = 1
                 outline.Parent = hitbox
             end
             outline.Color3 = AutoKill.KnifeExpander.Color
-            outline.SurfaceTransparency = 1
             outline.Transparency = 1 - math.clamp(AutoKill.KnifeExpander.Transparency, 0, 1)
             outline.Visible = true
         elseif outline then
