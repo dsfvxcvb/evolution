@@ -3246,6 +3246,32 @@ function Library:targetui_modern()
     local main = IndicatorUI:FindFirstChildOfClass("Frame")
     if not main then return IndicatorUI end
 
+    -- Replace the square glow image with a rounded glow frame so the corners
+    -- actually glow instead of showing black square edges behind the UI.
+    local oldGlow = main:FindFirstChildOfClass("ImageLabel")
+    if oldGlow then oldGlow:Destroy() end
+
+    local glow = Instance.new("Frame")
+    glow.Name = "RoundedGlow"
+    glow.AnchorPoint = main.AnchorPoint
+    glow.Position = main.Position
+    glow.Size = UDim2.new(
+        main.Size.Width.Scale,
+        main.Size.Width.Offset + 40,
+        main.Size.Height.Scale,
+        main.Size.Height.Offset + 40
+    )
+    glow.BackgroundColor3 = getgenv().TargetUIGlowColor or Color3.fromRGB(27, 206, 203)
+    glow.BackgroundTransparency = 0.82
+    glow.BorderSizePixel = 0
+    glow.ZIndex = main.ZIndex - 1
+    glow.Parent = IndicatorUI
+
+    local glowCorner = Instance.new("UICorner")
+    glowCorner.CornerRadius = UDim.new(0, 18)
+    glowCorner.Parent = glow
+    Library._targetUIGlow = glow
+
     local function round(frame, radius)
         if not frame or not frame:IsA("GuiObject") then return end
         if frame:FindFirstChildOfClass("UICorner") then return end
@@ -3263,14 +3289,8 @@ function Library:targetui_modern()
                     round(child, math.max(2, 12 - depth))
                 end
                 roundDescendants(child, depth + 1)
-            elseif child:IsA("ImageLabel") then
-                -- Glow behind the main frame, or the avatar inside the icon.
-                if child.Parent == main then
-                    round(child, 28)
-                elseif child.Parent and child.Parent.Name == "icon" then
-                    round(child, 32)
-                end
-                roundDescendants(child, depth)
+            elseif child:IsA("ImageLabel") and child.Parent and child.Parent.Name == "icon" then
+                round(child, 32)
             else
                 roundDescendants(child, depth)
             end
@@ -4496,7 +4516,11 @@ CombatTargetIndicators:AddToggle('TargetUI', {
         getgenv().TargetUIGlowColor = Value
 
         if Library._targetUIGlow then
-            Library._targetUIGlow.ImageColor3 = Value
+            if Library._targetUIGlow:IsA("ImageLabel") then
+                Library._targetUIGlow.ImageColor3 = Value
+            else
+                Library._targetUIGlow.BackgroundColor3 = Value
+            end
         end
     end
 })
