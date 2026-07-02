@@ -929,11 +929,12 @@ local Targeting = {
     Highlight = nil,
     LockedOn = false,
     HighlightEnabled = true,
-    DotEnabled = true,
-    TracerEnabled = true, 
+    DotEnabled = false,
+    TracerEnabled = true,
+    TracerStartPosition = "Mouse",
     HighlightColor = Color3.fromRGB(27, 206, 203),
     DotColor = Color3.fromRGB(27, 206, 203),
-    TracerColor = Color3.fromRGB(27, 206, 203), 
+    TracerColor = Color3.fromRGB(27, 206, 203),
     TargetAimbotPart = "HumanoidRootPart",
     AimbotMethod = "Index",
     TracerThickness = 2,
@@ -944,7 +945,7 @@ local Targeting = {
     JumpOffset = 0.5,
     AntiGroundShot = false,
     SpectateTarget = false,
-	LookAtTarget = false,
+    LookAtTarget = false,
 }
 
 -- ============================================
@@ -2781,7 +2782,8 @@ function Library:targetui_old()
     Glow.Size = UDim2.new(1, 40, 1, 40)
     Glow.ZIndex = MainFrame.ZIndex - 1
     Glow.Parent = MainFrame
-    
+    Glow.Visible = getgenv().TargetUIUseGlow ~= false
+
     Library._targetUIGlow = Glow
 
     local OuterBorder = Instance.new("Frame")
@@ -3221,6 +3223,25 @@ function Library:targetui_old()
             local ammoPercent = (ammoMax > 0) and math.clamp(ammoCurrent / ammoMax, 0, 1) or 0
             ArmorBarValue.Size = UDim2.new(ammoPercent, 0, 1, 0)
             ArmorText.Text = math.floor(ammoCurrent) .. "/" .. math.floor(ammoMax)
+
+            -- Position handling: Free (draggable) or Follow Target.
+            local positionMode = (Options.TargetUIPosition and Options.TargetUIPosition.Value) or getgenv().TargetUIPosition or "Free"
+            if positionMode == "Follow Target" then
+                local head = targetPlayer.Character:FindFirstChild("Head")
+                if head then
+                    local headScreen, headOnScreen = Camera:WorldToViewportPoint(head.Position)
+                    if headOnScreen then
+                        local offsetX, offsetY = 20, -20
+                        local absSize = MainFrame.AbsoluteSize
+                        MainFrame.Draggable = false
+                        MainFrame.Position = UDim2.new(0, headScreen.X + offsetX, 0, headScreen.Y - absSize.Y + offsetY)
+                    end
+                end
+            else
+                if not MainFrame.Draggable then
+                    MainFrame.Draggable = true
+                end
+            end
         else
             IndicatorUI.Enabled = false
         end
@@ -3298,7 +3319,7 @@ function Library:targetui_modern()
 
     local glowColor = getgenv().TargetUIGlowColor or getgenv().TargetUIColor or getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
     local glowLayers = 8
-    local glowMaxInset = 22
+    local glowMaxInset = 12
 
     -- This matches the original 9-slice image's ImageTransparency (0.85).
     -- Because all layers overlap near the panel edge, each layer must be much
@@ -3332,6 +3353,8 @@ function Library:targetui_modern()
         layerCorner.CornerRadius = UDim.new(0, mainRadius + inset)
         layerCorner.Parent = layer
     end
+
+    GlowHolder.Visible = getgenv().TargetUIUseGlow ~= false
 
     Library._targetUIGlow = GlowHolder
     -- === end glow ===
@@ -3703,12 +3726,30 @@ local function UpdateHighlight(Target)
     end
     if Target and Target.Character and Targeting.HighlightEnabled then
         local highlight = Instance.new("Highlight")
-        
-        highlight.FillColor = (Options.TargetAimColor.Value and Options.TargetAimColor.Value) or Color3.fromRGB(27, 206, 203)
         highlight.Parent = game.CoreGui
-        highlight.OutlineTransparency = 0
-        highlight.OutlineColor = Color3.new(1, 1, 1)
         highlight.Adornee = Target.Character
+
+        local fillEnabled = Toggles.HighlightFill and Toggles.HighlightFill.Value
+        local outlineEnabled = Toggles.HighlightOutline and Toggles.HighlightOutline.Value
+
+        if fillEnabled then
+            highlight.FillColor = (Options.HighlightFillColor and Options.HighlightFillColor.Value)
+                or Color3.fromRGB(27, 206, 203)
+            local fillTrans = Options.HighlightFillTransparency and Options.HighlightFillTransparency.Value or "0"
+            highlight.FillTransparency = tonumber(fillTrans) or 0
+        else
+            highlight.FillTransparency = 1
+        end
+
+        if outlineEnabled then
+            highlight.OutlineColor = (Options.HighlightOutlineColor and Options.HighlightOutlineColor.Value)
+                or Color3.new(1, 1, 1)
+            local outlineTrans = Options.HighlightOutlineTransparency and Options.HighlightOutlineTransparency.Value or "0"
+            highlight.OutlineTransparency = tonumber(outlineTrans) or 0
+        else
+            highlight.OutlineTransparency = 1
+        end
+
         Targeting.Highlight = highlight
     end
 end
@@ -4173,40 +4214,58 @@ end
             end
             
             if Targeting.TracerEnabled and (Toggles.TracerToggle and Toggles.TracerToggle.Value) then
-                local mousePos = UserInputService:GetMouseLocation()
                 local targetPos = targetPart.Position
                 local screenPos, onScreen = Camera:WorldToViewportPoint(targetPos)
-                
+                local viewportSize = Camera.ViewportSize
+                local centerX, centerY = viewportSize.X / 2, viewportSize.Y / 2
+
+                local tracerStartPos
+                local startMode = (Options.TracerStartPosition and Options.TracerStartPosition.Value) or Targeting.TracerStartPosition
+                if startMode == "Mouse" then
+                    tracerStartPos = UserInputService:GetMouseLocation()
+                elseif startMode == "Bottom" then
+                    tracerStartPos = Vector2.new(centerX, viewportSize.Y)
+                elseif startMode == "Top" then
+                    tracerStartPos = Vector2.new(centerX, 0)
+                elseif startMode == "HumanoidRootPart" then
+                    local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                    if hrp then
+                        local pos, startOnScreen = Camera:WorldToViewportPoint(hrp.Position)
+                        tracerStartPos = Vector2.new(pos.X, pos.Y)
+                    else
+                        tracerStartPos = UserInputService:GetMouseLocation()
+                    end
+                else
+                    tracerStartPos = UserInputService:GetMouseLocation()
+                end
+
                 local tracerEndPos
                 if onScreen then
                     tracerEndPos = Vector2.new(screenPos.X, screenPos.Y)
                 else
-                    local viewportSize = Camera.ViewportSize
-                    local centerX, centerY = viewportSize.X / 2, viewportSize.Y / 2
-                    
                     local dirX = screenPos.X - centerX
                     local dirY = screenPos.Y - centerY
-                    
+
                     local magnitude = math.sqrt(dirX^2 + dirY^2)
                     if magnitude > 0 then
                         dirX = dirX / magnitude
                         dirY = dirY / magnitude
-                        
+
                         local edgeX = centerX + dirX * (viewportSize.X / 2 - 50)
                         local edgeY = centerY + dirY * (viewportSize.Y / 2 - 50)
-                        
+
                         tracerEndPos = Vector2.new(edgeX, edgeY)
                     else
                         tracerEndPos = Vector2.new(centerX, centerY)
                     end
                 end
-                
-                tracerOutline.From = mousePos
+
+                tracerOutline.From = tracerStartPos
                 tracerOutline.To = tracerEndPos
                 tracerOutline.Thickness = (Options.TracerOutlineThickness and Options.TracerOutlineThickness.Value) or Targeting.TracerOutlineThickness
                 tracerOutline.Visible = true
-                
-                tracer.From = mousePos
+
+                tracer.From = tracerStartPos
                 tracer.To = tracerEndPos
                 tracer.Color = (Options.TracerColor and Options.TracerColor.Value) and (Options.TracerColor and Options.TracerColor.Value) or Targeting.TracerColor
                 tracer.Thickness = (Options.TracerThickness and Options.TracerThickness.Value) or Targeting.TracerThickness
@@ -4547,7 +4606,20 @@ CombatTargetUITab:AddToggle('TargetUI', {
             end
         end
     end
-}):AddColorPicker('TargetUIBorderColor', {
+})
+
+CombatTargetUITab:AddToggle('UseGlow', {
+    Text = "Use Glow",
+    Default = true,
+    Callback = function(Value)
+        getgenv().TargetUIUseGlow = Value
+        if Library._targetUIGlow then
+            Library._targetUIGlow.Visible = Value
+        end
+    end
+})
+
+CombatTargetUITab:AddColorPicker('TargetUIBorderColor', {
     Title = "Border Accent Color",
     Default = Color3.fromRGB(27, 206, 203),
     Callback = function(Value)
@@ -4605,18 +4677,28 @@ CombatTargetUITab:AddDropdown('TargetUIStyle', {
     end
 })
 
-CombatTargetUITab:AddToggle('DotToggle',{Text = "Dot",
-    Default = true,
+CombatTargetUITab:AddDropdown('TargetUIPosition', {
+    Text = "Position",
+    Values = {"Free", "Follow Target"},
+    Default = "Free",
     Callback = function(Value)
-        Targeting.DotEnabled = (Toggles.DotToggle and Toggles.DotToggle.Value)
-        if not Targeting.DotEnabled then
-            dot.Visible = false
+        getgenv().TargetUIPosition = Value
+        if Library._targetUIInstance then
+            local main = Library._targetUIInstance:FindFirstChildOfClass("Frame")
+            if main then
+                main.Draggable = (Value == "Free")
+            end
         end
-    end}):AddColorPicker('DotColor',{Title = "Dot Color",
-    Default = Color3.fromRGB(27, 206, 203),
-    Callback = function(Value) end})
+    end
+})
 
-CombatHighlightTab:AddToggle('HighlightToggle',{Text = "Highlight",
+local function RefreshHighlight()
+    if Targeting.Target or SilentAim.Target then
+        UpdateHighlight(Targeting.Target or SilentAim.Target)
+    end
+end
+
+CombatHighlightTab:AddToggle('HighlightToggle',{Text = "Use",
     Default = true,
     Callback = function(Value)
         Targeting.HighlightEnabled = (Toggles.HighlightToggle and Toggles.HighlightToggle.Value)
@@ -4625,12 +4707,40 @@ CombatHighlightTab:AddToggle('HighlightToggle',{Text = "Highlight",
         elseif Targeting.HighlightEnabled and (Targeting.Target or SilentAim.Target) then
             UpdateHighlight(Targeting.Target or SilentAim.Target)
         end
-    end}):AddColorPicker('TargetAimColor',{Title = "Highlight Color",
+    end})
+
+CombatHighlightTab:AddToggle('HighlightFill',{Text = "Fill",
+    Default = true,
+    Callback = function(Value)
+        RefreshHighlight()
+    end}):AddColorPicker('HighlightFillColor',{Title = "Fill Color",
     Default = Color3.fromRGB(27, 206, 203),
     Callback = function(Value)
-        if Targeting.Target or SilentAim.Target then
-            UpdateHighlight(Targeting.Target or SilentAim.Target)
-        end
+        RefreshHighlight()
+    end})
+
+CombatHighlightTab:AddToggle('HighlightOutline',{Text = "Outline",
+    Default = true,
+    Callback = function(Value)
+        RefreshHighlight()
+    end}):AddColorPicker('HighlightOutlineColor',{Title = "Outline Color",
+    Default = Color3.new(1, 1, 1),
+    Callback = function(Value)
+        RefreshHighlight()
+    end})
+
+CombatHighlightTab:AddDropdown('HighlightFillTransparency',{Text = "Fill Transparency",
+    Values = {"0", "0.25", "0.5", "0.75", "1"},
+    Default = "0",
+    Callback = function(Value)
+        RefreshHighlight()
+    end})
+
+CombatHighlightTab:AddDropdown('HighlightOutlineTransparency',{Text = "Outline Transparency",
+    Values = {"0", "0.25", "0.5", "0.75", "1"},
+    Default = "0",
+    Callback = function(Value)
+        RefreshHighlight()
     end})
 
 CombatTracerTab:AddToggle('TracerToggle',{Text = "Tracer",
@@ -4663,6 +4773,13 @@ CombatTracerTab:AddSlider('TracerOutlineThickness',{Text = "Outline Thickness",
     Rounding = 0,
     Callback = function(Value)
         tracerOutline.Thickness = (Options.TracerOutlineThickness and Options.TracerOutlineThickness.Value) or Targeting.TracerOutlineThickness
+    end})
+
+CombatTracerTab:AddDropdown('TracerStartPosition',{Text = "Starting Position",
+    Values = {"Bottom", "HumanoidRootPart", "Top", "Mouse"},
+    Default = "Mouse",
+    Callback = function(Value)
+        Targeting.TracerStartPosition = Value
     end})
 
 do
