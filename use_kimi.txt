@@ -3246,19 +3246,18 @@ function Library:targetui_modern()
     local main = IndicatorUI:FindFirstChildOfClass("Frame")
     if not main then return IndicatorUI end
 
-    -- Make the glow image follow the rounded main frame by cropping it with a
-    -- UICorner instead of relying on the 9-slice corners.
+    -- The glow image can't be cleanly rounded, so use a UIStroke glow that
+    -- follows the rounded main frame instead.
     local oldGlow = main:FindFirstChildOfClass("ImageLabel")
-    if oldGlow then
-        oldGlow.ScaleType = Enum.ScaleType.Crop
-        oldGlow.SliceCenter = Rect.new(0, 0, 0, 0)
-        local glowCorner = oldGlow:FindFirstChildOfClass("UICorner")
-        if not glowCorner then
-            glowCorner = Instance.new("UICorner")
-            glowCorner.Parent = oldGlow
-        end
-        glowCorner.CornerRadius = UDim.new(0, 32)
-    end
+    if oldGlow then oldGlow:Destroy() end
+
+    local glowStroke = Instance.new("UIStroke")
+    glowStroke.Color = getgenv().TargetUIGlowColor or getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
+    glowStroke.Thickness = 12
+    glowStroke.Transparency = 0.7
+    glowStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    glowStroke.Parent = main
+    Library._targetUIGlow = glowStroke
 
     local function round(frame, radius)
         if not frame or not frame:IsA("GuiObject") then return end
