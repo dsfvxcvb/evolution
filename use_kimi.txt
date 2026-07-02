@@ -3231,10 +3231,18 @@ function Library:targetui_old()
                 if head then
                     local headScreen, headOnScreen = Camera:WorldToViewportPoint(head.Position)
                     if headOnScreen then
-                        local offsetX, offsetY = 20, -20
                         local absSize = MainFrame.AbsoluteSize
+                        local viewportSize = Camera.ViewportSize
+                        local offsetX, offsetY = 15, -15
+
+                        local posX = headScreen.X + offsetX
+                        local posY = headScreen.Y - absSize.Y + offsetY
+
+                        posX = math.clamp(posX, 0, math.max(0, viewportSize.X - absSize.X))
+                        posY = math.clamp(posY, 0, math.max(0, viewportSize.Y - absSize.Y))
+
                         MainFrame.Draggable = false
-                        MainFrame.Position = UDim2.new(0, headScreen.X + offsetX, 0, headScreen.Y - absSize.Y + offsetY)
+                        MainFrame.Position = UDim2.new(0, posX, 0, posY)
                     end
                 end
             else
@@ -3735,8 +3743,7 @@ local function UpdateHighlight(Target)
         if fillEnabled then
             highlight.FillColor = (Options.HighlightFillColor and Options.HighlightFillColor.Value)
                 or Color3.fromRGB(27, 206, 203)
-            local fillTrans = Options.HighlightFillTransparency and Options.HighlightFillTransparency.Value or "0"
-            highlight.FillTransparency = tonumber(fillTrans) or 0
+            highlight.FillTransparency = (Options.HighlightFillTransparency and Options.HighlightFillTransparency.Value) or 0
         else
             highlight.FillTransparency = 1
         end
@@ -3744,8 +3751,7 @@ local function UpdateHighlight(Target)
         if outlineEnabled then
             highlight.OutlineColor = (Options.HighlightOutlineColor and Options.HighlightOutlineColor.Value)
                 or Color3.new(1, 1, 1)
-            local outlineTrans = Options.HighlightOutlineTransparency and Options.HighlightOutlineTransparency.Value or "0"
-            highlight.OutlineTransparency = tonumber(outlineTrans) or 0
+            highlight.OutlineTransparency = (Options.HighlightOutlineTransparency and Options.HighlightOutlineTransparency.Value) or 0
         else
             highlight.OutlineTransparency = 1
         end
@@ -4727,16 +4733,20 @@ CombatHighlightTab:AddToggle('HighlightOutline',{Text = "Outline",
         RefreshHighlight()
     end})
 
-CombatHighlightTab:AddDropdown('HighlightFillTransparency',{Text = "Fill Transparency",
-    Values = {"0", "0.25", "0.5", "0.75", "1"},
-    Default = "0",
+CombatHighlightTab:AddSlider('HighlightFillTransparency',{Text = "Fill Transparency",
+    Min = 0,
+    Max = 1,
+    Default = 0,
+    Rounding = 2,
     Callback = function(Value)
         RefreshHighlight()
     end})
 
-CombatHighlightTab:AddDropdown('HighlightOutlineTransparency',{Text = "Outline Transparency",
-    Values = {"0", "0.25", "0.5", "0.75", "1"},
-    Default = "0",
+CombatHighlightTab:AddSlider('HighlightOutlineTransparency',{Text = "Outline Transparency",
+    Min = 0,
+    Max = 1,
+    Default = 0,
+    Rounding = 2,
     Callback = function(Value)
         RefreshHighlight()
     end})
