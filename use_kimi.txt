@@ -48,6 +48,7 @@ local Tabs = {
 local CombatTargetAim = Tabs.Combat:AddLeftGroupbox('Target Aim')
 local CombatFOV = Tabs.Combat:AddLeftGroupbox('FOV Circle')
 local CombatTargetIndicators = Tabs.Combat:AddLeftTabbox('Target Indicators')
+local CombatProtectPlayer = Tabs.Combat:AddLeftGroupbox('Protect Player')
 local CombatAutoKill = Tabs.Combat:AddRightGroupbox('Auto Kill')
 local CombatKnifeHitbox = Tabs.Combat:AddRightGroupbox('Knife Hitbox Expander')
 local CombatAntiAim = Tabs.Combat:AddRightGroupbox('Anti-Aim')
@@ -992,6 +993,291 @@ local AutoKill = {
     ForceHitWasEnabled = false,
     ForceHitOriginal = nil,
 }
+
+local ProtectPlayer = {
+    Enabled = false,
+    Method = "Gun",
+    SelectedName = nil,
+    StompShooter = false,
+    SpectateShooter = false,
+    Active = false,
+    Shooter = nil,
+    LastHealth = nil,
+    BulletConnection = nil,
+    LoopConnection = nil,
+}
+
+local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent", 5)
+
+function ProtectPlayer.GetSelectedPlayer()
+    local name = ProtectPlayer.SelectedName
+    if not name then return nil end
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p.Name == name then return p end
+    end
+    return nil
+end
+
+function ProtectPlayer.IsValidTarget(player)
+    if not player or player == LocalPlayer then return false end
+    local char = player.Character
+    if not char then return false end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    local root = char:FindFirstChild("HumanoidRootPart")
+    return root ~= nil and hum ~= nil and hum.Health > 0
+end
+
+function ProtectPlayer.GetTargetStatus(player)
+    if not player or not player.Character then return "nochar" end
+    local hum = player.Character:FindFirstChildOfClass("Humanoid")
+    if not hum then return "nochar" end
+    if hum.Health <= 0 then return "dead" end
+    local be = player.Character:FindFirstChild("BodyEffects")
+    if be then
+        local dead = be:FindFirstChild("Dead")
+        if dead and dead.Value == true then return "dead" end
+        local ko = be:FindFirstChild("K.O")
+        if ko and ko.Value == true then return "downed" end
+    end
+    return "alive"
+end
+
+function ProtectPlayer.GetNearestEnemyAround(pos, ignorePlayer)
+    local closest, minDist = nil, math.huge
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer and p ~= ignorePlayer and ProtectPlayer.IsValidTarget(p) then
+            local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
+            if root then
+                local d = (root.Position - pos).Magnitude
+                if d < minDist then
+                    minDist = d
+                    closest = p
+                end
+            end
+        end
+    end
+    return closest
+end
+
+function ProtectPlayer.TryEquip(toolName)
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local tool = char:FindFirstChild(toolName)
+    if tool then return true end
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    if not backpack then return false end
+    tool = backpack:FindFirstChild(toolName)
+    if tool then
+        tool.Parent = char
+        return true
+    end
+    return false
+end
+
+function ProtectPlayer.GetAmmo()
+    local char = LocalPlayer.Character
+    if not char then return 0 end
+    local tool = char:FindFirstChild("[DoubleBarrel]")
+    if not tool then return 0 end
+    local scriptObj = tool:FindFirstChild("Script")
+    if not scriptObj then return 0 end
+    local ammo = scriptObj:FindFirstChild("Ammo")
+    local maxAmmo = scriptObj:FindFirstChild("MaxAmmo")
+    if ammo and maxAmmo and ammo:IsA("IntValue") and maxAmmo:IsA("IntValue") then
+        return ammo.Value
+    end
+    return 0
+end
+
+function ProtectPlayer.ReloadDoubleBarrel()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local tool = char:FindFirstChild("[DoubleBarrel]")
+    if not tool then return end
+    local mainEvent = getgenv().MainEvent or ReplicatedStorage:FindFirstChild("MainEvent")
+    if mainEvent then
+        pcall(function() mainEvent:FireServer("Reload", tool) end)
+    end
+end
+
+function ProtectPlayer.Stomp()
+    local mainEvent = getgenv().MainEvent or ReplicatedStorage:FindFirstChild("MainEvent")
+    if mainEvent then
+        pcall(function() mainEvent:FireServer("Stomp") end)
+    end
+end
+
+function ProtectPlayer.TeleportTo(targetPlayer, offset)
+    local char = LocalPlayer.Character
+    local root = char and char:FindFirstChild("HumanoidRootPart")
+    local targetRoot = targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not root or not targetRoot then return end
+    local cf = targetRoot.CFrame
+    if offset then
+        cf = cf * offset
+    end
+    root.CFrame = cf
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
+end
+
+function ProtectPlayer.GunAttack(target)
+    if not ProtectPlayer.TryEquip("[DoubleBarrel]") then return end
+    local ammo = ProtectPlayer.GetAmmo()
+    if ammo <= 0 then
+        ProtectPlayer.ReloadDoubleBarrel()
+        return
+    end
+    ProtectPlayer.TeleportTo(target, CFrame.new(0, 0, 2))
+    if getgenv().FH_Fire and getgenv().ForceHit and getgenv().ForceHit.Enabled then
+        pcall(function() getgenv().FH_Fire(target) end)
+    else
+        local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("[DoubleBarrel]")
+        if tool then
+            pcall(function() tool:Activate() end)
+        end
+    end
+end
+
+function ProtectPlayer.KnifeAttack(target)
+    if not ProtectPlayer.TryEquip("[Knife]") then return end
+    ProtectPlayer.TeleportTo(target, CFrame.new(0, 0, 1))
+    local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("[Knife]")
+    if tool then
+        local scriptObj = tool:FindFirstChild("Script")
+        if scriptObj then
+            local can1 = scriptObj:FindFirstChild("CanHitPlayer")
+            local can2 = scriptObj:FindFirstChild("CanHitPlayer2")
+            if can1 then pcall(function() can1.Value = target.Character end) end
+            if can2 then pcall(function() can2.Value = target.Character end) end
+        end
+        pcall(function() tool:Activate() end)
+    end
+end
+
+function ProtectPlayer.Attack(target)
+    if ProtectPlayer.Method == "Gun" then
+        ProtectPlayer.GunAttack(target)
+    else
+        ProtectPlayer.KnifeAttack(target)
+    end
+end
+
+function ProtectPlayer.ReturnToSelected()
+    local selected = ProtectPlayer.GetSelectedPlayer()
+    if not selected or not selected.Character then return end
+    local selRoot = selected.Character:FindFirstChild("HumanoidRootPart")
+    local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not selRoot or not myRoot then return end
+    myRoot.CFrame = selRoot.CFrame * CFrame.new(0, 0, 5)
+    myRoot.AssemblyLinearVelocity = Vector3.zero
+    myRoot.AssemblyAngularVelocity = Vector3.zero
+end
+
+function ProtectPlayer.SetSpectate(target)
+    if not ProtectPlayer.SpectateShooter then return end
+    if target and target.Character and target.Character:FindFirstChildOfClass("Humanoid") then
+        Camera.CameraSubject = target.Character:FindFirstChildOfClass("Humanoid")
+    elseif LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+        Camera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    end
+end
+
+function ProtectPlayer.Start()
+    if ProtectPlayer.LoopConnection then return end
+    ProtectPlayer.LoopConnection = RunService.Heartbeat:Connect(function()
+        if not ProtectPlayer.Enabled then return end
+        local selected = ProtectPlayer.GetSelectedPlayer()
+        if not selected then return end
+
+        -- If shooter is dead/gone, clear and return.
+        if ProtectPlayer.Shooter and not ProtectPlayer.IsValidTarget(ProtectPlayer.Shooter) then
+            local status = ProtectPlayer.GetTargetStatus(ProtectPlayer.Shooter)
+            if status == "dead" or status == "nochar" then
+                ProtectPlayer.SetSpectate(nil)
+                ProtectPlayer.ReturnToSelected()
+                ProtectPlayer.Shooter = nil
+                ProtectPlayer.Active = false
+            end
+        end
+
+        -- Determine shooter from health drop if we don't have one.
+        if not ProtectPlayer.Shooter or not ProtectPlayer.IsValidTarget(ProtectPlayer.Shooter) then
+            if selected.Character then
+                local root = selected.Character:FindFirstChild("HumanoidRootPart")
+                local hum = selected.Character:FindFirstChildOfClass("Humanoid")
+                if root and hum then
+                    local health = hum.Health
+                    if ProtectPlayer.LastHealth and health < ProtectPlayer.LastHealth then
+                        ProtectPlayer.Shooter = ProtectPlayer.GetNearestEnemyAround(root.Position, selected)
+                    end
+                    ProtectPlayer.LastHealth = health
+                end
+            end
+        end
+
+        -- Engage shooter.
+        local shooterStatus = ProtectPlayer.Shooter and ProtectPlayer.GetTargetStatus(ProtectPlayer.Shooter) or "nochar"
+        if shooterStatus ~= "nochar" then
+            if shooterStatus == "alive" then
+                ProtectPlayer.Active = true
+                ProtectPlayer.SetSpectate(ProtectPlayer.Shooter)
+                ProtectPlayer.Attack(ProtectPlayer.Shooter)
+            elseif shooterStatus == "downed" and ProtectPlayer.StompShooter then
+                ProtectPlayer.Active = true
+                ProtectPlayer.SetSpectate(ProtectPlayer.Shooter)
+                ProtectPlayer.TeleportTo(ProtectPlayer.Shooter, CFrame.new(0, 0, 1))
+                ProtectPlayer.Stomp()
+            else
+                ProtectPlayer.SetSpectate(nil)
+                ProtectPlayer.ReturnToSelected()
+                ProtectPlayer.Shooter = nil
+                ProtectPlayer.Active = false
+            end
+        else
+            ProtectPlayer.Active = false
+            if selected.Character then
+                local hum = selected.Character:FindFirstChildOfClass("Humanoid")
+                ProtectPlayer.LastHealth = hum and hum.Health or nil
+            end
+        end
+    end)
+
+    if UnreliableMainEvent and not ProtectPlayer.BulletConnection then
+        ProtectPlayer.BulletConnection = UnreliableMainEvent.OnClientEvent:Connect(function(...)
+            if not ProtectPlayer.Enabled then return end
+            local args = {...}
+            if args[1] ~= "ReplicateBulletRay" then return end
+            local endPos = args[3]
+            local shooterTbl = args[4]
+            local shooter = shooterTbl and shooterTbl[1]
+            if not endPos or not shooter or typeof(shooter) ~= "Instance" or not shooter:IsA("Player") then return end
+            if shooter == LocalPlayer then return end
+
+            local selected = ProtectPlayer.GetSelectedPlayer()
+            if not selected or not selected.Character then return end
+            local root = selected.Character:FindFirstChild("HumanoidRootPart")
+            if root and (root.Position - endPos).Magnitude < 12 then
+                ProtectPlayer.Shooter = shooter
+            end
+        end)
+    end
+end
+
+function ProtectPlayer.Stop()
+    if ProtectPlayer.LoopConnection then
+        ProtectPlayer.LoopConnection:Disconnect()
+        ProtectPlayer.LoopConnection = nil
+    end
+    if ProtectPlayer.BulletConnection then
+        ProtectPlayer.BulletConnection:Disconnect()
+        ProtectPlayer.BulletConnection = nil
+    end
+    ProtectPlayer.Shooter = nil
+    ProtectPlayer.Active = false
+    ProtectPlayer.LastHealth = nil
+    ProtectPlayer.SetSpectate(nil)
+end
 
 function AutoKill.CreateUI()
     if AutoKill.UI then return AutoKill.UI end
@@ -4572,8 +4858,67 @@ TargetAimSection:AddToggle('LookAtTarget',{Text = "Look At Target",
         end
     end})
 
+local function UpdateProtectPlayerList()
+    local list = {}
+    for _, p in ipairs(Players:GetPlayers()) do
+        if p ~= LocalPlayer then
+            table.insert(list, p.Name)
+        end
+    end
+    if Options.ProtectPlayerPlayers then
+        Options.ProtectPlayerPlayers:SetValues(list)
+        if not table.find(list, ProtectPlayer.SelectedName or "") then
+            ProtectPlayer.SelectedName = nil
+        end
+    end
+end
 
+CombatProtectPlayer:AddToggle('ProtectPlayerUse', {Text = "Use",
+    Default = false,
+    Callback = function(Value)
+        ProtectPlayer.Enabled = Value
+        if Value then
+            ProtectPlayer.Start()
+        else
+            ProtectPlayer.Stop()
+        end
+    end})
 
+CombatProtectPlayer:AddDropdown('ProtectPlayerMethod', {Text = "Mode",
+    Values = {"Gun", "Knife"},
+    Default = "Gun",
+    Callback = function(Value)
+        ProtectPlayer.Method = Value
+    end})
+
+CombatProtectPlayer:AddDropdown('ProtectPlayerPlayers', {Text = "Players",
+    Values = {},
+    Default = nil,
+    Callback = function(Value)
+        ProtectPlayer.SelectedName = Value
+        ProtectPlayer.LastHealth = nil
+    end})
+
+CombatProtectPlayer:AddToggle('ProtectPlayerStomp', {Text = "Stomp Shooter",
+    Default = false,
+    Callback = function(Value)
+        ProtectPlayer.StompShooter = Value
+    end})
+
+CombatProtectPlayer:AddToggle('ProtectPlayerSpectate', {Text = "Spectate Shooter",
+    Default = false,
+    Callback = function(Value)
+        ProtectPlayer.SpectateShooter = Value
+        if not Value then
+            if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                Camera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            end
+        end
+    end})
+
+Players.PlayerAdded:Connect(UpdateProtectPlayerList)
+Players.PlayerRemoving:Connect(UpdateProtectPlayerList)
+task.spawn(UpdateProtectPlayerList)
 
 local CombatTracerTab = CombatTargetIndicators:AddTab('Tracer')
 local CombatTargetUITab = CombatTargetIndicators:AddTab('Target UI')
