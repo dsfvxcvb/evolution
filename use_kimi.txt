@@ -2775,7 +2775,7 @@ function Library:targetui_old()
     Glow.Image = "http://www.roblox.com/asset/?id=18245826428"
     Glow.ScaleType = Enum.ScaleType.Slice
     Glow.SliceCenter = Rect.new(Vector2.new(21, 21), Vector2.new(79, 79))
-    Glow.ImageColor3 = getgenv().TargetUIColor or Color3.fromRGB(27, 206, 203)
+    Glow.ImageColor3 = getgenv().TargetUIGlowColor or getgenv().TargetUIColor or getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
     Glow.ImageTransparency = 0.85
     Glow.Position = UDim2.new(0, -20, 0, -20)
     Glow.Size = UDim2.new(1, 40, 1, 40)
@@ -2785,7 +2785,7 @@ function Library:targetui_old()
     Library._targetUIGlow = Glow
 
     local OuterBorder = Instance.new("Frame")
-    OuterBorder.BackgroundColor3 = getgenv().TargetUIColor or Color3.fromRGB(27, 206, 203)
+    OuterBorder.BackgroundColor3 = getgenv().TargetUIBorderColor or getgenv().TargetUIColor or Color3.fromRGB(27, 206, 203)
     OuterBorder.BorderSizePixel = 0
     OuterBorder.Position = UDim2.new(0, 1, 0, 1)
     OuterBorder.Size = UDim2.new(1, -2, 1, -2)
@@ -2915,7 +2915,7 @@ function Library:targetui_old()
     Gradient2.Parent = PlayerInfoInner2
 
     local TopBar = Instance.new("Frame")
-    TopBar.BackgroundColor3 = getgenv().TargetUIColor or Color3.fromRGB(27, 206, 203)
+    TopBar.BackgroundColor3 = getgenv().TargetUIBorderColor or getgenv().TargetUIColor or Color3.fromRGB(27, 206, 203)
     TopBar.BorderSizePixel = 0
     TopBar.Size = UDim2.new(1, 0, 0, 2)
     TopBar.Name = "bar"
@@ -3296,7 +3296,7 @@ function Library:targetui_modern()
     -- === Glow: concentric rounded frames, transparency solved so the
     -- combined (fully-stacked) result matches the original image's look ===
 
-    local glowColor = getgenv().TargetUIColor or Color3.fromRGB(27, 206, 203)
+    local glowColor = getgenv().TargetUIGlowColor or getgenv().TargetUIColor or getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
     local glowLayers = 8
     local glowMaxInset = 22
 
