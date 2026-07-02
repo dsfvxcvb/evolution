@@ -3257,18 +3257,18 @@ function Library:targetui_modern()
     glow.Position = main.Position
     glow.Size = UDim2.new(
         main.Size.Width.Scale,
-        main.Size.Width.Offset + 40,
+        main.Size.Width.Offset + 60,
         main.Size.Height.Scale,
-        main.Size.Height.Offset + 40
+        main.Size.Height.Offset + 60
     )
     glow.BackgroundColor3 = getgenv().TargetUIGlowColor or Color3.fromRGB(27, 206, 203)
-    glow.BackgroundTransparency = 0.82
+    glow.BackgroundTransparency = 0.65
     glow.BorderSizePixel = 0
     glow.ZIndex = main.ZIndex - 1
     glow.Parent = IndicatorUI
 
     local glowCorner = Instance.new("UICorner")
-    glowCorner.CornerRadius = UDim.new(0, 18)
+    glowCorner.CornerRadius = UDim.new(0, 20)
     glowCorner.Parent = glow
     Library._targetUIGlow = glow
 
