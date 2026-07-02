@@ -3252,9 +3252,7 @@ function Library:targetui_modern()
     -- The 9-slice glow image has square corners. To make it follow the rounded
     -- frame, put it inside a rounded Frame with ClipsDescendants so the image is
     -- cropped along the curve.
-    local mainRadius = 12
     local glowInset = 20
-    local glowRadius = mainRadius + glowInset
 
     local GlowHolder = Instance.new("Frame")
     GlowHolder.Name = "GlowHolder"
@@ -3266,7 +3264,7 @@ function Library:targetui_modern()
     GlowHolder.Parent = main
 
     local holderCorner = Instance.new("UICorner")
-    holderCorner.CornerRadius = UDim.new(0, glowRadius)
+    holderCorner.CornerRadius = UDim.new(0, 12 + glowInset)
     holderCorner.Parent = GlowHolder
 
     local Glow = Instance.new("ImageLabel")
@@ -3286,10 +3284,12 @@ function Library:targetui_modern()
 
     local function round(frame, radius)
         if not frame or not frame:IsA("GuiObject") then return end
-        if frame:FindFirstChildOfClass("UICorner") then return end
-        local corner = Instance.new("UICorner")
+        local corner = frame:FindFirstChildOfClass("UICorner")
+        if not corner then
+            corner = Instance.new("UICorner")
+            corner.Parent = frame
+        end
         corner.CornerRadius = UDim.new(0, radius)
-        corner.Parent = frame
     end
 
     local function roundDescendants(obj, depth)
@@ -3309,7 +3309,17 @@ function Library:targetui_modern()
         end
     end
 
-    round(main, mainRadius)
+    -- Round the main panel first and force it to clip to its rounded silhouette.
+    round(main, 12)
+    main.ClipsDescendants = true
+
+    -- Read the radius that was actually applied so the glow holder can stay concentric.
+    local mainCorner = main:FindFirstChildOfClass("UICorner")
+    local mainRadius = mainCorner and mainCorner.CornerRadius.Offset or 12
+    if holderCorner then
+        holderCorner.CornerRadius = UDim.new(0, mainRadius + glowInset)
+    end
+
     roundDescendants(main, 1)
 
     return IndicatorUI
