@@ -1007,7 +1007,7 @@ local ProtectPlayer = {
     LoopConnection = nil,
 }
 
-local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent", 5)
+local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent")
 
 function ProtectPlayer.GetSelectedPlayer()
     local name = ProtectPlayer.SelectedName
@@ -1042,21 +1042,42 @@ function ProtectPlayer.GetTargetStatus(player)
     return "alive"
 end
 
+function ProtectPlayer.HasGunEquipped(player)
+    local char = player.Character
+    if not char then return false end
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Tool") then
+            local name = child.Name
+            if name == "[DoubleBarrel]" or name == "[Revolver]" or name == "[SMG]" or name == "[Shotgun]"
+                or name == "[Silencer]" or name == "[TacticalShotgun]" or name == "[Flintlock]"
+                or name == "[RPG]" or name == "[Glock]" or name == "[Uzi]" or name == "[Ak47]" then
+                return true
+            end
+        end
+    end
+    return false
+end
+
 function ProtectPlayer.GetNearestEnemyAround(pos, ignorePlayer)
-    local closest, minDist = nil, math.huge
+    local closestGun, minDistGun = nil, math.huge
+    local closestAny, minDistAny = nil, math.huge
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p ~= ignorePlayer and ProtectPlayer.IsValidTarget(p) then
             local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
             if root then
                 local d = (root.Position - pos).Magnitude
-                if d < minDist then
-                    minDist = d
-                    closest = p
+                if d < minDistAny then
+                    minDistAny = d
+                    closestAny = p
+                end
+                if ProtectPlayer.HasGunEquipped(p) and d < minDistGun then
+                    minDistGun = d
+                    closestGun = p
                 end
             end
         end
     end
-    return closest
+    return closestGun or closestAny
 end
 
 function ProtectPlayer.TryEquip(toolName)
@@ -1130,7 +1151,14 @@ function ProtectPlayer.GunAttack(target)
     end
     ProtectPlayer.TeleportTo(target, CFrame.new(0, 0, 2))
     if getgenv().FH_Fire then
+        local wasEnabled = getgenv().ForceHit and getgenv().ForceHit.Enabled
+        if getgenv().ForceHit then
+            getgenv().ForceHit.Enabled = true
+        end
         pcall(function() getgenv().FH_Fire(target) end)
+        if getgenv().ForceHit and wasEnabled ~= nil then
+            getgenv().ForceHit.Enabled = wasEnabled
+        end
     else
         local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("[DoubleBarrel]")
         if tool then
@@ -1256,8 +1284,18 @@ function ProtectPlayer.Start()
 
             local selected = ProtectPlayer.GetSelectedPlayer()
             if not selected or not selected.Character then return end
-            local root = selected.Character:FindFirstChild("HumanoidRootPart")
-            if root and (root.Position - endPos).Magnitude < 12 then
+
+            -- Check if the bullet landed close to any part of the selected player.
+            local closestDist = math.huge
+            for _, part in ipairs(selected.Character:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    local d = (part.Position - endPos).Magnitude
+                    if d < closestDist then
+                        closestDist = d
+                    end
+                end
+            end
+            if closestDist < 8 then
                 ProtectPlayer.Shooter = shooter
             end
         end)
