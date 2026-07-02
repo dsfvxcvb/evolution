@@ -1129,7 +1129,7 @@ function ProtectPlayer.GunAttack(target)
         return
     end
     ProtectPlayer.TeleportTo(target, CFrame.new(0, 0, 2))
-    if getgenv().FH_Fire and getgenv().ForceHit and getgenv().ForceHit.Enabled then
+    if getgenv().FH_Fire then
         pcall(function() getgenv().FH_Fire(target) end)
     else
         local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("[DoubleBarrel]")
@@ -4893,6 +4893,7 @@ CombatProtectPlayer:AddDropdown('ProtectPlayerMethod', {Text = "Mode",
 
 CombatProtectPlayer:AddDropdown('ProtectPlayerPlayers', {Text = "Players",
     Values = {},
+    Default = nil,
     AllowNull = true,
     Callback = function(Value)
         ProtectPlayer.SelectedName = Value
