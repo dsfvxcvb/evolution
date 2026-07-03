@@ -1011,6 +1011,8 @@ local ProtectPlayer = {
     RayThreshold = 10,
     BulletWindow = 1.5,
     GlobalShotWindow = 0.3,
+    AttackCooldown = 0.25,
+    LastAttackTime = 0,
 }
 
 local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent")
@@ -1208,6 +1210,10 @@ function ProtectPlayer.GunAttack(target)
         return
     end
     ProtectPlayer.TeleportTo(target, CFrame.new(0, 0, 2))
+    -- Wait one physics step so the teleport actually replicates before firing.
+    -- Firing immediately after setting CFrame causes the shot to register from
+    -- the old position and trips the anti-cheat.
+    RunService.Heartbeat:Wait()
     if getgenv().FH_Fire then
         local useForcehit = GetFlag("UseForcehit")
         local wasEnabled = getgenv().ForceHit and getgenv().ForceHit.Enabled
@@ -1225,11 +1231,13 @@ function ProtectPlayer.GunAttack(target)
             pcall(function() tool:Activate() end)
         end
     end
+    ProtectPlayer.LastAttackTime = tick()
 end
 
 function ProtectPlayer.KnifeAttack(target)
     if not ProtectPlayer.TryEquip("[Knife]") then return end
     ProtectPlayer.TeleportTo(target, CFrame.new(0, 0, 1))
+    RunService.Heartbeat:Wait()
     local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("[Knife]")
     if tool then
         local scriptObj = tool:FindFirstChild("Script")
@@ -1241,6 +1249,7 @@ function ProtectPlayer.KnifeAttack(target)
         end
         pcall(function() tool:Activate() end)
     end
+    ProtectPlayer.LastAttackTime = tick()
 end
 
 function ProtectPlayer.Attack(target)
@@ -1310,12 +1319,18 @@ function ProtectPlayer.Start()
             if shooterStatus == "alive" then
                 ProtectPlayer.Active = true
                 ProtectPlayer.SetSpectate(ProtectPlayer.Shooter)
-                ProtectPlayer.Attack(ProtectPlayer.Shooter)
+                if tick() - ProtectPlayer.LastAttackTime >= ProtectPlayer.AttackCooldown then
+                    ProtectPlayer.Attack(ProtectPlayer.Shooter)
+                end
             elseif shooterStatus == "downed" and ProtectPlayer.StompShooter then
                 ProtectPlayer.Active = true
                 ProtectPlayer.SetSpectate(ProtectPlayer.Shooter)
-                ProtectPlayer.TeleportTo(ProtectPlayer.Shooter, CFrame.new(0, 0, 1))
-                ProtectPlayer.Stomp()
+                if tick() - ProtectPlayer.LastAttackTime >= ProtectPlayer.AttackCooldown then
+                    ProtectPlayer.TeleportTo(ProtectPlayer.Shooter, CFrame.new(0, 0, 1))
+                    RunService.Heartbeat:Wait()
+                    ProtectPlayer.Stomp()
+                    ProtectPlayer.LastAttackTime = tick()
+                end
             else
                 ProtectPlayer.SetSpectate(nil)
                 ProtectPlayer.ReturnToSelected()
