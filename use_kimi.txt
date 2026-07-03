@@ -10605,51 +10605,33 @@ MiscMovement:AddToggle('AddonInfiniteJump', { Text = 'Infinite Jump', Default = 
     end)
 
     do
+        local AnimatedToolsTools = {}
         local AnimatedToolsOriginalGrips = {}
         local AnimatedToolsConnection = nil
         local AnimatedToolsToolAddedConn = nil
         local AnimatedToolsToolRemovedConn = nil
         local AnimatedToolsCharAddedConn = nil
 
-        local function ClearGripsTable()
-            for k in pairs(AnimatedToolsOriginalGrips) do
-                AnimatedToolsOriginalGrips[k] = nil
-            end
-        end
-
-        local function GetEquippedTool()
-            local char = LocalPlayer.Character
-            if not char then return nil end
-            for _, child in ipairs(char:GetChildren()) do
-                if child:IsA("Tool") and child:FindFirstChild("Handle") then
-                    return child
-                end
-            end
-            return nil
-        end
-
-        local function StoreTool(tool)
+        local function AddAnimatedTool(tool)
             if not tool or not tool:IsA("Tool") then return end
-            if AnimatedToolsOriginalGrips[tool] then return end
-            AnimatedToolsOriginalGrips[tool] = tool.Grip
+            local handle = tool:FindFirstChild("Handle")
+            if not handle then return end
+            if AnimatedToolsOriginalGrips[handle] then return end
+            AnimatedToolsOriginalGrips[handle] = tool.Grip
+            AnimatedToolsTools[handle] = tool
         end
 
         local function RestoreAllGrips()
-            for tool, grip in pairs(AnimatedToolsOriginalGrips) do
+            for handle, grip in pairs(AnimatedToolsOriginalGrips) do
+                local tool = AnimatedToolsTools[handle]
                 if tool and tool.Parent then
                     pcall(function()
                         tool.Grip = grip
                     end)
                 end
             end
-            ClearGripsTable()
-        end
-
-        local function AddCurrentTool()
-            local tool = GetEquippedTool()
-            if tool then
-                StoreTool(tool)
-            end
+            AnimatedToolsOriginalGrips = {}
+            AnimatedToolsTools = {}
         end
 
         local function ConnectToolEvents(char)
@@ -10663,49 +10645,55 @@ MiscMovement:AddToggle('AddonInfiniteJump', { Text = 'Infinite Jump', Default = 
             end
 
             AnimatedToolsToolAddedConn = char.ChildAdded:Connect(function(child)
-                if child:IsA("Tool") and child:FindFirstChild("Handle") then
-                    StoreTool(child)
-                end
+                AddAnimatedTool(child)
             end)
 
             AnimatedToolsToolRemovedConn = char.ChildRemoved:Connect(function(child)
-                if AnimatedToolsOriginalGrips[child] then
+                if not child:IsA("Tool") then return end
+                local handle = child:FindFirstChild("Handle")
+                if not handle then return end
+                if AnimatedToolsOriginalGrips[handle] then
                     pcall(function()
-                        child.Grip = AnimatedToolsOriginalGrips[child]
+                        child.Grip = AnimatedToolsOriginalGrips[handle]
                     end)
-                    AnimatedToolsOriginalGrips[child] = nil
+                    AnimatedToolsOriginalGrips[handle] = nil
+                    AnimatedToolsTools[handle] = nil
                 end
             end)
         end
 
         local function UpdateAnimatedTools()
-            if not Toggles.AnimatedToolsEnabled.Value then
-                if AnimatedToolsConnection then
-                    AnimatedToolsConnection:Disconnect()
-                    AnimatedToolsConnection = nil
-                end
-                if AnimatedToolsToolAddedConn then
-                    AnimatedToolsToolAddedConn:Disconnect()
-                    AnimatedToolsToolAddedConn = nil
-                end
-                if AnimatedToolsToolRemovedConn then
-                    AnimatedToolsToolRemovedConn:Disconnect()
-                    AnimatedToolsToolRemovedConn = nil
-                end
-                if AnimatedToolsCharAddedConn then
-                    AnimatedToolsCharAddedConn:Disconnect()
-                    AnimatedToolsCharAddedConn = nil
-                end
-                RestoreAllGrips()
-                return
+            if AnimatedToolsConnection then
+                AnimatedToolsConnection:Disconnect()
+                AnimatedToolsConnection = nil
+            end
+            if AnimatedToolsToolAddedConn then
+                AnimatedToolsToolAddedConn:Disconnect()
+                AnimatedToolsToolAddedConn = nil
+            end
+            if AnimatedToolsToolRemovedConn then
+                AnimatedToolsToolRemovedConn:Disconnect()
+                AnimatedToolsToolRemovedConn = nil
+            end
+            if AnimatedToolsCharAddedConn then
+                AnimatedToolsCharAddedConn:Disconnect()
+                AnimatedToolsCharAddedConn = nil
             end
 
             RestoreAllGrips()
-            AddCurrentTool()
 
-            if AnimatedToolsConnection then
-                AnimatedToolsConnection:Disconnect()
+            if not Toggles.AnimatedToolsEnabled.Value then
+                return
             end
+
+            local char = LocalPlayer.Character
+            if char then
+                for _, child in ipairs(char:GetChildren()) do
+                    AddAnimatedTool(child)
+                end
+                ConnectToolEvents(char)
+            end
+
             AnimatedToolsConnection = RunService.Heartbeat:Connect(function(dt)
                 local horizontalMode = Options.AnimatedToolsHorizontal.Value
                 local verticalMode = Options.AnimatedToolsVertical.Value
@@ -10734,26 +10722,20 @@ MiscMovement:AddToggle('AddonInfiniteJump', { Text = 'Infinite Jump', Default = 
                     vertical = 45
                 end
 
-                for tool, originalGrip in pairs(AnimatedToolsOriginalGrips) do
+                for handle, tool in pairs(AnimatedToolsTools) do
                     if tool and tool.Parent then
                         tool.Grip = tool.Grip * CFrame.Angles(math.rad(vertical * dt * vSpeed), math.rad(horizontal * dt * hSpeed), 0)
                     end
                 end
             end)
 
-            local char = LocalPlayer.Character
-            if char then
-                ConnectToolEvents(char)
-            end
-
-            if AnimatedToolsCharAddedConn then
-                AnimatedToolsCharAddedConn:Disconnect()
-            end
             AnimatedToolsCharAddedConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
                 if not Toggles.AnimatedToolsEnabled.Value then return end
                 task.wait(0.1)
+                for _, child in ipairs(newChar:GetChildren()) do
+                    AddAnimatedTool(child)
+                end
                 ConnectToolEvents(newChar)
-                AddCurrentTool()
             end)
         end
 
