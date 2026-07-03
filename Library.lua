@@ -95,39 +95,39 @@ function Library:GetCornerRadius(Instance)
     end;
 end;
 
-function Library:ApplyCorner(Instance)
-    if not self:ShouldRound(Instance) then return end;
-    if Instance:FindFirstChild('ModernUICorner') then return end;
+function Library:ApplyCorner(Inst)
+    if not self:ShouldRound(Inst) then return end;
+    if Inst:FindFirstChild('ModernUICorner') then return end;
 
     local Corner = Instance.new('UICorner');
     Corner.Name = 'ModernUICorner';
-    Corner.CornerRadius = self:GetCornerRadius(Instance);
-    Corner.Parent = Instance;
+    Corner.CornerRadius = self:GetCornerRadius(Inst);
+    Corner.Parent = Inst;
 
     -- Roblox's legacy Border renders as a square outline on top of (or instead of)
     -- the rounded background, so hide it and replace it with a UIStroke that follows
     -- the UICorner.
-    if Instance:IsA('GuiObject') and Instance.BorderSizePixel > 0 then
-        Instance:SetAttribute('ModernUI_OriginalBorder', Instance.BorderSizePixel);
-        Instance.BorderSizePixel = 0;
+    if Inst:IsA('GuiObject') and Inst.BorderSizePixel > 0 then
+        Inst:SetAttribute('ModernUI_OriginalBorder', Inst.BorderSizePixel);
+        Inst.BorderSizePixel = 0;
 
-        local Stroke = Instance:FindFirstChild('ModernUIStroke');
+        local Stroke = Inst:FindFirstChild('ModernUIStroke');
         if not Stroke then
             Stroke = Instance.new('UIStroke');
             Stroke.Name = 'ModernUIStroke';
             Stroke.Thickness = 1;
             Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
             Stroke.LineJoinMode = Enum.LineJoinMode.Round;
-            Stroke.Parent = Instance;
+            Stroke.Parent = Inst;
         end;
 
-        Stroke.Color = Instance.BorderColor3;
+        Stroke.Color = Inst.BorderColor3;
 
-        if not self.ModernConnections[Instance] then
-            self.ModernConnections[Instance] = Instance:GetPropertyChangedSignal('BorderColor3'):Connect(function()
-                local S = Instance:FindFirstChild('ModernUIStroke');
+        if not self.ModernConnections[Inst] then
+            self.ModernConnections[Inst] = Inst:GetPropertyChangedSignal('BorderColor3'):Connect(function()
+                local S = Inst:FindFirstChild('ModernUIStroke');
                 if S then
-                    S.Color = Instance.BorderColor3;
+                    S.Color = Inst.BorderColor3;
                 end;
             end);
         end;
@@ -136,9 +136,9 @@ function Library:ApplyCorner(Instance)
     -- Without clipping, square child frames can poke out past the rounded parent
     -- corners and make the whole UI look square. Clip rounded containers so the
     -- rounded silhouette is actually visible.
-    if Instance:IsA('GuiObject') then
-        Instance:SetAttribute('ModernUI_OriginalClips', Instance.ClipsDescendants);
-        Instance.ClipsDescendants = true;
+    if Inst:IsA('GuiObject') then
+        Inst:SetAttribute('ModernUI_OriginalClips', Inst.ClipsDescendants);
+        Inst.ClipsDescendants = true;
     end;
 end;
 
