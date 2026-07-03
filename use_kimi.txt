@@ -8,6 +8,7 @@ print("cum")
 print("FUCKING FAGOGT HOLY")
 print("brody")
 print("TEST NIGGA HOLY FUCK")
+print("please work")
 
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
     pcall(function() Library:Unload() end)
