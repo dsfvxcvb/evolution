@@ -1015,7 +1015,6 @@ local ProtectPlayer = {
     LastAttackTime = 0,
     MaxShooterDistance = 200,
     VisualSpoof = false,
-    CameraSubjectRestore = nil,
 }
 
 local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent")
@@ -1308,27 +1307,9 @@ end
 
 function ProtectPlayer.ApplyVisualSpoof(active, selected)
     if active and ProtectPlayer.VisualSpoof then
-        local selHum = selected and selected.Character and selected.Character:FindFirstChildOfClass("Humanoid")
-        if selHum then
-            ProtectPlayer.HideLocalCharacter()
-            if Camera.CameraSubject ~= selHum then
-                if ProtectPlayer.CameraSubjectRestore == nil then
-                    ProtectPlayer.CameraSubjectRestore = Camera.CameraSubject
-                end
-                Camera.CameraSubject = selHum
-            end
-        end
+        ProtectPlayer.HideLocalCharacter()
     else
         ProtectPlayer.RestoreLocalCharacter()
-        if ProtectPlayer.CameraSubjectRestore ~= nil then
-            local restore = ProtectPlayer.CameraSubjectRestore
-            if typeof(restore) == "Instance" and restore.Parent then
-                Camera.CameraSubject = restore
-            elseif LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-                Camera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            end
-            ProtectPlayer.CameraSubjectRestore = nil
-        end
     end
 end
 
