@@ -7018,76 +7018,110 @@ do
         end
     end
 
+
+
     local function DrawLineTracer(startPos, endPos, cfg)
-        local cam = Camera
-        local thickness = cfg.LineThickness or 1
-        local baseAlpha = 1 - (cfg.Transparency0 or 0)
+        local lineTransparency = 1 - (cfg.Transparency0 or 0)
+        local outlineTransparency = 1 - (cfg.Transparency0 or 0)
+        local lineColor = cfg.LineColor or cfg.Color or Color3.fromRGB(255, 50, 50)
+        local outlineColor = cfg.LineOutlineColor or Color3.fromRGB(0, 0, 0)
+        local lifetime = cfg.Lifetime or 0.6
 
         local outline = Drawing.new("Line")
-        outline.Color = cfg.LineOutlineColor or Color3.fromRGB(0, 0, 0)
-        outline.Thickness = thickness + 2
-        outline.Transparency = baseAlpha
+        outline.Color = outlineColor
+        outline.Thickness = 3
+        outline.Transparency = outlineTransparency
         outline.Visible = true
 
         local line = Drawing.new("Line")
-        line.Color = cfg.LineColor or cfg.Color or Color3.fromRGB(255, 50, 50)
-        line.Thickness = thickness
-        line.Transparency = baseAlpha
+        line.Color = lineColor
+        line.Thickness = 1
+        line.Transparency = lineTransparency
         line.Visible = true
 
-        local lifetime = cfg.Lifetime or 0.6
-        local elapsed = 0
-
-        local function project(p)
-            local pos, onScreen = cam:WorldToViewportPoint(p)
-            if pos.Z < 0 then
-                local size = cam.ViewportSize
-                local half = size / 2
-                pos = Vector2.new(
-                    math.clamp(half.X + (half.X - pos.X), 0, size.X),
-                    math.clamp(half.Y + (half.Y - pos.Y), 0, size.Y)
-                )
-            end
-            return Vector2.new(pos.X, pos.Y), onScreen
-        end
-
+        local cam = Camera
+        local elapsed_time = 0
         local conn
-        conn = RunService.RenderStepped:Connect(function(dt)
-            elapsed = elapsed + dt
-            local from, on1 = project(startPos)
-            local to, on2 = project(endPos)
-            local onScreen = on1 or on2
+        conn = RunService.Heartbeat:Connect(function(dt)
+            if not line or not outline then
+                if conn then conn:Disconnect() end
+                return
+            end
 
-            if not onScreen then
+            elapsed_time = elapsed_time + dt
+
+            local pos, on_screen = cam:WorldToViewportPoint(startPos)
+            local pos2, on_screen2 = cam:WorldToViewportPoint(endPos)
+
+            if not on_screen and not on_screen2 then
                 line.Visible = false
                 outline.Visible = false
-            else
-                line.Visible = true
-                outline.Visible = true
-                line.From = from
-                line.To = to
-
-                local dir = (from - to)
-                if dir.Magnitude > 0 then
-                    local offset = dir.Unit
-                    outline.From = from + offset
-                    outline.To = to - offset
-                else
-                    outline.From = from
-                    outline.To = to
-                end
+                return
             end
 
-            if elapsed > lifetime then
-                local fade = math.clamp((elapsed - lifetime) / 0.3, 0, 1)
-                local newAlpha = baseAlpha + (1 - baseAlpha) * fade
-                line.Transparency = newAlpha
-                outline.Transparency = newAlpha
-                if fade >= 1 then
-                    conn:Disconnect()
-                    line:Destroy()
-                    outline:Destroy()
-                end
+            line.Visible = true
+            outline.Visible = true
+
+            local size = cam.ViewportSize
+            local x_full = size.X
+            local y_full = size.Y
+            local x_half = x_full / 2
+            local y_half = y_full / 2
+
+            if pos.Z < 0 then
+                pos = Vector2.new(
+                    math.clamp(x_half + (x_half - pos.X), 0, x_full),
+                    math.clamp(y_half + (y_half - pos.Y), 0, y_full)
+                )
+            end
+
+            if pos2.Z < 0 then
+                pos2 = Vector2.new(
+                    math.clamp(x_half + (x_half - pos2.X), 0, x_full),
+                    math.clamp(y_half + (y_half - pos2.Y), 0, y_full)
+                )
+            end
+
+            local to = Vector2.new(pos2.X, pos2.Y)
+            local from = Vector2.new(pos.X, pos.Y)
+
+            if elapsed_time > lifetime then
+                local fadeElapsed = elapsed_time - lifetime
+                local value = math.clamp(fadeElapsed / 0.3, 0, 1)
+                local new_transparency = lineTransparency + (0 - lineTransparency) * value
+                line.Transparency = new_transparency
+                outline.Transparency = new_transparency
+                from = from + (line.From - from) * value
+                line.From = from
+            else
+                line.From = from
+            end
+
+            line.To = to
+
+            local offsetDir = (from - to)
+            if offsetDir.Magnitude > 0 then
+                local offset = offsetDir.Unit
+                outline.From = from + offset
+                outline.To = to - offset
+            else
+                outline.From = from
+                outline.To = to
+            end
+        end)
+
+        task.delay(lifetime + 0.3, function()
+            if conn then
+                conn:Disconnect()
+                conn = nil
+            end
+            if line then
+                line:Destroy()
+                line = nil
+            end
+            if outline then
+                outline:Destroy()
+                outline = nil
             end
         end)
     end
