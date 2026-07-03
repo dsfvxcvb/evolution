@@ -3,12 +3,7 @@
 -- ============================================
 local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
 
-print("femboi")
-print("cum")
-print("FUCKING FAGOGT HOLY")
-print("brody")
-print("TEST NIGGA HOLY FUCK")
-print("please work")
+print("pray")
 
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
     pcall(function() Library:Unload() end)
