@@ -1013,6 +1013,7 @@ local ProtectPlayer = {
     GlobalShotWindow = 0.3,
     AttackCooldown = 0.25,
     LastAttackTime = 0,
+    MaxShooterDistance = 200,
 }
 
 local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent")
@@ -1104,6 +1105,7 @@ end
 
 function ProtectPlayer.GetLikelyShooter(selected, pos)
     local now = tick()
+    local maxDist = ProtectPlayer.MaxShooterDistance
 
     -- 1) A bullet ray recently passed close to the protected player.
     for i = #ProtectPlayer.BulletHistory, 1, -1 do
@@ -1115,20 +1117,15 @@ function ProtectPlayer.GetLikelyShooter(selected, pos)
         end
     end
 
-    -- 2) The most recent player to fire any bullet (only trust briefly).
-    -- They just shot something, so don't require them to have a gun in our whitelist.
-    if now - ProtectPlayer.LastGlobalShotTime <= ProtectPlayer.GlobalShotWindow
-        and ProtectPlayer.IsValidTarget(ProtectPlayer.LastGlobalShooter) then
-        return ProtectPlayer.LastGlobalShooter
-    end
-
-    -- 3) Someone with a gun out who is currently facing the protected player.
+    -- 2) Someone with a gun out who is currently facing the protected player,
+    --    but only if they're actually nearby. Don't lock onto a random player
+    --    across the map just because they looked in the right direction.
     local aimed = {}
     for _, p in ipairs(Players:GetPlayers()) do
         if p ~= LocalPlayer and p ~= selected and ProtectPlayer.IsValidTarget(p)
             and ProtectPlayer.HasGunEquipped(p) and ProtectPlayer.IsAimingAt(p, selected, 35) then
             local root = p.Character and p.Character:FindFirstChild("HumanoidRootPart")
-            if root then
+            if root and (root.Position - pos).Magnitude <= maxDist then
                 table.insert(aimed, {Player = p, Dist = (root.Position - pos).Magnitude})
             end
         end
@@ -1136,8 +1133,8 @@ function ProtectPlayer.GetLikelyShooter(selected, pos)
     table.sort(aimed, function(a, b) return a.Dist < b.Dist end)
     if aimed[1] then return aimed[1].Player end
 
-    -- 4) Last resort: closest enemy with a gun, then closest enemy.
-    return ProtectPlayer.GetNearestEnemyAround(pos, selected)
+    -- No evidence = no target. Prevents randomly chasing far-away players.
+    return nil
 end
 
 function ProtectPlayer.TryEquip(toolName)
