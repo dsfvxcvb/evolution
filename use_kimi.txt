@@ -6951,9 +6951,6 @@ do
     local function DrawNeonTracer(startPos, endPos, cfg)
         local dist = (endPos - startPos).Magnitude
         if dist < 0.1 then return end
-        local dir = (endPos - startPos).Unit
-        local mid = (startPos + endPos) / 2
-        local baseCF = CFrame.new(mid, mid + dir)
 
         -- Cap max tracers so they don't pile up and lag.
         local children = TracerFolder:GetChildren()
@@ -6964,24 +6961,11 @@ do
         end
 
         local color = cfg.Color or Color3.fromRGB(255, 50, 50)
-        local thickness = 0.25
-        local spread = 0.12
+        local thickness = 0.1
+        local startCF = CFrame.new(startPos, endPos)
 
-        local patterns = {
-            {{0, -spread}, {0, 0}, {0, spread}},
-            {{-spread, 0}, {0, 0}, {spread, 0}},
-            {{-spread, -spread}, {0, 0}, {spread, spread}},
-            {{spread, -spread}, {0, 0}, {-spread, spread}},
-        }
-        local offsets = {{0, 0}}
-        if cfg.UseSpread then
-            offsets = patterns[math.random(1, #patterns)]
-        end
-
-        for _, offset in ipairs(offsets) do
-            local offsetVec = baseCF.UpVector * offset[2] + baseCF.LookVector * offset[1]
-            local s = startPos + offsetVec
-            local e = endPos + offsetVec
+        local function makeBeam(startOffset)
+            local s = startPos + startOffset
 
             local partA = Instance.new("Part")
             partA.Anchored = true
@@ -6996,7 +6980,7 @@ do
             partB.CanCollide = false
             partB.Transparency = 1
             partB.Size = Vector3.new(0.1, 0.1, 0.1)
-            partB.CFrame = CFrame.new(e)
+            partB.CFrame = CFrame.new(endPos)
             partB.Parent = TracerFolder
 
             local attA = Instance.new("Attachment")
@@ -7008,7 +6992,7 @@ do
             beam.Attachment0 = attA
             beam.Attachment1 = attB
             beam.Color = ColorSequence.new(color)
-            beam.Texture = cfg.Texture or "rbxassetid://130791043"
+            beam.Texture = "" -- solid neon line; no repeating texture
             beam.TextureMode = Enum.TextureMode.Stretch
             beam.TextureLength = 1
             beam.Width0 = thickness
@@ -7029,6 +7013,17 @@ do
                     beam:Destroy()
                 end)
             end
+        end
+
+        -- Always converge at the target. Spread is applied only at the source (gun).
+        local count = cfg.UseSpread and 5 or 1
+        local maxSpread = math.clamp(dist * 0.4, 3, 14)
+        for i = 1, count do
+            local angle = math.random() * math.pi * 2
+            local radius = math.sqrt(math.random()) * maxSpread
+            local offset = startCF.RightVector * (math.cos(angle) * radius)
+                           + startCF.UpVector * (math.sin(angle) * radius)
+            makeBeam(offset)
         end
     end
 
