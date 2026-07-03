@@ -6841,7 +6841,7 @@ ForceHitTracersSection:AddDropdown('ForceHitTracersTexture',{Text = "Tracer Text
                 ["laser"] = "rbxassetid://12781800668",
                 ["light"] = "rbxassetid://2382169232",
                 ["flow"] = "rbxassetid://12788927812",
-                ["Neon"] = ""
+                ["Neon"] = "rbxassetid://130791043"
             }
             cfg.Texture = textureMap[selected] or textureMap["Default"]
         end
@@ -6953,7 +6953,7 @@ do
         if dist < 0.1 then return end
         local dir = (endPos - startPos).Unit
         local mid = (startPos + endPos) / 2
-        local baseCF = CFrame.new(mid, mid + dir) * CFrame.Angles(0, math.rad(-90), 0)
+        local baseCF = CFrame.new(mid, mid + dir)
 
         -- Cap max tracers so they don't pile up and lag.
         local children = TracerFolder:GetChildren()
@@ -6963,12 +6963,8 @@ do
             end
         end
 
-        local model = Instance.new("Model")
-        model.Name = "NeonTracer"
-        model.Parent = TracerFolder
-
         local color = cfg.Color or Color3.fromRGB(255, 50, 50)
-        local thickness = 0.06
+        local thickness = 0.25
         local spread = 0.12
 
         local patterns = {
@@ -6983,31 +6979,56 @@ do
         end
 
         for _, offset in ipairs(offsets) do
-            local cyl = Instance.new("Part")
-            cyl.Shape = Enum.PartType.Cylinder
-            cyl.Material = Enum.Material.Neon
-            cyl.Color = color
-            cyl.Size = Vector3.new(dist, thickness, thickness)
-            cyl.CFrame = baseCF * CFrame.new(0, offset[2], offset[1])
-            cyl.Anchored = true
-            cyl.CanCollide = false
-            cyl.CastShadow = false
-            cyl.Parent = model
+            local offsetVec = baseCF.UpVector * offset[2] + baseCF.LookVector * offset[1]
+            local s = startPos + offsetVec
+            local e = endPos + offsetVec
 
-            local light = Instance.new("PointLight")
-            light.Color = color
-            light.Brightness = 8
-            light.Range = 12
-            light.Parent = cyl
-        end
+            local partA = Instance.new("Part")
+            partA.Anchored = true
+            partA.CanCollide = false
+            partA.Transparency = 1
+            partA.Size = Vector3.new(0.1, 0.1, 0.1)
+            partA.CFrame = CFrame.new(s)
+            partA.Parent = TracerFolder
 
-        local lifetime = cfg.Lifetime or 0.6
-        if cfg.FadeOut then
-            task.spawn(FadeOutPart, model, lifetime)
-        else
-            task.delay(lifetime, function()
-                model:Destroy()
-            end)
+            local partB = Instance.new("Part")
+            partB.Anchored = true
+            partB.CanCollide = false
+            partB.Transparency = 1
+            partB.Size = Vector3.new(0.1, 0.1, 0.1)
+            partB.CFrame = CFrame.new(e)
+            partB.Parent = TracerFolder
+
+            local attA = Instance.new("Attachment")
+            attA.Parent = partA
+            local attB = Instance.new("Attachment")
+            attB.Parent = partB
+
+            local beam = Instance.new("Beam")
+            beam.Attachment0 = attA
+            beam.Attachment1 = attB
+            beam.Color = ColorSequence.new(color)
+            beam.Texture = cfg.Texture or "rbxassetid://130791043"
+            beam.TextureMode = Enum.TextureMode.Stretch
+            beam.TextureLength = 1
+            beam.Width0 = thickness
+            beam.Width1 = thickness
+            beam.FaceCamera = true
+            beam.LightEmission = 1
+            beam.LightInfluence = 0
+            beam.Transparency = NumberSequence.new(0, 0)
+            beam.Parent = TracerFolder
+
+            local lifetime = cfg.Lifetime or 0.6
+            if cfg.FadeOut then
+                task.spawn(FadeOutBeam, beam, partA, partB, lifetime)
+            else
+                task.delay(lifetime, function()
+                    partA:Destroy()
+                    partB:Destroy()
+                    beam:Destroy()
+                end)
+            end
         end
     end
 
