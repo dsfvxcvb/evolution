@@ -286,28 +286,49 @@ end;
 function Library:MakeDraggable(Instance, Cutoff)
     Instance.Active = true;
 
+    local dragConn = nil;
+    local endConn = nil;
+    local dragging = false;
+
     Instance.InputBegan:Connect(function(Input)
-        if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-            local ObjPos = Vector2.new(
-                Mouse.X - Instance.AbsolutePosition.X,
-                Mouse.Y - Instance.AbsolutePosition.Y
-            );
+        if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then
+            return;
+        end;
 
-            if ObjPos.Y > (Cutoff or 40) then
-                return;
-            end;
+        local ObjPos = Vector2.new(
+            Input.Position.X - Instance.AbsolutePosition.X,
+            Input.Position.Y - Instance.AbsolutePosition.Y
+        );
 
-            while InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1) do
+        if ObjPos.Y > (Cutoff or 40) then
+            return;
+        end;
+
+        dragging = true;
+
+        if dragConn then dragConn:Disconnect(); dragConn = nil; end;
+        if endConn then endConn:Disconnect(); endConn = nil; end;
+
+        dragConn = InputService.InputChanged:Connect(function(MoveInput)
+            if not dragging then return end;
+            if MoveInput.UserInputType == Enum.UserInputType.MouseMovement then
+                local Pos = MoveInput.Position;
                 Instance.Position = UDim2.new(
                     0,
-                    Mouse.X - ObjPos.X + (Instance.Size.X.Offset * Instance.AnchorPoint.X),
+                    Pos.X - ObjPos.X + (Instance.Size.X.Offset * Instance.AnchorPoint.X),
                     0,
-                    Mouse.Y - ObjPos.Y + (Instance.Size.Y.Offset * Instance.AnchorPoint.Y)
+                    Pos.Y - ObjPos.Y + (Instance.Size.Y.Offset * Instance.AnchorPoint.Y)
                 );
-
-                RenderStepped:Wait();
             end;
-        end;
+        end);
+
+        endConn = InputService.InputEnded:Connect(function(UpInput)
+            if UpInput.UserInputType == Enum.UserInputType.MouseButton1 then
+                dragging = false;
+                if dragConn then dragConn:Disconnect(); dragConn = nil; end;
+                if endConn then endConn:Disconnect(); endConn = nil; end;
+            end;
+        end);
     end)
 end;
 
