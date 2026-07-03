@@ -46,7 +46,7 @@ local Library = {
     ScreenGui = ScreenGui;
 
     Modern = false;
-    ModernCornerRadius = 6;
+    ModernCornerRadius = 8;
     ModernConnections = {};
     ModernBlacklist = {
         Cursor = true;
@@ -130,6 +130,14 @@ function Library:ApplyCorner(Instance)
             end);
         end;
     end;
+
+    -- Without clipping, square child frames can poke out past the rounded parent
+    -- corners and make the whole UI look square. Clip rounded containers so the
+    -- rounded silhouette is actually visible.
+    if Instance:IsA('GuiObject') then
+        Instance:SetAttribute('ModernUI_OriginalClips', Instance.ClipsDescendants);
+        Instance.ClipsDescendants = true;
+    end;
 end;
 
 function Library:RemoveCorners()
@@ -148,6 +156,12 @@ function Library:RemoveCorners()
         if OriginalBorder then
             Instance.BorderSizePixel = OriginalBorder;
             Instance:SetAttribute('ModernUI_OriginalBorder', nil);
+        end;
+
+        local OriginalClips = Instance:GetAttribute('ModernUI_OriginalClips');
+        if OriginalClips ~= nil then
+            Instance.ClipsDescendants = OriginalClips;
+            Instance:SetAttribute('ModernUI_OriginalClips', nil);
         end;
 
         local Connection = Library.ModernConnections[Instance];
