@@ -65,6 +65,7 @@ local VisualsTracers = Tabs.Visuals:AddLeftGroupbox('Visualize Bullets')
 
 local VisualsWorld = Tabs.Visuals:AddRightGroupbox('World')
 local VisualsWeather = Tabs.Visuals:AddRightGroupbox('Weather')
+local Visuals3DHitmarker = Tabs.Visuals:AddRightGroupbox('3D Hitmarker')
 local VisualsCrosshair = Tabs.Visuals:AddRightGroupbox('Crosshair')
 local VisualsClient = Tabs.Visuals:AddRightGroupbox('Client')
 local VisualsGunMaterial = Tabs.Visuals:AddRightGroupbox('Gun Material')
@@ -364,6 +365,7 @@ local MiscCosmeticsTabbox = Tabs.Misc:AddLeftTabbox('Cosmetics')
 local MiscSkins = MiscCosmeticsTabbox:AddTab('Skins')
 local MiscShootSounds = MiscCosmeticsTabbox:AddTab('Shoot Sounds')
 local MiscAnimationPlayer = Tabs.Misc:AddLeftGroupbox('Animation Player')
+local MiscAnimatedTools = Tabs.Misc:AddLeftGroupbox('Animated Tools')
 
 local MiscAutoFood = Tabs.Misc:AddRightGroupbox('Food')
 local MiscCombat = Tabs.Misc:AddRightGroupbox('Automation')
@@ -6727,6 +6729,9 @@ local lastDamageNumberTime = {}
 local HitmarkerSettings = {}
 local lastHitmarkerTime = {}
 
+local D3HitmarkerSettings = {}
+local lastD3HitmarkerTime = {}
+
 local KillMarkerSettings = {}
 local lastKillMarkerTime = {}
 
@@ -6747,6 +6752,14 @@ do
     HitmarkerSettings.Color = Color3.fromRGB(255, 255, 255)
     HitmarkerSettings.Lifetime = 0.5
     HitmarkerSettings.Size = 100
+
+    D3HitmarkerSettings.Enabled = false
+    D3HitmarkerSettings.Color = Color3.fromRGB(255, 255, 255)
+    D3HitmarkerSettings.OutlineColor = Color3.fromRGB(0, 0, 0)
+    D3HitmarkerSettings.LethalColor = Color3.fromRGB(255, 0, 0)
+    D3HitmarkerSettings.Thickness = 1
+    D3HitmarkerSettings.Size = 10
+    D3HitmarkerSettings.Lifetime = 0.5
     
     KillMarkerSettings.Enabled = false
     KillMarkerSettings.Lifetime = 3
@@ -6870,6 +6883,42 @@ ForceHitTracersSection:AddDropdown('ForceHitTracersTexture',{Text = "Tracer Text
         end
     end})
 
+ForceHitTracersSection:AddDropdown('BulletTracerMode',{Text = "Tracer Mode",
+    Values = {"Beam", "Line"},
+    Default = "Beam",
+    Callback = function(Value)
+        if getgenv().FH_TracerConfig then
+            getgenv().FH_TracerConfig.Mode = Value
+        end
+    end})
+
+ForceHitTracersSection:AddColorPicker('BulletTracerLineColor',{Title = "Line Color",
+    Default = Color3.fromRGB(255, 50, 50),
+    Callback = function(Value)
+        if getgenv().FH_TracerConfig then
+            getgenv().FH_TracerConfig.LineColor = Value
+        end
+    end})
+
+ForceHitTracersSection:AddColorPicker('BulletTracerOutlineColor',{Title = "Line Outline Color",
+    Default = Color3.fromRGB(0, 0, 0),
+    Callback = function(Value)
+        if getgenv().FH_TracerConfig then
+            getgenv().FH_TracerConfig.LineOutlineColor = Value
+        end
+    end})
+
+ForceHitTracersSection:AddSlider('BulletTracerThickness',{Text = "Line Thickness",
+    Min = 1,
+    Max = 10,
+    Default = 1,
+    Rounding = 0,
+    Callback = function(Value)
+        if getgenv().FH_TracerConfig then
+            getgenv().FH_TracerConfig.LineThickness = Value
+        end
+    end})
+
 -- Standalone ForceHit bullet tracer renderer.
 do
     if not getgenv().FH_TracerConfig then
@@ -6885,6 +6934,10 @@ do
             Lifetime = 0.6,
             TextureName = "Hoodcustoms",
             Texture = "rbxassetid://130791043",
+            Mode = "Beam",
+            LineColor = Color3.fromRGB(255, 50, 50),
+            LineOutlineColor = Color3.fromRGB(0, 0, 0),
+            LineThickness = 1,
         }
     end
 
@@ -6957,12 +7010,90 @@ do
         end
     end
 
+    local function DrawLineTracer(startPos, endPos, cfg)
+        local cam = Camera
+        local thickness = cfg.LineThickness or 1
+        local baseAlpha = 1 - (cfg.Transparency0 or 0)
+
+        local outline = Drawing.new("Line")
+        outline.Color = cfg.LineOutlineColor or Color3.fromRGB(0, 0, 0)
+        outline.Thickness = thickness + 2
+        outline.Transparency = baseAlpha
+        outline.Visible = true
+
+        local line = Drawing.new("Line")
+        line.Color = cfg.LineColor or cfg.Color or Color3.fromRGB(255, 50, 50)
+        line.Thickness = thickness
+        line.Transparency = baseAlpha
+        line.Visible = true
+
+        local lifetime = cfg.Lifetime or 0.6
+        local elapsed = 0
+
+        local function project(p)
+            local pos, onScreen = cam:WorldToViewportPoint(p)
+            if pos.Z < 0 then
+                local size = cam.ViewportSize
+                local half = size / 2
+                pos = Vector2.new(
+                    math.clamp(half.X + (half.X - pos.X), 0, size.X),
+                    math.clamp(half.Y + (half.Y - pos.Y), 0, size.Y)
+                )
+            end
+            return Vector2.new(pos.X, pos.Y), onScreen
+        end
+
+        local conn
+        conn = RunService.RenderStepped:Connect(function(dt)
+            elapsed = elapsed + dt
+            local from, on1 = project(startPos)
+            local to, on2 = project(endPos)
+            local onScreen = on1 or on2
+
+            if not onScreen then
+                line.Visible = false
+                outline.Visible = false
+            else
+                line.Visible = true
+                outline.Visible = true
+                line.From = from
+                line.To = to
+
+                local dir = (from - to)
+                if dir.Magnitude > 0 then
+                    local offset = dir.Unit
+                    outline.From = from + offset
+                    outline.To = to - offset
+                else
+                    outline.From = from
+                    outline.To = to
+                end
+            end
+
+            if elapsed > lifetime then
+                local fade = math.clamp((elapsed - lifetime) / 0.3, 0, 1)
+                local newAlpha = baseAlpha + (1 - baseAlpha) * fade
+                line.Transparency = newAlpha
+                outline.Transparency = newAlpha
+                if fade >= 1 then
+                    conn:Disconnect()
+                    line:Destroy()
+                    outline:Destroy()
+                end
+            end
+        end)
+    end
+
     local function DrawTracer(startPos, endPos)
         local cfg = getgenv().FH_TracerConfig
         if not cfg or not cfg.Enabled then return end
         if (startPos - endPos).Magnitude < 0.1 then return end
 
-        DrawBeamTracer(startPos, endPos, cfg)
+        if cfg.Mode == "Line" then
+            DrawLineTracer(startPos, endPos, cfg)
+        else
+            DrawBeamTracer(startPos, endPos, cfg)
+        end
     end
 
     if UnreliableMainEvent then
@@ -6990,6 +7121,7 @@ do
         Ambient = Color3.fromRGB(70, 70, 70),
         OutdoorAmbient = Color3.fromRGB(140, 140, 140),
         SkyboxEnabled = false,
+        SkyboxChoice = "black storm",
         TimeEnabled = false,
         TimeValue = 14,
         SunEnabled = false,
@@ -7238,6 +7370,107 @@ do
             end
         end})
 
+    -- Skybox
+    local skyboxOriginal = nil
+
+    local skyboxes = {
+        ["black storm"] = {
+            ["SkyboxLf"] = "rbxassetid://15502507918",
+            ["SkyboxUp"] = "rbxassetid://15502511911",
+            ["SkyboxRt"] = "rbxassetid://15502509398",
+            ["SkyboxFt"] = "rbxassetid://15502510289",
+            ["SkyboxDn"] = "rbxassetid://15502508460",
+            ["SkyboxBk"] = "rbxassetid://15502511288"
+        },
+        ["blue space"] = {
+            ["SkyboxLf"] = "rbxassetid://15536114370",
+            ["SkyboxUp"] = "rbxassetid://15536117282",
+            ["SkyboxRt"] = "rbxassetid://15536118762",
+            ["SkyboxFt"] = "rbxassetid://15536116141",
+            ["SkyboxDn"] = "rbxassetid://15536112543",
+            ["SkyboxBk"] = "rbxassetid://15536110634"
+        },
+        ["realistic"] = {
+            ["SkyboxUp"] = "rbxassetid://653719321",
+            ["SkyboxDn"] = "rbxassetid://653718790",
+            ["SkyboxLf"] = "rbxassetid://653719190",
+            ["SkyboxFt"] = "rbxassetid://653719067",
+            ["SkyboxRt"] = "rbxassetid://653718931",
+            ["SkyboxBk"] = "rbxassetid://653719502"
+        },
+        ["stormy"] = {
+            ["SkyboxUp"] = "http://www.roblox.com/asset/?id=18703232671",
+            ["SkyboxBk"] = "http://www.roblox.com/asset/?id=18703245834",
+            ["SkyboxLf"] = "http://www.roblox.com/asset/?id=18703237556",
+            ["SkyboxDn"] = "http://www.roblox.com/asset/?id=18703243349",
+            ["SkyboxFt"] = "http://www.roblox.com/asset/?id=18703240532",
+            ["SkyboxRt"] = "http://www.roblox.com/asset/?id=18703235430"
+        },
+        ["pink"] = {
+            ["SkyboxUp"] = "rbxassetid://12216108877",
+            ["SkyboxLf"] = "rbxassetid://12216110170",
+            ["SkyboxRt"] = "rbxassetid://12216110471",
+            ["SkyboxFt"] = "rbxassetid://12216109489",
+            ["SkyboxBk"] = "rbxassetid://12216109205",
+            ["SkyboxDn"] = "rbxassetid://12216109875"
+        }
+    }
+
+    local function getSky()
+        local sky = Lighting:FindFirstChildOfClass("Sky")
+        if not sky then
+            sky = Instance.new("Sky")
+            sky.Name = "CustomSky"
+            sky.Parent = Lighting
+        end
+        return sky
+    end
+
+    local function applySkybox(name)
+        local sky = getSky()
+        if not skyboxOriginal then
+            skyboxOriginal = {
+                SkyboxBk = sky.SkyboxBk,
+                SkyboxDn = sky.SkyboxDn,
+                SkyboxFt = sky.SkyboxFt,
+                SkyboxLf = sky.SkyboxLf,
+                SkyboxRt = sky.SkyboxRt,
+                SkyboxUp = sky.SkyboxUp
+            }
+        end
+        if name == "default" or not WorldSettings.SkyboxEnabled then
+            for prop, id in pairs(skyboxOriginal) do
+                sky[prop] = id
+            end
+            return
+        end
+        local ids = skyboxes[name]
+        if not ids then return end
+        sky.SkyboxBk = ids.SkyboxBk
+        sky.SkyboxDn = ids.SkyboxDn
+        sky.SkyboxFt = ids.SkyboxFt
+        sky.SkyboxLf = ids.SkyboxLf
+        sky.SkyboxRt = ids.SkyboxRt
+        sky.SkyboxUp = ids.SkyboxUp
+    end
+
+    WorldSection:AddToggle('SkyboxEnabled',{Text = "Skybox",
+    Default = false,
+    Callback = function(Value)
+            WorldSettings.SkyboxEnabled = Value
+            applySkybox(Value and WorldSettings.SkyboxChoice or "default")
+        end})
+
+    WorldSection:AddDropdown('SkyboxChoice',{Text = "Sky",
+    Values = {"black storm", "blue space", "realistic", "stormy", "pink"},
+    Default = "black storm",
+    Callback = function(Value)
+            WorldSettings.SkyboxChoice = Value
+            if WorldSettings.SkyboxEnabled then
+                applySkybox(Value)
+            end
+        end})
+
     -- Weather
     local weatherPart = nil
     local weatherParticle = nil
@@ -7316,6 +7549,10 @@ do
         ["Rain 2"] = "rbxassetid://138911277964858",
         ["Light Rain"] = "rbxassetid://18862087062",
         ["Thunder"] = "rbxassetid://88290426489497",
+        ["windy winter"] = "rbxassetid://6046340391",
+        ["thunderstorm"] = "rbxassetid://4305545740",
+        ["night"] = "rbxassetid://179507208",
+        ["day"] = "rbxassetid://6189453706",
     }
 
     local weatherOffset = Vector3.new(0, 20, 0)
@@ -7434,7 +7671,7 @@ do
         end})
 
     VisualsWeather:AddDropdown('WeatherNoise',{Text = "Noises",
-    Values = {"Rain 1", "Rain 2", "Light Rain", "Thunder"},
+    Values = {"Rain 1", "Rain 2", "Light Rain", "Thunder", "windy winter", "thunderstorm", "night", "day"},
     Default = "Rain 1",
     Callback = function(Value)
             WorldSettings.WeatherSound = Value
@@ -7518,6 +7755,56 @@ HitChamsSection:AddDropdown('HitChamsMaterial', {
         HitChamsSettings.Material = Enum.Material[(Options.HitChamsMaterial and Options.HitChamsMaterial.Value) or "Neon"]
     end
 })
+
+    local D3HitmarkerSection = Visuals3DHitmarker
+
+    D3HitmarkerSection:AddToggle('D3HitmarkerEnabled',{Text = "3D Hitmarker",
+    Default = false,
+    Callback = function(Value)
+            D3HitmarkerSettings.Enabled = (Toggles.D3HitmarkerEnabled and Toggles.D3HitmarkerEnabled.Value)
+        end}):AddColorPicker('D3HitmarkerColor',{Title = "Color",
+    Default = Color3.fromRGB(255, 255, 255),
+    Callback = function(Value)
+            D3HitmarkerSettings.Color = Value or Color3.fromRGB(255, 255, 255)
+        end}):AddColorPicker('D3HitmarkerOutlineColor',{Title = "Outline",
+    Default = Color3.fromRGB(0, 0, 0),
+    Callback = function(Value)
+            D3HitmarkerSettings.OutlineColor = Value or Color3.fromRGB(0, 0, 0)
+        end})
+
+    D3HitmarkerSection:AddColorPicker('D3HitmarkerLethalColor',{Title = "Lethal Color",
+    Default = Color3.fromRGB(255, 0, 0),
+    Callback = function(Value)
+            D3HitmarkerSettings.LethalColor = Value or Color3.fromRGB(255, 0, 0)
+        end})
+
+    D3HitmarkerSection:AddSlider('D3HitmarkerThickness',{Text = "Thickness",
+    Min = 1,
+    Max = 10,
+    Default = 1,
+    Rounding = 0,
+    Callback = function(Value)
+            D3HitmarkerSettings.Thickness = (Options.D3HitmarkerThickness and Options.D3HitmarkerThickness.Value) or 1
+        end})
+
+    D3HitmarkerSection:AddSlider('D3HitmarkerSize',{Text = "Size",
+    Min = 4,
+    Max = 40,
+    Default = 10,
+    Rounding = 0,
+    Callback = function(Value)
+            D3HitmarkerSettings.Size = (Options.D3HitmarkerSize and Options.D3HitmarkerSize.Value) or 10
+        end})
+
+    D3HitmarkerSection:AddSlider('D3HitmarkerLifetime',{Text = "Lifetime",
+    Min = 0.1,
+    Max = 3,
+    Default = 0.5,
+    Rounding = 1,
+    Suffix = "s",
+    Callback = function(Value)
+            D3HitmarkerSettings.Lifetime = (Options.D3HitmarkerLifetime and Options.D3HitmarkerLifetime.Value) or 0.5
+        end})
 
     local HitEffectsSection = VisualsHitEffects
 
@@ -7787,6 +8074,13 @@ local function HitChams(Player)
     end
 
     Cloned.Parent = HitChamsFolder
+
+    if Toggles.D3HitmarkerEnabled and Toggles.D3HitmarkerEnabled.Value then
+        local hHead = Cloned:FindFirstChild("Head")
+        if hHead and hHead:IsA("BasePart") then
+            Show3DHitmarker(hHead.Position, false)
+        end
+    end
 
     local chest = Cloned:FindFirstChild("UpperTorso") or Cloned:FindFirstChild("Torso") or Cloned:FindFirstChild("HumanoidRootPart")
     if chest and getgenv().FH_CreateBeamToHitChams then
@@ -8227,6 +8521,96 @@ local function ShowHitmarker(worldPos)
     }):Play()
 end
 
+local function Show3DHitmarker(worldPos, isLethal)
+    if not D3HitmarkerSettings.Enabled then return end
+    if not worldPos then return end
+
+    local currentTime = tick()
+    if lastD3HitmarkerTime[1] and (currentTime - lastD3HitmarkerTime[1]) < 0.05 then
+        return
+    end
+    lastD3HitmarkerTime[1] = currentTime
+
+    local cam = Camera
+    local size = D3HitmarkerSettings.Size or 10
+    local thickness = D3HitmarkerSettings.Thickness or 1
+    local color = isLethal and D3HitmarkerSettings.LethalColor or D3HitmarkerSettings.Color
+    local outlineColor = D3HitmarkerSettings.OutlineColor
+    local lifetime = D3HitmarkerSettings.Lifetime or 0.5
+
+    local lines = {}
+    local outlines = {}
+    for i = 1, 4 do
+        lines[i] = Drawing.new("Line")
+        lines[i].Thickness = thickness
+        lines[i].Color = color
+        lines[i].Transparency = 1
+        lines[i].Visible = true
+
+        outlines[i] = Drawing.new("Line")
+        outlines[i].Thickness = thickness + 2
+        outlines[i].Color = outlineColor
+        outlines[i].Transparency = 1
+        outlines[i].Visible = true
+    end
+
+    local elapsed = 0
+    local conn
+    conn = RunService.RenderStepped:Connect(function(dt)
+        elapsed = elapsed + dt
+        local pos, onScreen = cam:WorldToViewportPoint(worldPos)
+        if onScreen then
+            local px, py = pos.X, pos.Y
+            for i = 1, 4 do
+                lines[i].Visible = true
+                outlines[i].Visible = true
+            end
+
+            local s = size
+            lines[1].From = Vector2.new(px - s, py - s)
+            lines[1].To = Vector2.new(px - s/2, py - s/2)
+            lines[2].From = Vector2.new(px + s, py - s)
+            lines[2].To = Vector2.new(px + s/2, py - s/2)
+            lines[3].From = Vector2.new(px - s, py + s)
+            lines[3].To = Vector2.new(px - s/2, py + s/2)
+            lines[4].From = Vector2.new(px + s, py + s)
+            lines[4].To = Vector2.new(px + s/2, py + s/2)
+
+            for i = 1, 4 do
+                local dir = lines[i].To - lines[i].From
+                if dir.Magnitude > 0 then
+                    local offset = dir.Unit
+                    outlines[i].From = lines[i].From - offset
+                    outlines[i].To = lines[i].To + offset
+                else
+                    outlines[i].From = lines[i].From
+                    outlines[i].To = lines[i].To
+                end
+            end
+
+            if elapsed > lifetime then
+                local fade = math.clamp((elapsed - lifetime) / 0.3, 0, 1)
+                for i = 1, 4 do
+                    lines[i].Transparency = 1 - fade
+                    outlines[i].Transparency = 1 - fade
+                end
+                if fade >= 1 then
+                    conn:Disconnect()
+                    for i = 1, 4 do
+                        lines[i]:Destroy()
+                        outlines[i]:Destroy()
+                    end
+                end
+            end
+        else
+            for i = 1, 4 do
+                lines[i].Visible = false
+                outlines[i].Visible = false
+            end
+        end
+    end)
+end
+
 local function ShowKillMarker(worldPos)
     if not KillMarkerSettings.Enabled then return end
     if not worldPos then return end
@@ -8376,6 +8760,8 @@ do
                     if hitPos then
                         ShowDamageNumber(target, damage, hitPos)
                         ShowHitmarker(hitPos)
+                        local headPos = target.Character and target.Character:FindFirstChild("Head")
+                        Show3DHitmarker(headPos and headPos:IsA("BasePart") and headPos.Position or hitPos, newHealth <= 0)
                     end
                     
                     if newHealth <= 0 and hitPos then
@@ -10133,6 +10519,206 @@ MiscMovement:AddToggle('AddonInfiniteJump', { Text = 'Infinite Jump', Default = 
             PlayEmote(GetCurrentAnimId(), AnimationPlayer.LoopEmote, AnimationPlayer.EmoteSpeed)
         end
     end)
+
+    do
+        local AnimatedToolsOriginalGrips = {}
+        local AnimatedToolsConnection = nil
+        local AnimatedToolsToolAddedConn = nil
+        local AnimatedToolsToolRemovedConn = nil
+        local AnimatedToolsCharAddedConn = nil
+
+        local function ClearGripsTable()
+            for k in pairs(AnimatedToolsOriginalGrips) do
+                AnimatedToolsOriginalGrips[k] = nil
+            end
+        end
+
+        local function GetEquippedTool()
+            local char = LocalPlayer.Character
+            if not char then return nil end
+            for _, child in ipairs(char:GetChildren()) do
+                if child:IsA("Tool") and child:FindFirstChild("Handle") then
+                    return child
+                end
+            end
+            return nil
+        end
+
+        local function StoreTool(tool)
+            if not tool or not tool:IsA("Tool") then return end
+            if AnimatedToolsOriginalGrips[tool] then return end
+            AnimatedToolsOriginalGrips[tool] = tool.Grip
+        end
+
+        local function RestoreAllGrips()
+            for tool, grip in pairs(AnimatedToolsOriginalGrips) do
+                if tool and tool.Parent then
+                    pcall(function()
+                        tool.Grip = grip
+                    end)
+                end
+            end
+            ClearGripsTable()
+        end
+
+        local function AddCurrentTool()
+            local tool = GetEquippedTool()
+            if tool then
+                StoreTool(tool)
+            end
+        end
+
+        local function ConnectToolEvents(char)
+            if AnimatedToolsToolAddedConn then
+                AnimatedToolsToolAddedConn:Disconnect()
+                AnimatedToolsToolAddedConn = nil
+            end
+            if AnimatedToolsToolRemovedConn then
+                AnimatedToolsToolRemovedConn:Disconnect()
+                AnimatedToolsToolRemovedConn = nil
+            end
+
+            AnimatedToolsToolAddedConn = char.ChildAdded:Connect(function(child)
+                if child:IsA("Tool") and child:FindFirstChild("Handle") then
+                    StoreTool(child)
+                end
+            end)
+
+            AnimatedToolsToolRemovedConn = char.ChildRemoved:Connect(function(child)
+                if AnimatedToolsOriginalGrips[child] then
+                    pcall(function()
+                        child.Grip = AnimatedToolsOriginalGrips[child]
+                    end)
+                    AnimatedToolsOriginalGrips[child] = nil
+                end
+            end)
+        end
+
+        local function UpdateAnimatedTools()
+            if not Toggles.AnimatedToolsEnabled.Value then
+                if AnimatedToolsConnection then
+                    AnimatedToolsConnection:Disconnect()
+                    AnimatedToolsConnection = nil
+                end
+                if AnimatedToolsToolAddedConn then
+                    AnimatedToolsToolAddedConn:Disconnect()
+                    AnimatedToolsToolAddedConn = nil
+                end
+                if AnimatedToolsToolRemovedConn then
+                    AnimatedToolsToolRemovedConn:Disconnect()
+                    AnimatedToolsToolRemovedConn = nil
+                end
+                if AnimatedToolsCharAddedConn then
+                    AnimatedToolsCharAddedConn:Disconnect()
+                    AnimatedToolsCharAddedConn = nil
+                end
+                RestoreAllGrips()
+                return
+            end
+
+            RestoreAllGrips()
+            AddCurrentTool()
+
+            if AnimatedToolsConnection then
+                AnimatedToolsConnection:Disconnect()
+            end
+            AnimatedToolsConnection = RunService.Heartbeat:Connect(function(dt)
+                local horizontalMode = Options.AnimatedToolsHorizontal.Value
+                local verticalMode = Options.AnimatedToolsVertical.Value
+                local hSpeed = Options.AnimatedToolsHorizontalSpeed.Value / 4
+                local vSpeed = Options.AnimatedToolsVerticalSpeed.Value / 4
+
+                local horizontal = 0
+                if horizontalMode == "sine spin" then
+                    horizontal = math.sin(os.clock()) * 45
+                elseif horizontalMode == "random" then
+                    horizontal = (math.random() * 2 - 1) * 180
+                elseif horizontalMode == "jitter" then
+                    horizontal = math.random(-10, 10)
+                elseif horizontalMode == "spin" or horizontalMode == "character spin" then
+                    horizontal = 45
+                end
+
+                local vertical = 0
+                if verticalMode == "sine spin" then
+                    vertical = math.sin(os.clock()) * 45
+                elseif verticalMode == "random" then
+                    vertical = (math.random() * 2 - 1) * 180
+                elseif verticalMode == "jitter" then
+                    vertical = math.random(-10, 10)
+                elseif verticalMode == "spin" or verticalMode == "character spin" then
+                    vertical = 45
+                end
+
+                for tool, originalGrip in pairs(AnimatedToolsOriginalGrips) do
+                    if tool and tool.Parent then
+                        tool.Grip = originalGrip * CFrame.Angles(math.rad(vertical * dt * vSpeed), math.rad(horizontal * dt * hSpeed), 0)
+                    end
+                end
+            end)
+
+            local char = LocalPlayer.Character
+            if char then
+                ConnectToolEvents(char)
+            end
+
+            if AnimatedToolsCharAddedConn then
+                AnimatedToolsCharAddedConn:Disconnect()
+            end
+            AnimatedToolsCharAddedConn = LocalPlayer.CharacterAdded:Connect(function(newChar)
+                if not Toggles.AnimatedToolsEnabled.Value then return end
+                task.wait(0.1)
+                ConnectToolEvents(newChar)
+                AddCurrentTool()
+            end)
+        end
+
+        MiscAnimatedTools:AddToggle('AnimatedToolsEnabled', {
+            Text = 'Animated Tools',
+            Default = false,
+            Callback = function(Value)
+                UpdateAnimatedTools()
+            end
+        })
+
+        MiscAnimatedTools:AddDropdown('AnimatedToolsHorizontal', {
+            Text = 'Horizontal',
+            Default = 'sine spin',
+            Values = {'character spin', 'sine spin', 'random', 'jitter', 'spin'},
+            Callback = function(Value)
+                RestoreAllGrips()
+                AddCurrentTool()
+            end
+        })
+
+        MiscAnimatedTools:AddSlider('AnimatedToolsHorizontalSpeed', {
+            Text = 'Horizontal Speed',
+            Default = 10,
+            Min = 0,
+            Max = 100,
+            Rounding = 0,
+            Suffix = '%'
+        })
+
+        MiscAnimatedTools:AddDropdown('AnimatedToolsVertical', {
+            Text = 'Vertical',
+            Default = 'sine spin',
+            Values = {'character spin', 'sine spin', 'random', 'jitter', 'spin'},
+            Callback = function(Value)
+                RestoreAllGrips()
+                AddCurrentTool()
+            end
+        })
+
+        MiscAnimatedTools:AddSlider('AnimatedToolsVerticalSpeed', {
+            Text = 'Vertical Speed',
+            Default = 10,
+            Min = 0,
+            Max = 100,
+            Rounding = 0,
+            Suffix = '%'
+        })
+    end
 
 
 
