@@ -64,6 +64,7 @@ local VisualsHitChams = Tabs.Visuals:AddLeftGroupbox('Hit Chams')
 local VisualsHitEffects = Tabs.Visuals:AddLeftGroupbox('Hit Effects')
 local VisualsClient = Tabs.Visuals:AddLeftGroupbox('Client')
 local VisualsWorld = Tabs.Visuals:AddRightGroupbox('World')
+local VisualsWeather = Tabs.Visuals:AddRightGroupbox('Weather')
 local VisualsCrosshair = Tabs.Visuals:AddRightGroupbox('Crosshair')
 local VisualsHitIndicators = Tabs.Visuals:AddRightGroupbox('Damage Numbers')
 local VisualsHitLogs = Tabs.Visuals:AddRightGroupbox('Hit logs')
@@ -142,7 +143,7 @@ do
 
     VisualsESP:AddToggle('EspBoxOutline', {
         Text = 'Box Outline',
-        Default = true,
+        Default = false,
         Callback = function(Value)
             local t = GetEspTable()
             if t then t.Boxes.Outline.Enabled = Value end
@@ -153,6 +154,22 @@ do
         Callback = function(Value)
             local t = GetEspTable()
             if t then t.Boxes.Outline.Color = Value end
+        end
+    })
+
+    VisualsESP:AddLabel('Box Gradient'):AddColorPicker('EspBoxGradientTop', {
+        Title = 'Gradient Top',
+        Default = Color3.fromRGB(0, 255, 255),
+        Callback = function(Value)
+            local t = GetEspTable()
+            if t then t.Boxes.Gradients.Top = Value end
+        end
+    }):AddColorPicker('EspBoxGradientBot', {
+        Title = 'Gradient Bot',
+        Default = Color3.fromRGB(0, 85, 255),
+        Callback = function(Value)
+            local t = GetEspTable()
+            if t then t.Boxes.Gradients.Bot = Value end
         end
     })
 
@@ -7100,6 +7117,8 @@ do
         WeatherType = "rain",
         WeatherColor = Color3.fromRGB(255, 255, 255),
         WeatherRate = 100,
+        WeatherSoundEnabled = true,
+        WeatherVolume = 0.5,
     }
 
     local Lighting = game:GetService("Lighting")
@@ -7437,6 +7456,7 @@ do
     local weatherPart = nil
     local weatherParticle = nil
     local weatherConnection = nil
+    local weatherSound = nil
 
     local weatherTypes = {
         ["rain"] = {
@@ -7505,12 +7525,38 @@ do
         }
     }
 
+    local weatherSounds = {
+        ["rain"] = "rbxassetid://1847055976",
+        ["light rain"] = "rbxassetid://1847055976",
+        ["snow"] = "rbxassetid://6455667685",
+    }
+
     local weatherOffset = Vector3.new(0, 20, 0)
 
-    WorldSection:AddToggle('WeatherEnabled',{Text = "Weather",
+    local function updateWeatherSound()
+        if weatherSound then
+            weatherSound:Destroy()
+            weatherSound = nil
+        end
+        if not WorldSettings.WeatherEnabled then return end
+        if not WorldSettings.WeatherSoundEnabled then return end
+        if not weatherPart then return end
+        local currentType = (Options.WeatherType and Options.WeatherType.Value) or "rain"
+        local soundId = weatherSounds[currentType]
+        if not soundId then return end
+        weatherSound = Instance.new("Sound")
+        weatherSound.Name = "WeatherAmbient"
+        weatherSound.SoundId = soundId
+        weatherSound.Looped = true
+        weatherSound.Volume = WorldSettings.WeatherVolume
+        weatherSound.Parent = weatherPart
+        weatherSound:Play()
+    end
+
+    VisualsWeather:AddToggle('WeatherEnabled',{Text = "Weather",
     Default = false,
     Callback = function(Value)
-            WorldSettings.WeatherEnabled = (Toggles.WeatherEnabled and Toggles.WeatherEnabled.Value)
+            WorldSettings.WeatherEnabled = Value
             if weatherPart then
                 weatherPart:Destroy()
                 weatherPart = nil
@@ -7519,6 +7565,10 @@ do
             if weatherConnection then
                 weatherConnection:Disconnect()
                 weatherConnection = nil
+            end
+            if weatherSound then
+                weatherSound:Destroy()
+                weatherSound = nil
             end
             if WorldSettings.WeatherEnabled then
                 weatherPart = Instance.new("Part")
@@ -7546,6 +7596,8 @@ do
                         weatherPart.CFrame = CFrame.new(Camera.CFrame.Position) + weatherOffset
                     end
                 end)
+
+                updateWeatherSound()
             end
         end}):AddColorPicker('WeatherColor',{Title = "Weather Color",
     Default = Color3.fromRGB(255, 255, 255),
@@ -7556,7 +7608,7 @@ do
             end
         end})
 
-    WorldSection:AddDropdown('WeatherType',{Text = "Weather Type",
+    VisualsWeather:AddDropdown('WeatherType',{Text = "Weather Type",
     Values = {"light rain", "rain", "snow"},
     Default = "rain",
     Callback = function(Value)
@@ -7572,9 +7624,10 @@ do
                 weatherParticle.Rate = ((Options.WeatherRate and Options.WeatherRate.Value) or 100) * 10
                 weatherParticle.Parent = weatherPart
             end
+            updateWeatherSound()
         end})
 
-    WorldSection:AddSlider('WeatherRate',{Text = "Weather Rate",
+    VisualsWeather:AddSlider('WeatherRate',{Text = "Weather Rate",
     Min = 1,
     Max = 100,
     Default = 100,
@@ -7582,6 +7635,25 @@ do
     Callback = function(Value)
             if weatherParticle then
                 weatherParticle.Rate = Value * 10
+            end
+        end})
+
+    VisualsWeather:AddToggle('WeatherSoundsEnabled',{Text = "Ambient Sounds",
+    Default = true,
+    Callback = function(Value)
+            WorldSettings.WeatherSoundEnabled = Value
+            updateWeatherSound()
+        end})
+
+    VisualsWeather:AddSlider('WeatherVolume',{Text = "Sound Volume",
+    Min = 0,
+    Max = 1,
+    Default = 0.5,
+    Rounding = 2,
+    Callback = function(Value)
+            WorldSettings.WeatherVolume = Value
+            if weatherSound then
+                weatherSound.Volume = Value
             end
         end})
 
@@ -11374,11 +11446,6 @@ getgenv().EspLibrary = {
                 ['Transparency'] = {0.75, 0.75},
             },
 
-            ['Gradients'] = {
-                ['Top'] = Color3.fromRGB(255, 255, 255),
-                ['Bot'] = Color3.fromRGB(0, 255, 255),
-            },
-
             ['Filled'] = {
                 ['Enabled'] = true,
                 ['Top'] = Color3.fromRGB(255, 255, 255),
@@ -11387,8 +11454,13 @@ getgenv().EspLibrary = {
             },
 
             ['Outline'] = {
-                ['Enabled'] = true,
+                ['Enabled'] = false,
                 ['Color'] = Color3.fromRGB(0, 0, 0),
+            },
+
+            ['Gradients'] = {
+                ['Top'] = Color3.fromRGB(0, 255, 255),
+                ['Bot'] = Color3.fromRGB(0, 85, 255),
             },
         },
 
@@ -11528,7 +11600,7 @@ EspLibrary.Holder = EspLibrary:CreateObjects("ScreenGui", {
     ScreenInsets = Enum.ScreenInsets.DeviceSafeInsets,
     ZIndexBehavior = Enum.ZIndexBehavior.Global,
     ResetOnSpawn = false,
-    DisplayOrder = 10000,
+    DisplayOrder = -1,
     IgnoreGuiInset = true,
 })
 
@@ -11814,6 +11886,7 @@ function EspLibrary:InitEsp(Data)
         Objects["BoxInline"] = self:CreateObjects("UIStroke", {
             Parent = Objects["BoxInlineHolder"],
             Color = Color3.fromRGB(255, 255, 255),
+            Thickness = 2,
             LineJoinMode = Enum.LineJoinMode.Miter,
         })
 
@@ -11821,8 +11894,8 @@ function EspLibrary:InitEsp(Data)
             Parent = Objects["BoxInline"],
             Rotation = 90,
             Color = ColorSequence.new({
-                ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 0, 0)),
-                ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 255, 255)),
+                ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 255)),
+                ColorSequenceKeypoint.new(1, Color3.fromRGB(0, 85, 255)),
             }),
             Transparency = NumSeq({NumKey(0, 0), NumKey(1, 0)}),
         })
