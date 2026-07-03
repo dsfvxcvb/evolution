@@ -6894,7 +6894,8 @@ ForceHitTracersSection:AddDropdown('BulletTracerMode',{Text = "Tracer Mode",
         end
     end})
 
-ForceHitTracersSection:AddColorPicker('BulletTracerLineColor',{Title = "Line Color",
+ForceHitTracersSection:AddLabel('Line Color'):AddColorPicker('BulletTracerLineColor',{
+    Title = "Line Color",
     Default = Color3.fromRGB(255, 50, 50),
     Callback = function(Value)
         if getgenv().FH_TracerConfig then
@@ -6902,7 +6903,8 @@ ForceHitTracersSection:AddColorPicker('BulletTracerLineColor',{Title = "Line Col
         end
     end})
 
-ForceHitTracersSection:AddColorPicker('BulletTracerOutlineColor',{Title = "Line Outline Color",
+ForceHitTracersSection:AddLabel('Line Outline Color'):AddColorPicker('BulletTracerOutlineColor',{
+    Title = "Line Outline Color",
     Default = Color3.fromRGB(0, 0, 0),
     Callback = function(Value)
         if getgenv().FH_TracerConfig then
@@ -7774,7 +7776,8 @@ HitChamsSection:AddDropdown('HitChamsMaterial', {
             D3HitmarkerSettings.OutlineColor = Value or Color3.fromRGB(0, 0, 0)
         end})
 
-    D3HitmarkerSection:AddColorPicker('D3HitmarkerLethalColor',{Title = "Lethal Color",
+    D3HitmarkerSection:AddLabel('Lethal Color'):AddColorPicker('D3HitmarkerLethalColor',{
+    Title = "Lethal Color",
     Default = Color3.fromRGB(255, 0, 0),
     Callback = function(Value)
             D3HitmarkerSettings.LethalColor = Value or Color3.fromRGB(255, 0, 0)
