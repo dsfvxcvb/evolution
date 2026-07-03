@@ -7103,16 +7103,59 @@ do
         end
     end
 
-    if UnreliableMainEvent then
-        UnreliableMainEvent.OnClientEvent:Connect(function(...)
-            local args = {...}
-            if args[1] ~= "ReplicateBulletRay" then return end
-            local positions = args[2]
-            if typeof(positions) ~= "table" then return end
-            -- Only draw ForceHit tracers for bullets fired by the local player.
-            if args[3] ~= LocalPlayer then return end
-            DrawTracer(positions[1], positions[2])
-        end)
+    local function GetBulletContainer()
+        local ignored = Workspace:FindFirstChild("Ignored")
+        if not ignored then return nil end
+        local siren = ignored:FindFirstChild("Siren")
+        if not siren then return nil end
+        return siren:FindFirstChild("Radius")
+    end
+
+    local function OnBulletObjectAdded(object)
+        task.wait()
+
+        local cfg = getgenv().FH_TracerConfig
+        if not cfg or not cfg.Enabled then return end
+        if object.Name ~= "BULLET_RAYS" then return end
+
+        local beam = object:FindFirstChildOfClass("Beam")
+        if not beam then return end
+
+        local owner = object:GetAttribute("OwnerCharacter")
+        if owner ~= LocalPlayer.Name then return end
+
+        local attachment1 = beam.Attachment1
+        if not attachment1 then return end
+
+        local startPos = object.Position
+        local endPos = attachment1.WorldCFrame.Position
+
+        -- Destroy the original beam/part so the default texture tracer is replaced.
+        pcall(function() object:Destroy() end)
+
+        if cfg.Mode == "Line" then
+            DrawLineTracer(startPos, endPos, cfg)
+        else
+            DrawBeamTracer(startPos, endPos, cfg)
+        end
+    end
+
+    local BulletContainer = GetBulletContainer()
+    if BulletContainer then
+        BulletContainer.ChildAdded:Connect(OnBulletObjectAdded)
+    end
+
+    -- Fallback: if the container doesn't exist yet, try to connect once it appears.
+    local ignored = Workspace:FindFirstChild("Ignored")
+    if ignored then
+        local siren = ignored:FindFirstChild("Siren")
+        if siren then
+            siren.ChildAdded:Connect(function(child)
+                if child.Name == "Radius" then
+                    child.ChildAdded:Connect(OnBulletObjectAdded)
+                end
+            end)
+        end
     end
 end
 
