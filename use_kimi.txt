@@ -8011,6 +8011,96 @@ local function RemoveHeadAndAccessories(clonedCharacter)
     end
 end
 
+local function Show3DHitmarker(worldPos, isLethal)
+    if not D3HitmarkerSettings.Enabled then return end
+    if not worldPos then return end
+
+    local currentTime = tick()
+    if lastD3HitmarkerTime[1] and (currentTime - lastD3HitmarkerTime[1]) < 0.05 then
+        return
+    end
+    lastD3HitmarkerTime[1] = currentTime
+
+    local cam = Camera
+    local size = D3HitmarkerSettings.Size or 10
+    local thickness = D3HitmarkerSettings.Thickness or 1
+    local color = isLethal and D3HitmarkerSettings.LethalColor or D3HitmarkerSettings.Color
+    local outlineColor = D3HitmarkerSettings.OutlineColor
+    local lifetime = D3HitmarkerSettings.Lifetime or 0.5
+
+    local lines = {}
+    local outlines = {}
+    for i = 1, 4 do
+        lines[i] = Drawing.new("Line")
+        lines[i].Thickness = thickness
+        lines[i].Color = color
+        lines[i].Transparency = 1
+        lines[i].Visible = true
+
+        outlines[i] = Drawing.new("Line")
+        outlines[i].Thickness = thickness + 2
+        outlines[i].Color = outlineColor
+        outlines[i].Transparency = 1
+        outlines[i].Visible = true
+    end
+
+    local elapsed = 0
+    local conn
+    conn = RunService.RenderStepped:Connect(function(dt)
+        elapsed = elapsed + dt
+        local pos, onScreen = cam:WorldToViewportPoint(worldPos)
+        if onScreen then
+            local px, py = pos.X, pos.Y
+            for i = 1, 4 do
+                lines[i].Visible = true
+                outlines[i].Visible = true
+            end
+
+            local s = size
+            lines[1].From = Vector2.new(px - s, py - s)
+            lines[1].To = Vector2.new(px - s/2, py - s/2)
+            lines[2].From = Vector2.new(px + s, py - s)
+            lines[2].To = Vector2.new(px + s/2, py - s/2)
+            lines[3].From = Vector2.new(px - s, py + s)
+            lines[3].To = Vector2.new(px - s/2, py + s/2)
+            lines[4].From = Vector2.new(px + s, py + s)
+            lines[4].To = Vector2.new(px + s/2, py + s/2)
+
+            for i = 1, 4 do
+                local dir = lines[i].To - lines[i].From
+                if dir.Magnitude > 0 then
+                    local offset = dir.Unit
+                    outlines[i].From = lines[i].From - offset
+                    outlines[i].To = lines[i].To + offset
+                else
+                    outlines[i].From = lines[i].From
+                    outlines[i].To = lines[i].To
+                end
+            end
+
+            if elapsed > lifetime then
+                local fade = math.clamp((elapsed - lifetime) / 0.3, 0, 1)
+                for i = 1, 4 do
+                    lines[i].Transparency = 1 - fade
+                    outlines[i].Transparency = 1 - fade
+                end
+                if fade >= 1 then
+                    conn:Disconnect()
+                    for i = 1, 4 do
+                        lines[i]:Destroy()
+                        outlines[i]:Destroy()
+                    end
+                end
+            end
+        else
+            for i = 1, 4 do
+                lines[i].Visible = false
+                outlines[i].Visible = false
+            end
+        end
+    end)
+end
+
 local function HitChams(Player)
     if not HitChamsSettings.Enabled then return end
 
@@ -8526,96 +8616,6 @@ local function ShowHitmarker(worldPos)
     TweenService:Create(indicator, TweenInfo.new(HitmarkerSettings.Lifetime, Enum.EasingStyle.Linear), {
         ImageTransparency = 1
     }):Play()
-end
-
-local function Show3DHitmarker(worldPos, isLethal)
-    if not D3HitmarkerSettings.Enabled then return end
-    if not worldPos then return end
-
-    local currentTime = tick()
-    if lastD3HitmarkerTime[1] and (currentTime - lastD3HitmarkerTime[1]) < 0.05 then
-        return
-    end
-    lastD3HitmarkerTime[1] = currentTime
-
-    local cam = Camera
-    local size = D3HitmarkerSettings.Size or 10
-    local thickness = D3HitmarkerSettings.Thickness or 1
-    local color = isLethal and D3HitmarkerSettings.LethalColor or D3HitmarkerSettings.Color
-    local outlineColor = D3HitmarkerSettings.OutlineColor
-    local lifetime = D3HitmarkerSettings.Lifetime or 0.5
-
-    local lines = {}
-    local outlines = {}
-    for i = 1, 4 do
-        lines[i] = Drawing.new("Line")
-        lines[i].Thickness = thickness
-        lines[i].Color = color
-        lines[i].Transparency = 1
-        lines[i].Visible = true
-
-        outlines[i] = Drawing.new("Line")
-        outlines[i].Thickness = thickness + 2
-        outlines[i].Color = outlineColor
-        outlines[i].Transparency = 1
-        outlines[i].Visible = true
-    end
-
-    local elapsed = 0
-    local conn
-    conn = RunService.RenderStepped:Connect(function(dt)
-        elapsed = elapsed + dt
-        local pos, onScreen = cam:WorldToViewportPoint(worldPos)
-        if onScreen then
-            local px, py = pos.X, pos.Y
-            for i = 1, 4 do
-                lines[i].Visible = true
-                outlines[i].Visible = true
-            end
-
-            local s = size
-            lines[1].From = Vector2.new(px - s, py - s)
-            lines[1].To = Vector2.new(px - s/2, py - s/2)
-            lines[2].From = Vector2.new(px + s, py - s)
-            lines[2].To = Vector2.new(px + s/2, py - s/2)
-            lines[3].From = Vector2.new(px - s, py + s)
-            lines[3].To = Vector2.new(px - s/2, py + s/2)
-            lines[4].From = Vector2.new(px + s, py + s)
-            lines[4].To = Vector2.new(px + s/2, py + s/2)
-
-            for i = 1, 4 do
-                local dir = lines[i].To - lines[i].From
-                if dir.Magnitude > 0 then
-                    local offset = dir.Unit
-                    outlines[i].From = lines[i].From - offset
-                    outlines[i].To = lines[i].To + offset
-                else
-                    outlines[i].From = lines[i].From
-                    outlines[i].To = lines[i].To
-                end
-            end
-
-            if elapsed > lifetime then
-                local fade = math.clamp((elapsed - lifetime) / 0.3, 0, 1)
-                for i = 1, 4 do
-                    lines[i].Transparency = 1 - fade
-                    outlines[i].Transparency = 1 - fade
-                end
-                if fade >= 1 then
-                    conn:Disconnect()
-                    for i = 1, 4 do
-                        lines[i]:Destroy()
-                        outlines[i]:Destroy()
-                    end
-                end
-            end
-        else
-            for i = 1, 4 do
-                lines[i].Visible = false
-                outlines[i].Visible = false
-            end
-        end
-    end)
 end
 
 local function ShowKillMarker(worldPos)
