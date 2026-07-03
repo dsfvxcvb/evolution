@@ -56,18 +56,19 @@ local CombatStrafe = Tabs.Combat:AddRightGroupbox('Target Strafe')
 local CombatHitsound = Tabs.Combat:AddRightGroupbox('Hitsounds')
 
 local VisualsESP = Tabs.Visuals:AddLeftGroupbox('ESP')
-local VisualsTracers = Tabs.Visuals:AddLeftGroupbox('Visualize Bullets')
 local VisualsHitChams = Tabs.Visuals:AddLeftGroupbox('Hit Chams')
 local VisualsHitEffects = Tabs.Visuals:AddLeftGroupbox('Hit Effects')
-local VisualsClient = Tabs.Visuals:AddLeftGroupbox('Client')
+local VisualsHitLogs = Tabs.Visuals:AddLeftGroupbox('Hit logs')
+local VisualsHitVignette = Tabs.Visuals:AddLeftGroupbox('Hit Vignette')
+
 local VisualsWorld = Tabs.Visuals:AddRightGroupbox('World')
 local VisualsWeather = Tabs.Visuals:AddRightGroupbox('Weather')
 local VisualsCrosshair = Tabs.Visuals:AddRightGroupbox('Crosshair')
 local VisualsHitIndicators = Tabs.Visuals:AddRightGroupbox('Damage Numbers')
-local VisualsHitLogs = Tabs.Visuals:AddRightGroupbox('Hit logs')
-local VisualsHitVignette = Tabs.Visuals:AddRightGroupbox('Hit Vignette')
-local VisualsGunMaterial = Tabs.Visuals:AddLeftGroupbox('Gun Material')
-local VisualsAspectRatio = Tabs.Visuals:AddLeftGroupbox('Aspect Ratio')
+local VisualsTracers = Tabs.Visuals:AddRightGroupbox('Visualize Bullets')
+local VisualsClient = Tabs.Visuals:AddRightGroupbox('Client')
+local VisualsGunMaterial = Tabs.Visuals:AddRightGroupbox('Gun Material')
+local VisualsAspectRatio = Tabs.Visuals:AddRightGroupbox('Aspect Ratio')
 
 -- ===== ESP UI Controls =====
 do
@@ -981,10 +982,11 @@ local AutoKill = {
         Enabled = true,
         Size = 20,
         Fill = true,
+        FillColor = Color3.fromRGB(255, 0, 0),
         FillTransparency = 0.5,
         Outline = true,
+        OutlineColor = Color3.fromRGB(255, 0, 0),
         OutlineTransparency = 0.5,
-        Color = Color3.fromRGB(255, 0, 0),
     },
     KnifeAura = false,
     AuraLockedTarget = nil,
@@ -2027,7 +2029,7 @@ RunService.Heartbeat:Connect(function()
             hitbox.Size = Vector3.new(sz, sz, sz)
             hitbox.CanCollide = false
             hitbox.Massless = true
-            hitbox.Color = AutoKill.KnifeExpander.Color
+            hitbox.Color = AutoKill.KnifeExpander.FillColor
 
             if AutoKill.KnifeExpander.Fill then
                 hitbox.Transparency = math.clamp(AutoKill.KnifeExpander.FillTransparency, 0, 1)
@@ -2051,7 +2053,7 @@ RunService.Heartbeat:Connect(function()
                 outline.SurfaceTransparency = 1
                 outline.Parent = hitbox
             end
-            outline.Color3 = AutoKill.KnifeExpander.Color
+            outline.Color3 = AutoKill.KnifeExpander.OutlineColor
             outline.Transparency = 1 - math.clamp(AutoKill.KnifeExpander.OutlineTransparency, 0, 1)
             outline.Visible = true
         elseif outline then
@@ -2637,12 +2639,6 @@ CombatKnifeHitbox:AddToggle('KnifeHitboxToggle', {
     Callback = function(Value)
         AutoKill.KnifeExpander.Enabled = Value
     end
-}):AddColorPicker('KnifeHitboxColor', {
-    Title = "Color",
-    Default = AutoKill.KnifeExpander.Color,
-    Callback = function(Value)
-        AutoKill.KnifeExpander.Color = Value
-    end
 })
 
 CombatKnifeHitbox:AddSlider('KnifeHitboxSize', {
@@ -2684,6 +2680,12 @@ CombatKnifeHitbox:AddToggle('KnifeHitboxFill', {
     Callback = function(Value)
         AutoKill.KnifeExpander.Fill = Value
     end
+}):AddColorPicker('KnifeHitboxFillColor', {
+    Title = "Fill Color",
+    Default = AutoKill.KnifeExpander.FillColor,
+    Callback = function(Value)
+        AutoKill.KnifeExpander.FillColor = Value
+    end
 })
 
 CombatKnifeHitbox:AddToggle('KnifeHitboxOutline', {
@@ -2691,6 +2693,12 @@ CombatKnifeHitbox:AddToggle('KnifeHitboxOutline', {
     Default = true,
     Callback = function(Value)
         AutoKill.KnifeExpander.Outline = Value
+    end
+}):AddColorPicker('KnifeHitboxOutlineColor', {
+    Title = "Outline Color",
+    Default = AutoKill.KnifeExpander.OutlineColor,
+    Callback = function(Value)
+        AutoKill.KnifeExpander.OutlineColor = Value
     end
 })
 
@@ -6843,22 +6851,20 @@ ForceHitTracersSection:AddSlider('ForceHitTracersLifetime',{Text = "Lifetime",
     end})
 
 ForceHitTracersSection:AddDropdown('ForceHitTracersTexture',{Text = "Tracer Texture",
-    Values = {"Default", "Hoodcustoms", "laser", "light", "flow", "Neon"},
-    Default = "Neon",
+    Values = {"Default", "Hoodcustoms", "laser", "light", "flow"},
+    Default = "Hoodcustoms",
     Callback = function(Value)
         if getgenv().FH_TracerConfig then
             local cfg = getgenv().FH_TracerConfig
-            local selected = (Options.ForceHitTracersTexture and Options.ForceHitTracersTexture.Value) or "Neon"
+            local selected = (Options.ForceHitTracersTexture and Options.ForceHitTracersTexture.Value) or "Hoodcustoms"
             cfg.TextureName = selected
 
-            -- Map the selected texture to the correct ID (Neon uses a solid emissive beam)
             local textureMap = {
                 ["Default"] = "rbxassetid://130791043",
                 ["Hoodcustoms"] = "rbxassetid://130791043",
                 ["laser"] = "rbxassetid://12781800668",
                 ["light"] = "rbxassetid://2382169232",
-                ["flow"] = "rbxassetid://12788927812",
-                ["Neon"] = ""
+                ["flow"] = "rbxassetid://12788927812"
             }
             cfg.Texture = textureMap[selected] or textureMap["Default"]
         end
@@ -6877,8 +6883,8 @@ do
             FaceCamera = true,
             UseSpread = true,
             Lifetime = 0.6,
-            TextureName = "Neon",
-            Texture = "",
+            TextureName = "Hoodcustoms",
+            Texture = "rbxassetid://130791043",
         }
     end
 
@@ -6898,28 +6904,14 @@ do
         beam:Destroy()
     end
 
-    local function FadeOutPart(model, lifetime)
-        local start = tick()
-        for _, part in ipairs(model:GetDescendants()) do
-            if part:IsA("BasePart") or part:IsA("PointLight") then
-                part:SetAttribute("OriginalTransparency", part.Transparency)
-            end
-        end
-        while tick() - start < lifetime do
-            local t = (tick() - start) / lifetime
-            for _, part in ipairs(model:GetDescendants()) do
-                if part:IsA("BasePart") then
-                    part.Transparency = t
-                elseif part:IsA("PointLight") then
-                    part.Brightness = (1 - t) * 5
-                end
-            end
-            task.wait(0.05)
-        end
-        model:Destroy()
-    end
-
     local function DrawBeamTracer(startPos, endPos, cfg)
+        local children = TracerFolder:GetChildren()
+        if #children > 30 then
+            for i = 1, #children - 30 do
+                children[i]:Destroy()
+            end
+        end
+
         local partA = Instance.new("Part")
         partA.Anchored = true
         partA.CanCollide = false
@@ -6965,125 +6957,12 @@ do
         end
     end
 
-    local function DrawNeonTracer(startPos, endPos, cfg)
-        local dist = (endPos - startPos).Magnitude
-        if dist < 0.1 then return end
-
-        -- Cap max tracers so they don't pile up and lag.
-        local children = TracerFolder:GetChildren()
-        if #children > 30 then
-            for i = 1, #children - 30 do
-                children[i]:Destroy()
-            end
-        end
-
-        local startColor = cfg.Color or Color3.fromRGB(255, 50, 50)
-        local endColor = cfg.EndColor or startColor
-        local thickness = 0.08
-        local startCF = CFrame.new(startPos, endPos)
-
-        local function makeBeam(startOffset, endOffset)
-            local s = startPos + startOffset
-            local e = endPos + endOffset
-
-            local partA = Instance.new("Part")
-            partA.Anchored = true
-            partA.CanCollide = false
-            partA.Transparency = 1
-            partA.Size = Vector3.new(0.1, 0.1, 0.1)
-            partA.CFrame = CFrame.new(s)
-            partA.Parent = TracerFolder
-
-            local partB = Instance.new("Part")
-            partB.Anchored = true
-            partB.CanCollide = false
-            partB.Transparency = 1
-            partB.Size = Vector3.new(0.1, 0.1, 0.1)
-            partB.CFrame = CFrame.new(e)
-            partB.Parent = TracerFolder
-
-            local attA = Instance.new("Attachment")
-            attA.Parent = partA
-            local attB = Instance.new("Attachment")
-            attB.Parent = partB
-
-            -- Wide faint glow behind the thin core for a neon halo
-            local glow = Instance.new("Beam")
-            glow.Attachment0 = attA
-            glow.Attachment1 = attB
-            glow.Color = ColorSequence.new(startColor)
-            glow.Texture = ""
-            glow.TextureMode = Enum.TextureMode.Stretch
-            glow.TextureLength = 1
-            glow.Width0 = thickness * 4.5
-            glow.Width1 = thickness * 4.5
-            glow.FaceCamera = true
-            glow.LightEmission = 1
-            glow.LightInfluence = 0
-            glow.Transparency = NumberSequence.new(0.75, 0.75)
-            glow.Segments = 1
-            glow.Parent = TracerFolder
-
-            -- Thin bright core
-            local core = Instance.new("Beam")
-            core.Attachment0 = attA
-            core.Attachment1 = attB
-            core.Color = ColorSequence.new(startColor, endColor)
-            core.Texture = ""
-            core.TextureMode = Enum.TextureMode.Stretch
-            core.TextureLength = 1
-            core.Width0 = thickness
-            core.Width1 = thickness
-            core.FaceCamera = true
-            core.LightEmission = 1
-            core.LightInfluence = 0
-            core.Transparency = NumberSequence.new(0, 0)
-            core.Segments = 1
-            core.Parent = TracerFolder
-
-            local lifetime = cfg.Lifetime or 0.6
-            if cfg.FadeOut then
-                task.spawn(function()
-                    FadeOutBeam(core, partA, partB, lifetime)
-                    if glow then glow:Destroy() end
-                end)
-            else
-                task.delay(lifetime, function()
-                    partA:Destroy()
-                    partB:Destroy()
-                    core:Destroy()
-                    glow:Destroy()
-                end)
-            end
-        end
-
-        -- Fan the beams out wide from the gun while clustering the ends near the target.
-        local count = cfg.UseSpread and 10 or 1
-        local startSpread = math.clamp(dist * 0.55, 8, 35)
-        local endSpread = 2.0
-        for i = 1, count do
-            local angle = math.random() * math.pi * 2
-            local rStart = math.sqrt(math.random()) * startSpread
-            local rEnd = math.sqrt(math.random()) * endSpread
-            local startOffset = startCF.RightVector * (math.cos(angle) * rStart)
-                              + startCF.UpVector * (math.sin(angle) * rStart)
-            local endAngle = math.random() * math.pi * 2
-            local endOffset = startCF.RightVector * (math.cos(endAngle) * rEnd)
-                            + startCF.UpVector * (math.sin(endAngle) * rEnd)
-            makeBeam(startOffset, endOffset)
-        end
-    end
-
     local function DrawTracer(startPos, endPos)
         local cfg = getgenv().FH_TracerConfig
         if not cfg or not cfg.Enabled then return end
         if (startPos - endPos).Magnitude < 0.1 then return end
 
-        if cfg.TextureName == "Neon" then
-            DrawNeonTracer(startPos, endPos, cfg)
-        else
-            DrawBeamTracer(startPos, endPos, cfg)
-        end
+        DrawBeamTracer(startPos, endPos, cfg)
     end
 
     if UnreliableMainEvent then
@@ -9994,9 +9873,10 @@ local function UpdateMenuGlow()
     newGlow.Parent = Window.Holder
 end
 
-ThemeGroup:AddDivider()
+-- Apply the initial glow settings now
+UpdateMenuGlow()
 
-ThemeGroup:AddToggle('MenuGlowEnabled', {
+MenuGroup:AddToggle('MenuGlowEnabled', {
     Text = "Enable Menu Glow",
     Default = getgenv().MenuGlowEnabled,
     Callback = function(Value)
@@ -10012,7 +9892,7 @@ ThemeGroup:AddToggle('MenuGlowEnabled', {
     end
 })
 
-ThemeGroup:AddSlider('MenuGlowTransparency', {
+MenuGroup:AddSlider('MenuGlowTransparency', {
     Text = "Glow Transparency",
     Min = 0,
     Max = 100,
@@ -10023,9 +9903,6 @@ ThemeGroup:AddSlider('MenuGlowTransparency', {
         UpdateMenuGlow()
     end
 })
-
--- Apply the initial glow settings now
-UpdateMenuGlow()
 
 
 -- Hood Customs Addons integration for existing Linoria UI
@@ -12546,6 +12423,11 @@ function EspLibrary:Update(Player, Data)
         Objects['CornerHolder'].Size = DimOffset(W + 2, H + 2)
         Data['LastW'] = W
         Data['LastH'] = H
+
+        -- Scale stroke thickness with box size so far-away boxes don't look overly thick.
+        local minDim = math.min(W, H)
+        Objects['BoxOutline'].Thickness = math.clamp(math.floor(minDim * 0.08 + 0.5), 1, 3)
+        Objects['BoxInline'].Thickness = math.clamp(math.floor(minDim * 0.05 + 0.5), 1, 2)
     end
 
     local BoxesCfg = Table['Boxes']
