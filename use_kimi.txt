@@ -3,14 +3,6 @@
 -- ============================================
 local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
 
-print("SO0PHIA")
-print("hmmmmm")
-print("KIMI")
-print("SONNNNNNN")
-print("larp")
-print("nigger slave")
-print("github")
-print("https://larpbasezoinbasefartbase>com")
 print("femboi")
 
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
