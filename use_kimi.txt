@@ -6806,12 +6806,11 @@ ForceHitTracersSection:AddToggle('ForceHitTracersFaceCamera',{Text = "Face Camer
         end
     end})
 
-ForceHitTracersSection:AddDropdown('ForceHitTracersSpreadMode',{Text = "Spread Mode",
-    Values = {"Off", "Vertical", "Horizontal", "Diagonal", "Random"},
-    Default = "Random",
+ForceHitTracersSection:AddToggle('ForceHitTracersUseSpread',{Text = "Use Spread",
+    Default = true,
     Callback = function(Value)
         if getgenv().FH_TracerConfig then
-            getgenv().FH_TracerConfig.SpreadMode = (Options.ForceHitTracersSpreadMode and Options.ForceHitTracersSpreadMode.Value) or "Random"
+            getgenv().FH_TracerConfig.UseSpread = (Toggles.ForceHitTracersUseSpread and Toggles.ForceHitTracersUseSpread.Value)
         end
     end})
 
@@ -6859,7 +6858,7 @@ do
             Transparency0 = 0,
             Transparency1 = 0,
             FaceCamera = true,
-            SpreadMode = "Random",
+            UseSpread = true,
             Lifetime = 0.6,
             TextureName = "Neon",
             Texture = "",
@@ -6968,28 +6967,19 @@ do
         model.Name = "NeonTracer"
         model.Parent = TracerFolder
 
-        local color = cfg.Color or Color3.fromRGB(255, 50, 50)
-        local thickness = 0.03
-        local spread = 0.06
+:        local color = cfg.Color or Color3.fromRGB(255, 50, 50)
+        local thickness = 0.06
+        local spread = 0.12
 
-        local mode = cfg.SpreadMode or "Random"
         local patterns = {
-            Off = {{0, 0}},
-            Vertical = {{0, -spread}, {0, 0}, {0, spread}},
-            Horizontal = {{-spread, 0}, {0, 0}, {spread, 0}},
-            Diagonal = {{-spread, -spread}, {0, 0}, {spread, spread}},
+            {{0, -spread}, {0, 0}, {0, spread}},
+            {{-spread, 0}, {0, 0}, {spread, 0}},
+            {{-spread, -spread}, {0, 0}, {spread, spread}},
+            {{spread, -spread}, {0, 0}, {-spread, spread}},
         }
-        local offsets
-        if mode == "Random" then
-            local list = {}
-            for _, v in pairs(patterns) do
-                if v ~= patterns.Off then
-                    table.insert(list, v)
-                end
-            end
-            offsets = list[math.random(1, #list)]
-        else
-            offsets = patterns[mode] or patterns.Off
+        local offsets = {{0, 0}}
+        if cfg.UseSpread then
+            offsets = patterns[math.random(1, #patterns)]
         end
 
         for _, offset in ipairs(offsets) do
@@ -7006,8 +6996,8 @@ do
 
             local light = Instance.new("PointLight")
             light.Color = color
-            light.Brightness = 3
-            light.Range = 5
+            light.Brightness = 8
+            light.Range = 12
             light.Parent = cyl
         end
 
