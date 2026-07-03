@@ -6826,25 +6826,197 @@ ForceHitTracersSection:AddSlider('ForceHitTracersLifetime',{Text = "Lifetime",
     end})
 
 ForceHitTracersSection:AddDropdown('ForceHitTracersTexture',{Text = "Tracer Texture",
-    Values = {"Default", "Hoodcustoms", "laser", "light", "flow"},
-    Default = "Default",
+    Values = {"Default", "Hoodcustoms", "laser", "light", "flow", "Neon"},
+    Default = "Neon",
     Callback = function(Value)
         if getgenv().FH_TracerConfig then
             local cfg = getgenv().FH_TracerConfig
-            local selected = (Options.ForceHitTracersTexture and Options.ForceHitTracersTexture.Value) or "Default"
+            local selected = (Options.ForceHitTracersTexture and Options.ForceHitTracersTexture.Value) or "Neon"
             cfg.TextureName = selected
-            
-            -- Map the selected texture to the correct ID
+
+            -- Map the selected texture to the correct ID (Neon uses parts, not a texture ID)
             local textureMap = {
-                ["Default"] = "",
-                ["Hoodcustoms"] = "",
+                ["Default"] = "rbxassetid://130791043",
+                ["Hoodcustoms"] = "rbxassetid://130791043",
                 ["laser"] = "rbxassetid://12781800668",
                 ["light"] = "rbxassetid://2382169232",
-                ["flow"] = "rbxassetid://12788927812"
+                ["flow"] = "rbxassetid://12788927812",
+                ["Neon"] = ""
             }
-            cfg.Texture = textureMap[selected] or ""
+            cfg.Texture = textureMap[selected] or textureMap["Default"]
         end
     end})
+
+-- Standalone ForceHit bullet tracer renderer.
+do
+    if not getgenv().FH_TracerConfig then
+        getgenv().FH_TracerConfig = {
+            Enabled = true,
+            Color = Color3.fromRGB(255, 50, 50),
+            EndColor = Color3.fromRGB(255, 50, 50),
+            FadeOut = true,
+            Transparency0 = 0,
+            Transparency1 = 0,
+            FaceCamera = true,
+            UseSpread = false,
+            Lifetime = 2,
+            TextureName = "Neon",
+            Texture = "",
+        }
+    end
+
+    local TracerFolder = Instance.new("Folder")
+    TracerFolder.Name = "ForceHitTracers"
+    TracerFolder.Parent = workspace
+
+    local function FadeOutBeam(beam, partA, partB, lifetime)
+        local start = tick()
+        while tick() - start < lifetime do
+            local t = (tick() - start) / lifetime
+            beam.Transparency = NumberSequence.new(t, t)
+            task.wait(0.05)
+        end
+        partA:Destroy()
+        partB:Destroy()
+        beam:Destroy()
+    end
+
+    local function FadeOutPart(model, lifetime)
+        local start = tick()
+        for _, part in ipairs(model:GetDescendants()) do
+            if part:IsA("BasePart") or part:IsA("PointLight") then
+                part:SetAttribute("OriginalTransparency", part.Transparency)
+            end
+        end
+        while tick() - start < lifetime do
+            local t = (tick() - start) / lifetime
+            for _, part in ipairs(model:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.Transparency = t
+                elseif part:IsA("PointLight") then
+                    part.Brightness = (1 - t) * 5
+                end
+            end
+            task.wait(0.05)
+        end
+        model:Destroy()
+    end
+
+    local function DrawBeamTracer(startPos, endPos, cfg)
+        local partA = Instance.new("Part")
+        partA.Anchored = true
+        partA.CanCollide = false
+        partA.Transparency = 1
+        partA.Size = Vector3.new(0.1, 0.1, 0.1)
+        partA.CFrame = CFrame.new(startPos)
+        partA.Parent = TracerFolder
+
+        local partB = Instance.new("Part")
+        partB.Anchored = true
+        partB.CanCollide = false
+        partB.Transparency = 1
+        partB.Size = Vector3.new(0.1, 0.1, 0.1)
+        partB.CFrame = CFrame.new(endPos)
+        partB.Parent = TracerFolder
+
+        local attA = Instance.new("Attachment")
+        attA.Parent = partA
+        local attB = Instance.new("Attachment")
+        attB.Parent = partB
+
+        local beam = Instance.new("Beam")
+        beam.Attachment0 = attA
+        beam.Attachment1 = attB
+        beam.Color = ColorSequence.new(cfg.Color or Color3.fromRGB(255, 50, 50), cfg.EndColor or cfg.Color or Color3.fromRGB(255, 50, 50))
+        beam.Texture = cfg.Texture or "rbxassetid://130791043"
+        beam.TextureMode = Enum.TextureMode.Stretch
+        beam.TextureLength = 1
+        beam.Width0 = 1
+        beam.Width1 = 1
+        beam.FaceCamera = cfg.FaceCamera
+        beam.Transparency = NumberSequence.new(cfg.Transparency0 or 0, cfg.Transparency1 or 0)
+        beam.Parent = TracerFolder
+
+        if cfg.FadeOut then
+            task.spawn(FadeOutBeam, beam, partA, partB, cfg.Lifetime or 2)
+        else
+            task.delay(cfg.Lifetime or 2, function()
+                partA:Destroy()
+                partB:Destroy()
+                beam:Destroy()
+            end)
+        end
+    end
+
+    local function DrawNeonTracer(startPos, endPos, cfg)
+        local dist = (endPos - startPos).Magnitude
+        if dist < 0.1 then return end
+        local dir = (endPos - startPos).Unit
+        local mid = (startPos + endPos) / 2
+        local baseCF = CFrame.new(mid, mid + dir) * CFrame.Angles(0, math.rad(-90), 0)
+
+        local model = Instance.new("Model")
+        model.Name = "NeonTracer"
+        model.Parent = TracerFolder
+
+        local color = cfg.Color or Color3.fromRGB(255, 50, 50)
+        local count = 3
+        local thickness = 0.08
+        local spread = 0.12
+
+        for i = 1, count do
+            local cyl = Instance.new("Part")
+            cyl.Shape = Enum.PartType.Cylinder
+            cyl.Material = Enum.Material.Neon
+            cyl.Color = color
+            cyl.Size = Vector3.new(dist, thickness, thickness)
+            cyl.CFrame = baseCF * CFrame.new(0, (i - (count + 1) / 2) * spread, 0)
+            cyl.Anchored = true
+            cyl.CanCollide = false
+            cyl.CastShadow = false
+            cyl.Parent = model
+
+            local light = Instance.new("PointLight")
+            light.Color = color
+            light.Brightness = 5
+            light.Range = 8
+            light.Parent = cyl
+        end
+
+        if cfg.FadeOut then
+            task.spawn(FadeOutPart, model, cfg.Lifetime or 2)
+        else
+            task.delay(cfg.Lifetime or 2, function()
+                model:Destroy()
+            end)
+        end
+    end
+
+    local function DrawTracer(startPos, endPos)
+        local cfg = getgenv().FH_TracerConfig
+        if not cfg or not cfg.Enabled then return end
+        if (startPos - endPos).Magnitude < 0.1 then return end
+
+        if cfg.TextureName == "Neon" then
+            DrawNeonTracer(startPos, endPos, cfg)
+        else
+            DrawBeamTracer(startPos, endPos, cfg)
+        end
+    end
+
+    if UnreliableMainEvent then
+        UnreliableMainEvent.OnClientEvent:Connect(function(...)
+            local args = {...}
+            if args[1] ~= "ReplicateBulletRay" then return end
+            local positions = args[2]
+            if typeof(positions) ~= "table" then return end
+            local shooter = args[3]
+            -- Only draw ForceHit tracers for bullets fired by the local player.
+            if typeof(shooter) == "Instance" and shooter:IsA("Player") and shooter ~= LocalPlayer then return end
+            DrawTracer(positions[1], positions[2])
+        end)
+    end
+end
 
 do
     local WorldSection = VisualsWorld
