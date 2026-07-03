@@ -6851,14 +6851,14 @@ ForceHitTracersSection:AddDropdown('ForceHitTracersTexture',{Text = "Tracer Text
             local selected = (Options.ForceHitTracersTexture and Options.ForceHitTracersTexture.Value) or "Neon"
             cfg.TextureName = selected
 
-            -- Map the selected texture to the correct ID (Neon uses parts, not a texture ID)
+            -- Map the selected texture to the correct ID (Neon uses a solid emissive beam)
             local textureMap = {
                 ["Default"] = "rbxassetid://130791043",
                 ["Hoodcustoms"] = "rbxassetid://130791043",
                 ["laser"] = "rbxassetid://12781800668",
                 ["light"] = "rbxassetid://2382169232",
                 ["flow"] = "rbxassetid://12788927812",
-                ["Neon"] = "rbxassetid://130791043"
+                ["Neon"] = ""
             }
             cfg.Texture = textureMap[selected] or textureMap["Default"]
         end
@@ -6971,14 +6971,15 @@ do
 
         -- Cap max tracers so they don't pile up and lag.
         local children = TracerFolder:GetChildren()
-        if #children > 40 then
-            for i = 1, #children - 40 do
+        if #children > 30 then
+            for i = 1, #children - 30 do
                 children[i]:Destroy()
             end
         end
 
-        local color = cfg.Color or Color3.fromRGB(255, 50, 50)
-        local thickness = 0.1
+        local startColor = cfg.Color or Color3.fromRGB(255, 50, 50)
+        local endColor = cfg.EndColor or startColor
+        local thickness = 0.08
         local startCF = CFrame.new(startPos, endPos)
 
         local function makeBeam(startOffset, endOffset)
@@ -7006,45 +7007,67 @@ do
             local attB = Instance.new("Attachment")
             attB.Parent = partB
 
-            local beam = Instance.new("Beam")
-            beam.Attachment0 = attA
-            beam.Attachment1 = attB
-            beam.Color = ColorSequence.new(color)
-            beam.Texture = "" -- solid neon line; no repeating texture
-            beam.TextureMode = Enum.TextureMode.Stretch
-            beam.TextureLength = 1
-            beam.Width0 = thickness
-            beam.Width1 = thickness
-            beam.FaceCamera = true
-            beam.LightEmission = 1
-            beam.LightInfluence = 0
-            beam.Transparency = NumberSequence.new(0, 0)
-            beam.Parent = TracerFolder
+            -- Wide faint glow behind the thin core for a neon halo
+            local glow = Instance.new("Beam")
+            glow.Attachment0 = attA
+            glow.Attachment1 = attB
+            glow.Color = ColorSequence.new(startColor)
+            glow.Texture = ""
+            glow.TextureMode = Enum.TextureMode.Stretch
+            glow.TextureLength = 1
+            glow.Width0 = thickness * 4.5
+            glow.Width1 = thickness * 4.5
+            glow.FaceCamera = true
+            glow.LightEmission = 1
+            glow.LightInfluence = 0
+            glow.Transparency = NumberSequence.new(0.75, 0.75)
+            glow.Segments = 1
+            glow.Parent = TracerFolder
+
+            -- Thin bright core
+            local core = Instance.new("Beam")
+            core.Attachment0 = attA
+            core.Attachment1 = attB
+            core.Color = ColorSequence.new(startColor, endColor)
+            core.Texture = ""
+            core.TextureMode = Enum.TextureMode.Stretch
+            core.TextureLength = 1
+            core.Width0 = thickness
+            core.Width1 = thickness
+            core.FaceCamera = true
+            core.LightEmission = 1
+            core.LightInfluence = 0
+            core.Transparency = NumberSequence.new(0, 0)
+            core.Segments = 1
+            core.Parent = TracerFolder
 
             local lifetime = cfg.Lifetime or 0.6
             if cfg.FadeOut then
-                task.spawn(FadeOutBeam, beam, partA, partB, lifetime)
+                task.spawn(function()
+                    FadeOutBeam(core, partA, partB, lifetime)
+                    if glow then glow:Destroy() end
+                end)
             else
                 task.delay(lifetime, function()
                     partA:Destroy()
                     partB:Destroy()
-                    beam:Destroy()
+                    core:Destroy()
+                    glow:Destroy()
                 end)
             end
         end
 
-        -- Fan the beams out from the gun, but keep the destination clustered
-        -- near the target so they look like they converge without overlapping.
-        local count = cfg.UseSpread and 8 or 1
-        local startSpread = math.clamp(dist * 0.7, 6, 25)
-        local endSpread = 0.8
+        -- Fan the beams out wide from the gun while clustering the ends near the target.
+        local count = cfg.UseSpread and 10 or 1
+        local startSpread = math.clamp(dist * 0.55, 8, 35)
+        local endSpread = 2.0
         for i = 1, count do
             local angle = math.random() * math.pi * 2
             local rStart = math.sqrt(math.random()) * startSpread
             local rEnd = math.sqrt(math.random()) * endSpread
             local startOffset = startCF.RightVector * (math.cos(angle) * rStart)
                               + startCF.UpVector * (math.sin(angle) * rStart)
-            local endAngle = angle + (math.random() - 0.5) * 0.5
+            local endAngle = math.random() * math.pi * 2
             local endOffset = startCF.RightVector * (math.cos(endAngle) * rEnd)
                             + startCF.UpVector * (math.sin(endAngle) * rEnd)
             makeBeam(startOffset, endOffset)
