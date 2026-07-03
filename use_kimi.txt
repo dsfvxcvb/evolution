@@ -11,6 +11,7 @@ print("larp")
 print("nigger slave")
 print("github")
 print("https://larpbasezoinbasefartbase>com")
+print("femboi")
 
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
     pcall(function() Library:Unload() end)
