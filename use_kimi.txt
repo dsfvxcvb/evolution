@@ -7178,9 +7178,11 @@ do
         end
     end
 
+    local HookedRemotes = {}
+
     local function HookRemote(remote)
-        if not remote or remote._FHTracerHooked then return end
-        remote._FHTracerHooked = true
+        if not remote or HookedRemotes[remote] then return end
+        HookedRemotes[remote] = true
 
         if typeof(hookfunction) ~= "function" then return end
 
