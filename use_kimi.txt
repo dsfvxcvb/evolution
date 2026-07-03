@@ -5,8 +5,8 @@ local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
 
 print("SO0PHIA")
 print("hmmmmm")
-print("wow smile")
-print("son")
+print("KIMI")
+print("SONNNNNNN")
 
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
     pcall(function() Library:Unload() end)
