@@ -1015,6 +1015,7 @@ local ProtectPlayer = {
     LastAttackTime = 0,
     MaxShooterDistance = 200,
     StartCFrame = nil,
+    StompRunning = false,
 }
 
 local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent")
@@ -1281,6 +1282,41 @@ function ProtectPlayer.SetSpectate(target)
     end
 end
 
+function ProtectPlayer.StartAutoStomp(target)
+    local state = getgenv().AutoStompState
+    if not state or state.running or ProtectPlayer.StompRunning then return end
+    ProtectPlayer.StompRunning = true
+    local originalTarget = Targeting.Target
+    Targeting.Target = target
+    state.autostomp = true
+    getgenv().AutoStompLoop()
+    task.spawn(function()
+        while state.running do
+            local stillDowned = false
+            if target and target.Character then
+                local b = target.Character:FindFirstChild("BodyEffects")
+                local ko = b and b:FindFirstChild("K.O")
+                local dead = b and b:FindFirstChild("Dead")
+                if ko and ko.Value and (not dead or not dead.Value) then
+                    stillDowned = true
+                end
+            end
+            if not ProtectPlayer.Enabled or not ProtectPlayer.StompRunning or not stillDowned then
+                state.autostomp = false
+            end
+            task.wait(0.05)
+        end
+        Targeting.Target = originalTarget
+        ProtectPlayer.StompRunning = false
+    end)
+end
+
+function ProtectPlayer.StopAutoStomp()
+    local state = getgenv().AutoStompState
+    if state then state.autostomp = false end
+    ProtectPlayer.StompRunning = false
+end
+
 function ProtectPlayer.Start()
     if ProtectPlayer.LoopConnection then return end
     ProtectPlayer.LoopConnection = RunService.Heartbeat:Connect(function()
@@ -1293,6 +1329,7 @@ function ProtectPlayer.Start()
             local status = ProtectPlayer.GetTargetStatus(ProtectPlayer.Shooter)
             if status == "dead" or status == "nochar" then
                 ProtectPlayer.SetSpectate(nil)
+                ProtectPlayer.StopAutoStomp()
                 ProtectPlayer.ReturnToStart()
                 ProtectPlayer.Shooter = nil
                 ProtectPlayer.Active = false
@@ -1334,14 +1371,12 @@ function ProtectPlayer.Start()
             elseif shooterStatus == "downed" and ProtectPlayer.StompShooter then
                 ProtectPlayer.Active = true
                 ProtectPlayer.SetSpectate(ProtectPlayer.Shooter)
-                if tick() - ProtectPlayer.LastAttackTime >= ProtectPlayer.AttackCooldown then
-                    ProtectPlayer.TeleportTo(ProtectPlayer.Shooter, CFrame.new(0, 0, 1))
-                    RunService.Heartbeat:Wait()
-                    ProtectPlayer.Stomp()
-                    ProtectPlayer.LastAttackTime = tick()
+                if not ProtectPlayer.StompRunning then
+                    ProtectPlayer.StartAutoStomp(ProtectPlayer.Shooter)
                 end
             else
                 ProtectPlayer.SetSpectate(nil)
+                ProtectPlayer.StopAutoStomp()
                 ProtectPlayer.ReturnToStart()
                 ProtectPlayer.Shooter = nil
                 ProtectPlayer.Active = false
@@ -1436,6 +1471,7 @@ function ProtectPlayer.Stop()
     ProtectPlayer.LastGlobalShooter = nil
     ProtectPlayer.LastGlobalShotTime = 0
     ProtectPlayer.SetSpectate(nil)
+    ProtectPlayer.StopAutoStomp()
     ProtectPlayer.ReturnToStart()
 end
 
