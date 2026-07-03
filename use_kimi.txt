@@ -6938,6 +6938,7 @@ do
             LineColor = Color3.fromRGB(133, 220, 255),
             LineOutlineColor = Color3.fromRGB(15, 15, 15),
             LineThickness = 1,
+            OutlineTransparency0 = 0,
         }
     end
 
@@ -7016,20 +7017,21 @@ do
 
     local function DrawLineTracer(startPos, endPos, cfg)
         local lineTransparency = 1 - (cfg.Transparency0 or 0)
-        local outlineTransparency = 1 - (cfg.OutlineTransparency0 or cfg.Transparency0 or 0)
+        local outlineTransparency = 1 - (cfg.OutlineTransparency0 or 0)
         local lineColor = cfg.LineColor or cfg.Color or Color3.fromRGB(133, 220, 255)
         local outlineColor = cfg.LineOutlineColor or Color3.fromRGB(15, 15, 15)
+        local lineThickness = cfg.LineThickness or 1
         local lifetime = cfg.Lifetime or 0.8
 
         local outline = Drawing.new("Line")
         outline.Color = outlineColor
-        outline.Thickness = 3
+        outline.Thickness = lineThickness + 2
         outline.Transparency = outlineTransparency
         outline.Visible = true
 
         local line = Drawing.new("Line")
         line.Color = lineColor
-        line.Thickness = 1
+        line.Thickness = lineThickness
         line.Transparency = lineTransparency
         line.Visible = true
 
@@ -7138,57 +7140,45 @@ do
         return part and part.Position or nil
     end
 
-    local function TryDrawForceHitTracer()
-        local cfg = getgenv().FH_TracerConfig
-        if not cfg or not cfg.Enabled then return end
-
-        local startPos = GetGunPosition()
-        local endPos = GetCurrentTargetPosition()
-        if not startPos or not endPos then return end
-        if (startPos - endPos).Magnitude < 0.1 then return end
-
-        if cfg.Mode == "Line" then
-            DrawLineTracer(startPos, endPos, cfg)
-        else
-            DrawBeamTracer(startPos, endPos, cfg)
-        end
-    end
-
-    local HookedRemotes = {}
-
-    local function HookRemote(remote)
-        if not remote or HookedRemotes[remote] then return end
-        HookedRemotes[remote] = true
-
-        if typeof(hookfunction) ~= "function" then return end
-
-        local oldFireServer
-        oldFireServer = hookfunction(remote.FireServer, function(self, ...)
-            if self == remote then
-                local args = {...}
-                local name = args[1]
-                if name == "Shoot" or name == "ShootGun" or name == "Fire" or name == "Bullet" then
-                    TryDrawForceHitTracer()
-                end
+    local function ResolveShooterPlayer(arg)
+        if typeof(arg) == "Instance" and arg:IsA("Player") then
+            return arg
+        elseif typeof(arg) == "string" then
+            return Players:FindFirstChild(arg)
+        elseif typeof(arg) == "table" then
+            for _, v in pairs(arg) do
+                local p = ResolveShooterPlayer(v)
+                if p then return p end
             end
-            return oldFireServer(self, ...)
-        end)
-    end
-
-    local function HookShootRemotes()
-        local mainEvent = getgenv().MainEvent or ReplicatedStorage:FindFirstChild("MainEvent")
-        if mainEvent then HookRemote(mainEvent) end
-        if UnreliableMainEvent then HookRemote(UnreliableMainEvent) end
-    end
-
-    HookShootRemotes()
-    task.spawn(function()
-        while true do
-            task.wait(1)
-            HookShootRemotes()
         end
-    end)
+        return nil
+    end
+
+    local function OnBulletRayReplicated(...)
+        local args = {...}
+        if args[1] ~= "ReplicateBulletRay" then return end
+
+        local positions = args[2]
+        local shooter = ResolveShooterPlayer(args[3])
+        if typeof(positions) ~= "table" or shooter ~= LocalPlayer then return end
+
+        local startPos = positions[1]
+        local endPos = positions[2]
+        if typeof(startPos) ~= "Vector3" or typeof(endPos) ~= "Vector3" then return end
+
+        DrawTracer(startPos, endPos)
+    end
+
+    if UnreliableMainEvent then
+        UnreliableMainEvent.OnClientEvent:Connect(OnBulletRayReplicated)
+    end
+    local mainEvent = ReplicatedStorage:FindFirstChild("MainEvent")
+    if mainEvent and mainEvent:IsA("RemoteEvent") and mainEvent ~= UnreliableMainEvent then
+        mainEvent.OnClientEvent:Connect(OnBulletRayReplicated)
+    end
 end
+
+
 
 
 
@@ -10632,6 +10622,14 @@ MiscMovement:AddToggle('AddonInfiniteJump', { Text = 'Infinite Jump', Default = 
             end
             AnimatedToolsOriginalGrips = {}
             AnimatedToolsTools = {}
+        end
+
+        local function AddCurrentTool()
+            local char = LocalPlayer.Character
+            if not char then return end
+            for _, child in ipairs(char:GetChildren()) do
+                AddAnimatedTool(child)
+            end
         end
 
         local function ConnectToolEvents(char)
