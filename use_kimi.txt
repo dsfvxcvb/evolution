@@ -8,6 +8,7 @@ print("hmmmmm")
 print("KIMI")
 print("SONNNNNNN")
 print("larp")
+print("nigger slave")
 
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
     pcall(function() Library:Unload() end)
