@@ -2250,67 +2250,58 @@ function AutoKill.AutoStomp(target)
     AutoKill.GunMethod.StompReturn = nil
     AutoKill.GunMethod.StompTarget = target
     task.spawn(function()
-        local stompReturn = nil
-        local originalCamOffset = nil
         while AutoKill.GunMethod.StompRunning and AutoKill.Enabled and AutoKill.Target == target do
             local c = LocalPlayer.Character
             local hrp = c and c:FindFirstChild("HumanoidRootPart")
             local hum = c and c:FindFirstChildWhichIsA("Humanoid")
             if not c or not hrp or not hum then
                 task.wait(0.1)
-                continue
-            end
+            else
+                local t = AutoKill.GunMethod.StompTarget
+                if t and t.Character and t ~= LocalPlayer then
+                    local tc = t.Character
+                    local b = tc:FindFirstChild("BodyEffects")
+                    local ko = b and b:FindFirstChild("K.O") and b["K.O"].Value
+                    local dead = b and b:FindFirstChild("Dead") and b["Dead"].Value
+                    if ko and not dead then
+                        local ut = tc:FindFirstChild("UpperTorso") or tc:FindFirstChild("HumanoidRootPart")
+                        if ut then
+                            if not AutoKill.GunMethod.StompReturn then
+                                AutoKill.GunMethod.StompReturn = hrp.CFrame
+                            end
+                            local o = hrp.CFrame
+                            local originalCamOffset = hum.CameraOffset
 
-            local t = AutoKill.GunMethod.StompTarget
-            local tc = t and t.Character
-            if not t or not tc then break end
+                            hum.Sit = false
+                            hum.PlatformStand = false
+                            local originalVel = hrp.AssemblyLinearVelocity
+                            hrp.CFrame = CFrame.new(ut.Position + Vector3.new(0, 3.5, 0))
+                            hum.CameraOffset = o.Position - hrp.Position
 
-            local b = tc:FindFirstChild("BodyEffects")
-            local ko = b and b:FindFirstChild("K.O")
-            local dead = b and b:FindFirstChild("Dead")
+                            RunService.RenderStepped:Wait()
+                            for i = 1, 5 do
+                                task.spawn(function()
+                                    local me = getgenv().MainEvent
+                                    if me then me:FireServer("Stomp") end
+                                end)
+                            end
 
-            if not ko or not ko.Value or (dead and dead.Value) then
-                break
-            end
-
-            local ut = tc:FindFirstChild("UpperTorso")
-            if ut then
-                if not stompReturn then
-                    stompReturn = hrp.CFrame
-                    originalCamOffset = hum.CameraOffset
-                    AutoKill.GunMethod.OriginalCameraOffset = originalCamOffset
+                            hum.CameraOffset = originalCamOffset
+                            hrp.CFrame = o
+                            hrp.AssemblyLinearVelocity = originalVel
+                        end
+                    end
                 end
-                local originalVel = hrp.AssemblyLinearVelocity
-                local originalCFrame = hrp.CFrame
-
-                hum.Sit = false
-                hum.PlatformStand = false
-                hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-                hrp.CFrame = CFrame.new(ut.Position + Vector3.new(0, 3.5, 0))
-                hum.CameraOffset = originalCFrame.Position - hrp.Position
-
-                RunService.RenderStepped:Wait()
-                for i = 1, 5 do
-                    task.spawn(function()
-                        local me = getgenv().MainEvent
-                        if me then me:FireServer("Stomp") end
-                    end)
+                if AutoKill.GunMethod.StompReturn and hrp then
+                    while (hrp.Position - AutoKill.GunMethod.StompReturn.Position).Magnitude > 5 do
+                        hrp.CFrame = AutoKill.GunMethod.StompReturn
+                        task.wait()
+                    end
+                    AutoKill.GunMethod.StompReturn = nil
                 end
-
-                hum.CameraOffset = originalCamOffset
-                hrp.CFrame = originalCFrame
-                hrp.AssemblyLinearVelocity = originalVel
-            end
-            task.wait(0.2)
-        end
-        if stompReturn then
-            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid")
-            if hrp then
-                hrp.CFrame = stompReturn
-            end
-            if hum then
-                hum.CameraOffset = originalCamOffset
+                local me = getgenv().MainEvent
+                if me then pcall(function() me:FireServer("Stomp") end) end
+                task.wait()
             end
         end
         AutoKill.GunMethod.StompRunning = false
@@ -2325,17 +2316,12 @@ function AutoKill.StopAutoStomp()
     if AutoKill.GunMethod.StompReturn then
         local c = LocalPlayer.Character
         local hrp = c and c:FindFirstChild("HumanoidRootPart")
-        local hum = c and c:FindFirstChildWhichIsA("Humanoid")
         if hrp then
             hrp.CFrame = AutoKill.GunMethod.StompReturn
-        end
-        if hum then
-            hum.CameraOffset = AutoKill.GunMethod.OriginalCameraOffset or hum.CameraOffset
         end
     end
     AutoKill.GunMethod.StompTarget = nil
     AutoKill.GunMethod.StompReturn = nil
-    AutoKill.GunMethod.OriginalCameraOffset = nil
     AutoKill.UnhideCharacter()
 end
 
