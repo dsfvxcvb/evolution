@@ -7012,24 +7012,24 @@ do
 
 
 
+
+
     local function DrawLineTracer(startPos, endPos, cfg)
         local lineTransparency = 1 - (cfg.Transparency0 or 0)
-        local outlineTransparency = 1 - (cfg.Transparency0 or 0)
-        local lineColor = cfg.LineColor or cfg.Color or Color3.fromRGB(255, 50, 50)
-        local outlineColor = cfg.LineOutlineColor or Color3.fromRGB(0, 0, 0)
-        local lifetime = cfg.Lifetime or 0.6
-
-        local lineThickness = cfg.LineThickness or 1
+        local outlineTransparency = 1 - (cfg.OutlineTransparency0 or cfg.Transparency0 or 0)
+        local lineColor = cfg.LineColor or cfg.Color or Color3.fromRGB(133, 220, 255)
+        local outlineColor = cfg.LineOutlineColor or Color3.fromRGB(15, 15, 15)
+        local lifetime = cfg.Lifetime or 0.8
 
         local outline = Drawing.new("Line")
         outline.Color = outlineColor
-        outline.Thickness = lineThickness + 2
+        outline.Thickness = 3
         outline.Transparency = outlineTransparency
         outline.Visible = true
 
         local line = Drawing.new("Line")
         line.Color = lineColor
-        line.Thickness = lineThickness
+        line.Thickness = 1
         line.Transparency = lineTransparency
         line.Visible = true
 
@@ -7063,17 +7063,11 @@ do
             local y_half = y_full / 2
 
             if pos.Z < 0 then
-                pos = Vector2.new(
-                    math.clamp(x_half + (x_half - pos.X), 0, x_full),
-                    math.clamp(y_half + (y_half - pos.Y), 0, y_full)
-                )
+                pos = Vector2.new(math.clamp(x_half + (x_half - pos.X), 0, x_full), math.clamp(y_half + (y_half - pos.Y), 0, y_full))
             end
 
             if pos2.Z < 0 then
-                pos2 = Vector2.new(
-                    math.clamp(x_half + (x_half - pos2.X), 0, x_full),
-                    math.clamp(y_half + (y_half - pos2.Y), 0, y_full)
-                )
+                pos2 = Vector2.new(math.clamp(x_half + (x_half - pos2.X), 0, x_full), math.clamp(y_half + (y_half - pos2.Y), 0, y_full))
             end
 
             local to = Vector2.new(pos2.X, pos2.Y)
@@ -7105,18 +7099,9 @@ do
         end)
 
         task.delay(lifetime + 0.3, function()
-            if conn then
-                conn:Disconnect()
-                conn = nil
-            end
-            if line then
-                line:Destroy()
-                line = nil
-            end
-            if outline then
-                outline:Destroy()
-                outline = nil
-            end
+            if conn then conn:Disconnect() end
+            if line then line:Destroy() end
+            if outline then outline:Destroy() end
         end)
     end
 
