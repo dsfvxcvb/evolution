@@ -6967,7 +6967,7 @@ do
         model.Name = "NeonTracer"
         model.Parent = TracerFolder
 
-:        local color = cfg.Color or Color3.fromRGB(255, 50, 50)
+        local color = cfg.Color or Color3.fromRGB(255, 50, 50)
         local thickness = 0.06
         local spread = 0.12
 
