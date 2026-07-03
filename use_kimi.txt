@@ -8,6 +8,7 @@ if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
 end
 
 print("save")
+print("LOAD")
 
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
