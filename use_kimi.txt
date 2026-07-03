@@ -6806,18 +6806,19 @@ ForceHitTracersSection:AddToggle('ForceHitTracersFaceCamera',{Text = "Face Camer
         end
     end})
 
-ForceHitTracersSection:AddToggle('ForceHitTracersUseSpread',{Text = "Use Spread",
-    Default = false,
+ForceHitTracersSection:AddDropdown('ForceHitTracersSpreadMode',{Text = "Spread Mode",
+    Values = {"Off", "Vertical", "Horizontal", "Diagonal", "Random"},
+    Default = "Random",
     Callback = function(Value)
         if getgenv().FH_TracerConfig then
-            getgenv().FH_TracerConfig.UseSpread = (Toggles.ForceHitTracersUseSpread and Toggles.ForceHitTracersUseSpread.Value)
+            getgenv().FH_TracerConfig.SpreadMode = (Options.ForceHitTracersSpreadMode and Options.ForceHitTracersSpreadMode.Value) or "Random"
         end
     end})
 
 ForceHitTracersSection:AddSlider('ForceHitTracersLifetime',{Text = "Lifetime",
-    Min = 0.5,
-    Max = 10,
-    Default = 2,
+    Min = 0.1,
+    Max = 5,
+    Default = 0.6,
     Rounding = 1,
     Callback = function(Value)
         if getgenv().FH_TracerConfig then
@@ -6858,8 +6859,8 @@ do
             Transparency0 = 0,
             Transparency1 = 0,
             FaceCamera = true,
-            UseSpread = false,
-            Lifetime = 2,
+            SpreadMode = "Random",
+            Lifetime = 0.6,
             TextureName = "Neon",
             Texture = "",
         }
@@ -6955,22 +6956,49 @@ do
         local mid = (startPos + endPos) / 2
         local baseCF = CFrame.new(mid, mid + dir) * CFrame.Angles(0, math.rad(-90), 0)
 
+        -- Cap max tracers so they don't pile up and lag.
+        local children = TracerFolder:GetChildren()
+        if #children > 40 then
+            for i = 1, #children - 40 do
+                children[i]:Destroy()
+            end
+        end
+
         local model = Instance.new("Model")
         model.Name = "NeonTracer"
         model.Parent = TracerFolder
 
         local color = cfg.Color or Color3.fromRGB(255, 50, 50)
-        local count = 3
-        local thickness = 0.08
-        local spread = 0.12
+        local thickness = 0.03
+        local spread = 0.06
 
-        for i = 1, count do
+        local mode = cfg.SpreadMode or "Random"
+        local patterns = {
+            Off = {{0, 0}},
+            Vertical = {{0, -spread}, {0, 0}, {0, spread}},
+            Horizontal = {{-spread, 0}, {0, 0}, {spread, 0}},
+            Diagonal = {{-spread, -spread}, {0, 0}, {spread, spread}},
+        }
+        local offsets
+        if mode == "Random" then
+            local list = {}
+            for _, v in pairs(patterns) do
+                if v ~= patterns.Off then
+                    table.insert(list, v)
+                end
+            end
+            offsets = list[math.random(1, #list)]
+        else
+            offsets = patterns[mode] or patterns.Off
+        end
+
+        for _, offset in ipairs(offsets) do
             local cyl = Instance.new("Part")
             cyl.Shape = Enum.PartType.Cylinder
             cyl.Material = Enum.Material.Neon
             cyl.Color = color
             cyl.Size = Vector3.new(dist, thickness, thickness)
-            cyl.CFrame = baseCF * CFrame.new(0, (i - (count + 1) / 2) * spread, 0)
+            cyl.CFrame = baseCF * CFrame.new(0, offset[2], offset[1])
             cyl.Anchored = true
             cyl.CanCollide = false
             cyl.CastShadow = false
@@ -6978,15 +7006,16 @@ do
 
             local light = Instance.new("PointLight")
             light.Color = color
-            light.Brightness = 5
-            light.Range = 8
+            light.Brightness = 3
+            light.Range = 5
             light.Parent = cyl
         end
 
+        local lifetime = cfg.Lifetime or 0.6
         if cfg.FadeOut then
-            task.spawn(FadeOutPart, model, cfg.Lifetime or 2)
+            task.spawn(FadeOutPart, model, lifetime)
         else
-            task.delay(cfg.Lifetime or 2, function()
+            task.delay(lifetime, function()
                 model:Destroy()
             end)
         end
@@ -7010,9 +7039,8 @@ do
             if args[1] ~= "ReplicateBulletRay" then return end
             local positions = args[2]
             if typeof(positions) ~= "table" then return end
-            local shooter = args[3]
             -- Only draw ForceHit tracers for bullets fired by the local player.
-            if typeof(shooter) == "Instance" and shooter:IsA("Player") and shooter ~= LocalPlayer then return end
+            if args[3] ~= LocalPlayer then return end
             DrawTracer(positions[1], positions[2])
         end)
     end
