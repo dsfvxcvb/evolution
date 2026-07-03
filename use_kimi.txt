@@ -7166,8 +7166,13 @@ do
         local startPos = object.Position
         local endPos = attachment1.WorldCFrame.Position
 
-        -- Destroy the original beam/part so the default texture tracer is replaced.
-        pcall(function() object:Destroy() end)
+        -- Hide and destroy the original beam/part so the default texture tracer is replaced.
+        pcall(function()
+            if beam then
+                beam.Enabled = false
+            end
+            object:Destroy()
+        end)
 
         if cfg.Mode == "Line" then
             DrawLineTracer(startPos, endPos, cfg)
@@ -10739,7 +10744,7 @@ MiscMovement:AddToggle('AddonInfiniteJump', { Text = 'Infinite Jump', Default = 
 
                 for tool, originalGrip in pairs(AnimatedToolsOriginalGrips) do
                     if tool and tool.Parent then
-                        tool.Grip = originalGrip * CFrame.Angles(math.rad(vertical * dt * vSpeed), math.rad(horizontal * dt * hSpeed), 0)
+                        tool.Grip = tool.Grip * CFrame.Angles(math.rad(vertical * dt * vSpeed), math.rad(horizontal * dt * hSpeed), 0)
                     end
                 end
             end)
