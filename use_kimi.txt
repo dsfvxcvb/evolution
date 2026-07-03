@@ -7087,24 +7087,16 @@ do
         AmbientEnabled = false,
         Ambient = Color3.fromRGB(70, 70, 70),
         OutdoorAmbient = Color3.fromRGB(140, 140, 140),
-        BrightnessEnabled = false,
-        Brightness = 2,
         SkyboxEnabled = false,
         TimeEnabled = false,
         TimeValue = 14,
         SunEnabled = false,
         SunTextureId = "",
         MoonEnabled = false,
-        FullbrightEnabled = false,
         BloomEnabled = false,
         BloomIntensity = 0.75,
         BloomSize = 24,
         BloomThreshold = 1,
-        BlurEnabled = false,
-        BlurSize = 24,
-        SunRaysEnabled = false,
-        SunRaysIntensity = 0.25,
-        SunRaysSpread = 1,
         ColorCorrectionEnabled = false,
         CCBrightness = 0,
         CCContrast = 0,
@@ -7115,6 +7107,7 @@ do
         WeatherColor = Color3.fromRGB(255, 255, 255),
         WeatherRate = 100,
         WeatherSoundEnabled = true,
+        WeatherSound = "Rain 1",
         WeatherVolume = 0.5,
     }
 
@@ -7131,8 +7124,6 @@ do
     }
 
     local bloomEffect = nil
-    local blurEffect = nil
-    local sunRaysEffect = nil
     local colorCorrectionEffect = nil
 
     local function getOrCreateEffect(className, name)
@@ -7143,25 +7134,6 @@ do
         effect.Parent = Lighting
         return effect
     end
-
-    WorldSection:AddToggle('FullbrightEnabled',{Text = "Fullbright",
-    Default = false,
-    Callback = function(Value)
-            WorldSettings.FullbrightEnabled = (Toggles.FullbrightEnabled and Toggles.FullbrightEnabled.Value)
-            if WorldSettings.FullbrightEnabled then
-                Lighting.Brightness = 2
-                Lighting.Ambient = Color3.fromRGB(178, 178, 178)
-                Lighting.OutdoorAmbient = Color3.fromRGB(178, 178, 178)
-                Lighting.FogEnd = 100000
-                Lighting.FogStart = 100000
-            else
-                Lighting.Brightness = OriginalLighting.Brightness
-                Lighting.Ambient = OriginalLighting.Ambient
-                Lighting.OutdoorAmbient = OriginalLighting.OutdoorAmbient
-                Lighting.FogEnd = OriginalLighting.FogEnd
-                Lighting.FogStart = OriginalLighting.FogStart
-            end
-        end})
 
     WorldSection:AddToggle('FogEnabled',{Text = "Custom Fog",
     Default = false,
@@ -7230,28 +7202,6 @@ do
             WorldSettings.OutdoorAmbient = (Value and Value) or Color3.fromRGB(140, 140, 140)
             if (Toggles.OutdoorAmbientEnabled and Toggles.OutdoorAmbientEnabled.Value) then
                 Lighting.OutdoorAmbient = WorldSettings.OutdoorAmbient
-            end
-        end})
-
-    WorldSection:AddSlider('WorldBrightness',{Text = "Brightness",
-    Min = 0,
-    Max = 10,
-    Default = 2,
-    Rounding = 1,
-    Callback = function(Value)
-            if (Toggles.BrightnessEnabled and Toggles.BrightnessEnabled.Value) then
-                Lighting.Brightness = (Options.WorldBrightness and Options.WorldBrightness.Value) or 2
-            end
-        end})
-
-    WorldSection:AddToggle('BrightnessEnabled',{Text = "Override Brightness",
-    Default = false,
-    Callback = function(Value)
-            WorldSettings.BrightnessEnabled = (Toggles.BrightnessEnabled and Toggles.BrightnessEnabled.Value)
-            if not WorldSettings.BrightnessEnabled then
-                Lighting.Brightness = OriginalLighting.Brightness
-            else
-                Lighting.Brightness = (Options.WorldBrightness and Options.WorldBrightness.Value) or 2
             end
         end})
 
@@ -7324,69 +7274,6 @@ do
             WorldSettings.BloomThreshold = (Options.BloomThreshold and Options.BloomThreshold.Value) or 1
             if bloomEffect and WorldSettings.BloomEnabled then
                 bloomEffect.Threshold = WorldSettings.BloomThreshold
-            end
-        end})
-
-    WorldSection:AddToggle('BlurEnabled',{Text = "Blur",
-    Default = false,
-    Callback = function(Value)
-            WorldSettings.BlurEnabled = (Toggles.BlurEnabled and Toggles.BlurEnabled.Value)
-            if WorldSettings.BlurEnabled then
-                blurEffect = getOrCreateEffect("BlurEffect", "CustomBlur")
-                blurEffect.Size = WorldSettings.BlurSize
-                blurEffect.Enabled = true
-            else
-                if blurEffect then blurEffect.Enabled = false end
-            end
-        end})
-
-    WorldSection:AddSlider('BlurSize',{Text = "Blur Size",
-    Min = 0,
-    Max = 56,
-    Default = 24,
-    Rounding = 0,
-    Callback = function(Value)
-            WorldSettings.BlurSize = (Options.BlurSize and Options.BlurSize.Value) or 24
-            if blurEffect and WorldSettings.BlurEnabled then
-                blurEffect.Size = WorldSettings.BlurSize
-            end
-        end})
-
-    WorldSection:AddToggle('SunRaysEnabled',{Text = "Sun Rays",
-    Default = false,
-    Callback = function(Value)
-            WorldSettings.SunRaysEnabled = (Toggles.SunRaysEnabled and Toggles.SunRaysEnabled.Value)
-            if WorldSettings.SunRaysEnabled then
-                sunRaysEffect = getOrCreateEffect("SunRaysEffect", "CustomSunRays")
-                sunRaysEffect.Intensity = WorldSettings.SunRaysIntensity
-                sunRaysEffect.Spread = WorldSettings.SunRaysSpread
-                sunRaysEffect.Enabled = true
-            else
-                if sunRaysEffect then sunRaysEffect.Enabled = false end
-            end
-        end})
-
-    WorldSection:AddSlider('SunRaysIntensity',{Text = "Sun Rays Intensity",
-    Min = 0,
-    Max = 1,
-    Default = 0.25,
-    Rounding = 2,
-    Callback = function(Value)
-            WorldSettings.SunRaysIntensity = (Options.SunRaysIntensity and Options.SunRaysIntensity.Value) or 0.25
-            if sunRaysEffect and WorldSettings.SunRaysEnabled then
-                sunRaysEffect.Intensity = WorldSettings.SunRaysIntensity
-            end
-        end})
-
-    WorldSection:AddSlider('SunRaysSpread',{Text = "Sun Rays Spread",
-    Min = 0,
-    Max = 1,
-    Default = 1,
-    Rounding = 2,
-    Callback = function(Value)
-            WorldSettings.SunRaysSpread = (Options.SunRaysSpread and Options.SunRaysSpread.Value) or 1
-            if sunRaysEffect and WorldSettings.SunRaysEnabled then
-                sunRaysEffect.Spread = WorldSettings.SunRaysSpread
             end
         end})
 
@@ -7523,9 +7410,10 @@ do
     }
 
     local weatherSounds = {
-        ["rain"] = "rbxassetid://1847055976",
-        ["light rain"] = "rbxassetid://1847055976",
-        ["snow"] = "rbxassetid://6455667685",
+        ["Rain 1"] = "rbxassetid://1516791621",
+        ["Rain 2"] = "rbxassetid://138911277964858",
+        ["Light Rain"] = "rbxassetid://18862087062",
+        ["Thunder"] = "rbxassetid://88290426489497",
     }
 
     local weatherOffset = Vector3.new(0, 20, 0)
@@ -7538,8 +7426,9 @@ do
         if not WorldSettings.WeatherEnabled then return end
         if not WorldSettings.WeatherSoundEnabled then return end
         if not weatherPart then return end
-        local currentType = (Options.WeatherType and Options.WeatherType.Value) or "rain"
-        local soundId = weatherSounds[currentType]
+        local noise = (Options.WeatherNoise and Options.WeatherNoise.Value) or "Rain 1"
+        WorldSettings.WeatherSound = noise
+        local soundId = weatherSounds[noise]
         if not soundId then return end
         weatherSound = Instance.new("Sound")
         weatherSound.Name = "WeatherAmbient"
@@ -7635,10 +7524,18 @@ do
             end
         end})
 
-    VisualsWeather:AddToggle('WeatherSoundsEnabled',{Text = "Ambient Sounds",
+    VisualsWeather:AddToggle('WeatherSoundsEnabled',{Text = "Background Noise",
     Default = true,
     Callback = function(Value)
             WorldSettings.WeatherSoundEnabled = Value
+            updateWeatherSound()
+        end})
+
+    VisualsWeather:AddDropdown('WeatherNoise',{Text = "Noises",
+    Values = {"Rain 1", "Rain 2", "Light Rain", "Thunder"},
+    Default = "Rain 1",
+    Callback = function(Value)
+            WorldSettings.WeatherSound = Value
             updateWeatherSound()
         end})
 
