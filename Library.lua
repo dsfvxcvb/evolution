@@ -47,6 +47,7 @@ local Library = {
 
     Modern = false;
     ModernCornerRadius = 6;
+    ModernConnections = {};
     ModernBlacklist = {
         Cursor = true;
         CursorInner = true;
@@ -100,6 +101,35 @@ function Library:ApplyCorner(Instance)
     Corner.Name = 'ModernUICorner';
     Corner.CornerRadius = self:GetCornerRadius(Instance);
     Corner.Parent = Instance;
+
+    -- Roblox's legacy Border renders as a square outline on top of (or instead of)
+    -- the rounded background, so hide it and replace it with a UIStroke that follows
+    -- the UICorner.
+    if Instance:IsA('GuiObject') and Instance.BorderSizePixel > 0 then
+        Instance:SetAttribute('ModernUI_OriginalBorder', Instance.BorderSizePixel);
+        Instance.BorderSizePixel = 0;
+
+        local Stroke = Instance:FindFirstChild('ModernUIStroke');
+        if not Stroke then
+            Stroke = Instance.new('UIStroke');
+            Stroke.Name = 'ModernUIStroke';
+            Stroke.Thickness = 1;
+            Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+            Stroke.LineJoinMode = Enum.LineJoinMode.Round;
+            Stroke.Parent = Instance;
+        end;
+
+        Stroke.Color = Instance.BorderColor3;
+
+        if not self.ModernConnections[Instance] then
+            self.ModernConnections[Instance] = Instance:GetPropertyChangedSignal('BorderColor3'):Connect(function()
+                local S = Instance:FindFirstChild('ModernUIStroke');
+                if S then
+                    S.Color = Instance.BorderColor3;
+                end;
+            end);
+        end;
+    end;
 end;
 
 function Library:RemoveCorners()
@@ -107,6 +137,23 @@ function Library:RemoveCorners()
         local Corner = Instance:FindFirstChild('ModernUICorner');
         if Corner then
             Corner:Destroy();
+        end;
+
+        local Stroke = Instance:FindFirstChild('ModernUIStroke');
+        if Stroke then
+            Stroke:Destroy();
+        end;
+
+        local OriginalBorder = Instance:GetAttribute('ModernUI_OriginalBorder');
+        if OriginalBorder then
+            Instance.BorderSizePixel = OriginalBorder;
+            Instance:SetAttribute('ModernUI_OriginalBorder', nil);
+        end;
+
+        local Connection = Library.ModernConnections[Instance];
+        if Connection then
+            Connection:Disconnect();
+            Library.ModernConnections[Instance] = nil;
         end;
     end;
 end;
