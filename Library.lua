@@ -110,6 +110,20 @@ function Library:ApplyCorner(Inst)
         Inst:SetAttribute('ModernUI_OriginalBorder', Inst.BorderSizePixel);
         Inst.BorderSizePixel = 0;
     end;
+
+    -- Add a single rounded outline around the outer edge of the main window.
+    if Inst.Name == 'Outer' and Inst.Parent == ScreenGui then
+        local Stroke = Inst:FindFirstChild('ModernUIOuterStroke');
+        if not Stroke then
+            Stroke = Instance.new('UIStroke');
+            Stroke.Name = 'ModernUIOuterStroke';
+            Stroke.Thickness = 1;
+            Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
+            Stroke.LineJoinMode = Enum.LineJoinMode.Round;
+            Stroke.Color = Library.AccentColor;
+            Stroke.Parent = Inst;
+        end;
+    end;
 end;
 
 function Library:RemoveCorners()
@@ -117,6 +131,11 @@ function Library:RemoveCorners()
         local Corner = Instance:FindFirstChild('ModernUICorner');
         if Corner then
             Corner:Destroy();
+        end;
+
+        local OuterStroke = Instance:FindFirstChild('ModernUIOuterStroke');
+        if OuterStroke then
+            OuterStroke:Destroy();
         end;
 
         local OriginalBorder = Instance:GetAttribute('ModernUI_OriginalBorder');
