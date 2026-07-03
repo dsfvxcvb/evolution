@@ -7140,40 +7140,35 @@ do
         end
     end
 
-    local function GetBulletContainer()
-        local ignored = Workspace:FindFirstChild("Ignored")
-        if not ignored then return nil end
-        local siren = ignored:FindFirstChild("Siren")
-        if not siren then return nil end
-        return siren:FindFirstChild("Radius")
+    local function GetGunPosition()
+        local char = LocalPlayer.Character
+        if not char then return nil end
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool and tool:FindFirstChild("Handle") then
+            return tool.Handle.Position
+        end
+        local hand = char:FindFirstChild("RightHand") or char:FindFirstChild("Right Arm")
+        if hand then return hand.Position end
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        return hrp and hrp.Position or nil
     end
 
-    local function OnBulletObjectAdded(object)
-        task.wait()
+    local function GetCurrentTargetPosition()
+        local target = Targeting.Target or SilentAim.Target
+        if not target or not target.Character then return nil end
+        local partName = (SilentAim and SilentAim.HitPart) or (Targeting and Targeting.TargetAimbotPart) or "HumanoidRootPart"
+        local part = target.Character:FindFirstChild(partName) or target.Character:FindFirstChild("HumanoidRootPart") or target.Character:FindFirstChild("Head")
+        return part and part.Position or nil
+    end
 
+    local function TryDrawForceHitTracer()
         local cfg = getgenv().FH_TracerConfig
         if not cfg or not cfg.Enabled then return end
-        if object.Name ~= "BULLET_RAYS" then return end
 
-        local beam = object:FindFirstChildOfClass("Beam")
-        if not beam then return end
-
-        local owner = object:GetAttribute("OwnerCharacter")
-        if owner ~= LocalPlayer.Name then return end
-
-        local attachment1 = beam.Attachment1
-        if not attachment1 then return end
-
-        local startPos = object.Position
-        local endPos = attachment1.WorldCFrame.Position
-
-        -- Hide and destroy the original beam/part so the default texture tracer is replaced.
-        pcall(function()
-            if beam then
-                beam.Enabled = false
-            end
-            object:Destroy()
-        end)
+        local startPos = GetGunPosition()
+        local endPos = GetCurrentTargetPosition()
+        if not startPos or not endPos then return end
+        if (startPos - endPos).Magnitude < 0.1 then return end
 
         if cfg.Mode == "Line" then
             DrawLineTracer(startPos, endPos, cfg)
@@ -7182,24 +7177,41 @@ do
         end
     end
 
-    local BulletContainer = GetBulletContainer()
-    if BulletContainer then
-        BulletContainer.ChildAdded:Connect(OnBulletObjectAdded)
+    local function HookRemote(remote)
+        if not remote or remote._FHTracerHooked then return end
+        remote._FHTracerHooked = true
+
+        if typeof(hookfunction) ~= "function" then return end
+
+        local oldFireServer
+        oldFireServer = hookfunction(remote.FireServer, function(self, ...)
+            if self == remote then
+                local args = {...}
+                local name = args[1]
+                if name == "Shoot" or name == "ShootGun" or name == "Fire" or name == "Bullet" then
+                    TryDrawForceHitTracer()
+                end
+            end
+            return oldFireServer(self, ...)
+        end)
     end
 
-    -- Fallback: if the container doesn't exist yet, try to connect once it appears.
-    local ignored = Workspace:FindFirstChild("Ignored")
-    if ignored then
-        local siren = ignored:FindFirstChild("Siren")
-        if siren then
-            siren.ChildAdded:Connect(function(child)
-                if child.Name == "Radius" then
-                    child.ChildAdded:Connect(OnBulletObjectAdded)
-                end
-            end)
-        end
+    local function HookShootRemotes()
+        local mainEvent = getgenv().MainEvent or ReplicatedStorage:FindFirstChild("MainEvent")
+        if mainEvent then HookRemote(mainEvent) end
+        if UnreliableMainEvent then HookRemote(UnreliableMainEvent) end
     end
+
+    HookShootRemotes()
+    task.spawn(function()
+        while true do
+            task.wait(1)
+            HookShootRemotes()
+        end
+    end)
 end
+
+
 
 do
     local WorldSection = VisualsWorld
