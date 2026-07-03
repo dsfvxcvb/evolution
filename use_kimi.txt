@@ -3,9 +3,9 @@
 -- ============================================
 local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
 
-print("plss load")
-print("PLS NICCER")
-print("niglet")
+print("SO0PHIA")
+print("hmmmmm")
+print("wow smile")
 
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
     pcall(function() Library:Unload() end)
