@@ -6870,7 +6870,7 @@ ForceHitTracersSection:AddSlider('ForceHitTracersLifetime',{Text = "Lifetime",
     end})
 
 ForceHitTracersSection:AddDropdown('ForceHitTracersTexture',{Text = "Tracer Texture",
-    Values = {"Default", "Hoodcustoms", "laser", "light", "flow"},
+    Values = {"Default", "Hoodcustoms", "laser", "light", "flow", "Line"},
     Default = "Hoodcustoms",
     Callback = function(Value)
         if getgenv().FH_TracerConfig then
@@ -6878,23 +6878,19 @@ ForceHitTracersSection:AddDropdown('ForceHitTracersTexture',{Text = "Tracer Text
             local selected = (Options.ForceHitTracersTexture and Options.ForceHitTracersTexture.Value) or "Hoodcustoms"
             cfg.TextureName = selected
 
-            local textureMap = {
-                ["Default"] = "rbxassetid://130791043",
-                ["Hoodcustoms"] = "rbxassetid://130791043",
-                ["laser"] = "rbxassetid://12781800668",
-                ["light"] = "rbxassetid://2382169232",
-                ["flow"] = "rbxassetid://12788927812"
-            }
-            cfg.Texture = textureMap[selected] or textureMap["Default"]
-        end
-    end})
-
-ForceHitTracersSection:AddDropdown('BulletTracerMode',{Text = "Tracer Mode",
-    Values = {"Beam", "Line"},
-    Default = "Beam",
-    Callback = function(Value)
-        if getgenv().FH_TracerConfig then
-            getgenv().FH_TracerConfig.Mode = Value
+            if selected == "Line" then
+                cfg.Mode = "Line"
+            else
+                cfg.Mode = "Beam"
+                local textureMap = {
+                    ["Default"] = "rbxassetid://130791043",
+                    ["Hoodcustoms"] = "rbxassetid://130791043",
+                    ["laser"] = "rbxassetid://12781800668",
+                    ["light"] = "rbxassetid://2382169232",
+                    ["flow"] = "rbxassetid://12788927812"
+                }
+                cfg.Texture = textureMap[selected] or textureMap["Default"]
+            end
         end
     end})
 
