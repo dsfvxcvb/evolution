@@ -105,31 +105,10 @@ function Library:ApplyCorner(Inst)
     Corner.Parent = Inst;
 
     -- Roblox's legacy Border is drawn as a square outline, so it hides the
-    -- rounded background. Replace it with a UIStroke that follows the corner.
+    -- rounded background. Disable it in modern mode for a clean rounded look.
     if Inst:IsA('GuiObject') and Inst.BorderSizePixel > 0 then
         Inst:SetAttribute('ModernUI_OriginalBorder', Inst.BorderSizePixel);
         Inst.BorderSizePixel = 0;
-
-        local Stroke = Inst:FindFirstChild('ModernUIStroke');
-        if not Stroke then
-            Stroke = Instance.new('UIStroke');
-            Stroke.Name = 'ModernUIStroke';
-            Stroke.Thickness = 1;
-            Stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border;
-            Stroke.LineJoinMode = Enum.LineJoinMode.Round;
-            Stroke.Parent = Inst;
-        end;
-
-        Stroke.Color = Inst.BorderColor3;
-
-        if not self.ModernConnections[Inst] then
-            self.ModernConnections[Inst] = Inst:GetPropertyChangedSignal('BorderColor3'):Connect(function()
-                local S = Inst:FindFirstChild('ModernUIStroke');
-                if S then
-                    S.Color = Inst.BorderColor3;
-                end;
-            end);
-        end;
     end;
 end;
 
@@ -140,21 +119,10 @@ function Library:RemoveCorners()
             Corner:Destroy();
         end;
 
-        local Stroke = Instance:FindFirstChild('ModernUIStroke');
-        if Stroke then
-            Stroke:Destroy();
-        end;
-
         local OriginalBorder = Instance:GetAttribute('ModernUI_OriginalBorder');
         if OriginalBorder then
             Instance.BorderSizePixel = OriginalBorder;
             Instance:SetAttribute('ModernUI_OriginalBorder', nil);
-        end;
-
-        local Connection = Library.ModernConnections[Instance];
-        if Connection then
-            Connection:Disconnect();
-            Library.ModernConnections[Instance] = nil;
         end;
     end;
 end;
