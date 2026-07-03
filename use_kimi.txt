@@ -1015,6 +1015,8 @@ local ProtectPlayer = {
     LastAttackTime = 0,
     MaxShooterDistance = 200,
     VisualSpoof = false,
+    StartCFrame = nil,
+    OriginalCameraOffset = nil,
 }
 
 local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent")
@@ -1258,18 +1260,23 @@ function ProtectPlayer.Attack(target)
     end
 end
 
-function ProtectPlayer.ReturnToSelected()
-    local selected = ProtectPlayer.GetSelectedPlayer()
-    if not selected or not selected.Character then return end
-    local selRoot = selected.Character:FindFirstChild("HumanoidRootPart")
+function ProtectPlayer.ReturnToStart()
     local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
-    if not selRoot or not myRoot then return end
-    myRoot.CFrame = selRoot.CFrame * CFrame.new(0, 0, 5)
-    myRoot.AssemblyLinearVelocity = Vector3.zero
-    myRoot.AssemblyAngularVelocity = Vector3.zero
+    local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+    if ProtectPlayer.StartCFrame and myRoot then
+        myRoot.CFrame = ProtectPlayer.StartCFrame
+        myRoot.AssemblyLinearVelocity = Vector3.zero
+        myRoot.AssemblyAngularVelocity = Vector3.zero
+        if hum then
+            hum.CameraOffset = ProtectPlayer.OriginalCameraOffset or Vector3.zero
+        end
+        ProtectPlayer.StartCFrame = nil
+        ProtectPlayer.OriginalCameraOffset = nil
+    end
 end
 
 function ProtectPlayer.SetSpectate(target)
+    if ProtectPlayer.VisualSpoof then return end
     if not ProtectPlayer.SpectateShooter then return end
     if target and target.Character and target.Character:FindFirstChildOfClass("Humanoid") then
         Camera.CameraSubject = target.Character:FindFirstChildOfClass("Humanoid")
@@ -1306,9 +1313,33 @@ function ProtectPlayer.RestoreLocalCharacter()
 end
 
 function ProtectPlayer.ApplyVisualSpoof(active, selected)
+    local char = LocalPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
     if active and ProtectPlayer.VisualSpoof then
-        ProtectPlayer.HideLocalCharacter()
-    else
+        if hrp and hum then
+            if not ProtectPlayer.StartCFrame then
+                ProtectPlayer.StartCFrame = hrp.CFrame
+                ProtectPlayer.OriginalCameraOffset = hum.CameraOffset
+            end
+            ProtectPlayer.HideLocalCharacter()
+            hum.CameraOffset = ProtectPlayer.StartCFrame.Position - hrp.Position
+        end
+    elseif active and not ProtectPlayer.VisualSpoof then
+        -- Visual spoof toggled off mid-fight: show yourself again but keep the start position for later.
+        if hrp and hum and ProtectPlayer.StartCFrame then
+            hum.CameraOffset = ProtectPlayer.OriginalCameraOffset or Vector3.zero
+        end
+        ProtectPlayer.RestoreLocalCharacter()
+    elseif not active then
+        if ProtectPlayer.StartCFrame and hrp and hum then
+            hrp.CFrame = ProtectPlayer.StartCFrame
+            hrp.AssemblyLinearVelocity = Vector3.zero
+            hrp.AssemblyAngularVelocity = Vector3.zero
+            hum.CameraOffset = ProtectPlayer.OriginalCameraOffset or Vector3.zero
+            ProtectPlayer.StartCFrame = nil
+            ProtectPlayer.OriginalCameraOffset = nil
+        end
         ProtectPlayer.RestoreLocalCharacter()
     end
 end
@@ -1325,7 +1356,7 @@ function ProtectPlayer.Start()
             local status = ProtectPlayer.GetTargetStatus(ProtectPlayer.Shooter)
             if status == "dead" or status == "nochar" then
                 ProtectPlayer.SetSpectate(nil)
-                ProtectPlayer.ReturnToSelected()
+                ProtectPlayer.ReturnToStart()
                 ProtectPlayer.Shooter = nil
                 ProtectPlayer.Active = false
             end
@@ -1349,6 +1380,16 @@ function ProtectPlayer.Start()
         -- Engage shooter.
         local shooterStatus = ProtectPlayer.Shooter and ProtectPlayer.GetTargetStatus(ProtectPlayer.Shooter) or "nochar"
         if shooterStatus ~= "nochar" then
+            -- Save where we were when protection started so we can return there later.
+            if not ProtectPlayer.StartCFrame then
+                local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+                local myHum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+                if myRoot then
+                    ProtectPlayer.StartCFrame = myRoot.CFrame
+                    ProtectPlayer.OriginalCameraOffset = myHum and myHum.CameraOffset or Vector3.zero
+                end
+            end
+
             if shooterStatus == "alive" then
                 ProtectPlayer.Active = true
                 ProtectPlayer.SetSpectate(ProtectPlayer.Shooter)
@@ -1366,7 +1407,7 @@ function ProtectPlayer.Start()
                 end
             else
                 ProtectPlayer.SetSpectate(nil)
-                ProtectPlayer.ReturnToSelected()
+                ProtectPlayer.ReturnToStart()
                 ProtectPlayer.Shooter = nil
                 ProtectPlayer.Active = false
             end
@@ -2209,6 +2250,8 @@ function AutoKill.AutoStomp(target)
     AutoKill.GunMethod.StompReturn = nil
     AutoKill.GunMethod.StompTarget = target
     task.spawn(function()
+        local stompReturn = nil
+        local originalCamOffset = nil
         while AutoKill.GunMethod.StompRunning and AutoKill.Enabled and AutoKill.Target == target do
             local c = LocalPlayer.Character
             local hrp = c and c:FindFirstChild("HumanoidRootPart")
@@ -2232,23 +2275,42 @@ function AutoKill.AutoStomp(target)
 
             local ut = tc:FindFirstChild("UpperTorso")
             if ut then
-                if not AutoKill.GunMethod.StompReturn then
-                    AutoKill.GunMethod.StompReturn = hrp.CFrame
+                if not stompReturn then
+                    stompReturn = hrp.CFrame
+                    originalCamOffset = hum.CameraOffset
+                    AutoKill.GunMethod.OriginalCameraOffset = originalCamOffset
                 end
+                local originalVel = hrp.AssemblyLinearVelocity
+                local originalCFrame = hrp.CFrame
+
                 hum.Sit = false
                 hum.PlatformStand = false
                 hum:ChangeState(Enum.HumanoidStateType.GettingUp)
-                hrp.Velocity = Vector3.zero
                 hrp.CFrame = CFrame.new(ut.Position + Vector3.new(0, 3.5, 0))
-                RunService.Heartbeat:Wait()
-                getgenv().MainEvent:FireServer("Stomp")
+                hum.CameraOffset = originalCFrame.Position - hrp.Position
+
+                RunService.RenderStepped:Wait()
+                for i = 1, 5 do
+                    task.spawn(function()
+                        local me = getgenv().MainEvent
+                        if me then me:FireServer("Stomp") end
+                    end)
+                end
+
+                hum.CameraOffset = originalCamOffset
+                hrp.CFrame = originalCFrame
+                hrp.AssemblyLinearVelocity = originalVel
             end
             task.wait(0.2)
         end
-        if AutoKill.GunMethod.StompReturn then
+        if stompReturn then
             local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildWhichIsA("Humanoid")
             if hrp then
-                hrp.CFrame = AutoKill.GunMethod.StompReturn
+                hrp.CFrame = stompReturn
+            end
+            if hum then
+                hum.CameraOffset = originalCamOffset
             end
         end
         AutoKill.GunMethod.StompRunning = false
@@ -2263,12 +2325,17 @@ function AutoKill.StopAutoStomp()
     if AutoKill.GunMethod.StompReturn then
         local c = LocalPlayer.Character
         local hrp = c and c:FindFirstChild("HumanoidRootPart")
+        local hum = c and c:FindFirstChildWhichIsA("Humanoid")
         if hrp then
             hrp.CFrame = AutoKill.GunMethod.StompReturn
+        end
+        if hum then
+            hum.CameraOffset = AutoKill.GunMethod.OriginalCameraOffset or hum.CameraOffset
         end
     end
     AutoKill.GunMethod.StompTarget = nil
     AutoKill.GunMethod.StompReturn = nil
+    AutoKill.GunMethod.OriginalCameraOffset = nil
     AutoKill.UnhideCharacter()
 end
 
