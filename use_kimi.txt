@@ -1014,6 +1014,8 @@ local ProtectPlayer = {
     AttackCooldown = 0.25,
     LastAttackTime = 0,
     MaxShooterDistance = 200,
+    VisualSpoof = false,
+    CameraSubjectRestore = nil,
 }
 
 local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent")
@@ -1277,6 +1279,59 @@ function ProtectPlayer.SetSpectate(target)
     end
 end
 
+function ProtectPlayer.HideLocalCharacter()
+    local char = LocalPlayer.Character
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if part:GetAttribute("Protect_OriginalLTM") == nil then
+                part:SetAttribute("Protect_OriginalLTM", part.LocalTransparencyModifier)
+            end
+            part.LocalTransparencyModifier = 1
+        end
+    end
+end
+
+function ProtectPlayer.RestoreLocalCharacter()
+    local char = LocalPlayer.Character
+    if not char then return end
+    for _, part in ipairs(char:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local original = part:GetAttribute("Protect_OriginalLTM")
+            if original ~= nil then
+                part.LocalTransparencyModifier = original
+                part:SetAttribute("Protect_OriginalLTM", nil)
+            end
+        end
+    end
+end
+
+function ProtectPlayer.ApplyVisualSpoof(active, selected)
+    if active and ProtectPlayer.VisualSpoof then
+        local selHum = selected and selected.Character and selected.Character:FindFirstChildOfClass("Humanoid")
+        if selHum then
+            ProtectPlayer.HideLocalCharacter()
+            if Camera.CameraSubject ~= selHum then
+                if ProtectPlayer.CameraSubjectRestore == nil then
+                    ProtectPlayer.CameraSubjectRestore = Camera.CameraSubject
+                end
+                Camera.CameraSubject = selHum
+            end
+        end
+    else
+        ProtectPlayer.RestoreLocalCharacter()
+        if ProtectPlayer.CameraSubjectRestore ~= nil then
+            local restore = ProtectPlayer.CameraSubjectRestore
+            if typeof(restore) == "Instance" and restore.Parent then
+                Camera.CameraSubject = restore
+            elseif LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+                Camera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            end
+            ProtectPlayer.CameraSubjectRestore = nil
+        end
+    end
+end
+
 function ProtectPlayer.Start()
     if ProtectPlayer.LoopConnection then return end
     ProtectPlayer.LoopConnection = RunService.Heartbeat:Connect(function()
@@ -1341,6 +1396,8 @@ function ProtectPlayer.Start()
                 ProtectPlayer.LastHealth = hum and hum.Health or nil
             end
         end
+
+        ProtectPlayer.ApplyVisualSpoof(ProtectPlayer.Active, selected)
     end)
 
     if UnreliableMainEvent and not ProtectPlayer.BulletConnection then
@@ -1424,6 +1481,7 @@ function ProtectPlayer.Stop()
     ProtectPlayer.LastGlobalShooter = nil
     ProtectPlayer.LastGlobalShotTime = 0
     ProtectPlayer.SetSpectate(nil)
+    ProtectPlayer.ApplyVisualSpoof(false)
 end
 
 function AutoKill.CreateUI()
@@ -1631,10 +1689,7 @@ function AutoKill.KillAuraStep()
 
     if status == "downed" then
         if not AutoKill.GunMethod.StompRunning then
-            task.spawn(function()
-                AutoKill.AutoStomp(target)
-                AutoKill.UnhideCharacter()
-            end)
+            AutoKill.AutoStomp(target)
         end
         return
     end
@@ -2178,20 +2233,19 @@ function AutoKill.AutoStomp(target)
             local hrp = c and c:FindFirstChild("HumanoidRootPart")
             local hum = c and c:FindFirstChildWhichIsA("Humanoid")
             if not c or not hrp or not hum then
-                task.wait()
+                task.wait(0.1)
                 continue
             end
 
             local t = AutoKill.GunMethod.StompTarget
             local tc = t and t.Character
-            local b = tc and tc:FindFirstChild("BodyEffects")
+            if not t or not tc then break end
+
+            local b = tc:FindFirstChild("BodyEffects")
             local ko = b and b:FindFirstChild("K.O")
             local dead = b and b:FindFirstChild("Dead")
 
-            if not t or not ko or not ko.Value or (dead and dead.Value) then
-                if AutoKill.GunMethod.StompReturn then
-                    hrp.CFrame = AutoKill.GunMethod.StompReturn
-                end
+            if not ko or not ko.Value or (dead and dead.Value) then
                 break
             end
 
@@ -2205,21 +2259,21 @@ function AutoKill.AutoStomp(target)
                 hum:ChangeState(Enum.HumanoidStateType.GettingUp)
                 hrp.Velocity = Vector3.zero
                 hrp.CFrame = CFrame.new(ut.Position + Vector3.new(0, 3.5, 0))
-                RunService.RenderStepped:Wait()
-                for _ = 1, 5 do
-                    getgenv().MainEvent:FireServer("Stomp")
-                end
-                AutoKill.HideCharacter()
-                if AutoKill.GunMethod.StompReturn then
-                    hrp.CFrame = AutoKill.GunMethod.StompReturn
-                end
+                RunService.Heartbeat:Wait()
+                getgenv().MainEvent:FireServer("Stomp")
             end
-            task.wait()
+            task.wait(0.2)
+        end
+        if AutoKill.GunMethod.StompReturn then
+            local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+            if hrp then
+                hrp.CFrame = AutoKill.GunMethod.StompReturn
+            end
         end
         AutoKill.GunMethod.StompRunning = false
         AutoKill.GunMethod.StompTarget = nil
         AutoKill.GunMethod.StompReturn = nil
-        AutoKill.HideCharacter()
+        AutoKill.UnhideCharacter()
     end)
 end
 
@@ -2234,6 +2288,7 @@ function AutoKill.StopAutoStomp()
     end
     AutoKill.GunMethod.StompTarget = nil
     AutoKill.GunMethod.StompReturn = nil
+    AutoKill.UnhideCharacter()
 end
 
 function AutoKill.GetClosestTarget()
@@ -5080,6 +5135,15 @@ CombatProtectPlayer:AddToggle('ProtectPlayerSpectate', {Text = "Spectate Shooter
             if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
                 Camera.CameraSubject = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
             end
+        end
+    end})
+
+CombatProtectPlayer:AddToggle('ProtectPlayerSpoof', {Text = "Visual Spoof",
+    Default = false,
+    Callback = function(Value)
+        ProtectPlayer.VisualSpoof = Value
+        if not Value then
+            ProtectPlayer.ApplyVisualSpoof(false)
         end
     end})
 
