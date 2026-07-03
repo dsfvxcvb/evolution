@@ -7,6 +7,8 @@ if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
     pcall(function() Library:Unload() end)
 end
 
+print("is loading?")
+
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
