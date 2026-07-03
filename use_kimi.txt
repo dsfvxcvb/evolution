@@ -6964,8 +6964,9 @@ do
         local thickness = 0.1
         local startCF = CFrame.new(startPos, endPos)
 
-        local function makeBeam(startOffset)
+        local function makeBeam(startOffset, endOffset)
             local s = startPos + startOffset
+            local e = endPos + endOffset
 
             local partA = Instance.new("Part")
             partA.Anchored = true
@@ -6980,7 +6981,7 @@ do
             partB.CanCollide = false
             partB.Transparency = 1
             partB.Size = Vector3.new(0.1, 0.1, 0.1)
-            partB.CFrame = CFrame.new(endPos)
+            partB.CFrame = CFrame.new(e)
             partB.Parent = TracerFolder
 
             local attA = Instance.new("Attachment")
@@ -7015,15 +7016,21 @@ do
             end
         end
 
-        -- Always converge at the target. Spread is applied only at the source (gun).
-        local count = cfg.UseSpread and 5 or 1
-        local maxSpread = math.clamp(dist * 0.4, 3, 14)
+        -- Fan the beams out from the gun, but keep the destination clustered
+        -- near the target so they look like they converge without overlapping.
+        local count = cfg.UseSpread and 8 or 1
+        local startSpread = math.clamp(dist * 0.7, 6, 25)
+        local endSpread = 0.8
         for i = 1, count do
             local angle = math.random() * math.pi * 2
-            local radius = math.sqrt(math.random()) * maxSpread
-            local offset = startCF.RightVector * (math.cos(angle) * radius)
-                           + startCF.UpVector * (math.sin(angle) * radius)
-            makeBeam(offset)
+            local rStart = math.sqrt(math.random()) * startSpread
+            local rEnd = math.sqrt(math.random()) * endSpread
+            local startOffset = startCF.RightVector * (math.cos(angle) * rStart)
+                              + startCF.UpVector * (math.sin(angle) * rStart)
+            local endAngle = angle + (math.random() - 0.5) * 0.5
+            local endOffset = startCF.RightVector * (math.cos(endAngle) * rEnd)
+                            + startCF.UpVector * (math.sin(endAngle) * rEnd)
+            makeBeam(startOffset, endOffset)
         end
     end
 
