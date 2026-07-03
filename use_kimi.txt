@@ -1,7 +1,7 @@
 -- ============================================
 -- MAIN SCRIPT
 -- ============================================
-local repo = 'https://raw.githubusercontent.com/asdasdasdasdasd2dad21/Linorialibb/refs/heads/main/'
+local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
 
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
     pcall(function() Library:Unload() end)
@@ -9708,6 +9708,15 @@ local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 
 MenuGroup:AddButton({Text = 'Unload', Func = function() Library:Unload() end})
 MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', {Default = 'End', NoUI = true, Text = 'Menu keybind'})
+MenuGroup:AddToggle('ModernUI', {
+    Text = 'Modern UI',
+    Default = false,
+    Callback = function(Value)
+        if Library.SetModern then
+            Library:SetModern(Value)
+        end
+    end
+})
 
 Library.ToggleKeybind = Options.MenuKeybind
 
