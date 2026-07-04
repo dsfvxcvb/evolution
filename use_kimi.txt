@@ -10297,6 +10297,7 @@ MenuGroup:AddToggle('ModernUI', {
         if Library.SetModern then
             Library:SetModern(Value)
         end
+        task.delay(0.05, UpdateMenuGlow)
     end
 })
 
@@ -10332,32 +10333,58 @@ local function UpdateMenuGlow()
         return
     end
 
-    -- Recreate the glow so Linoria's internal transparency cache picks up the new value
     local oldGlow = Window.Holder:FindFirstChild("WindowGlow")
     if oldGlow then
         oldGlow:Destroy()
     end
 
-    local newGlow = Instance.new("ImageLabel")
+    local glowColor = getgenv().MenuGlowColor or Color3.fromRGB(0, 85, 255)
+    local glowLayers = 8
+    local glowMaxInset = 12
+    local targetCombinedTransparency = 1 - (getgenv().MenuGlowTransparency or 0.85)
+    local perLayerTransparency = targetCombinedTransparency ^ (1 / glowLayers)
+
+    local baseRadius = Library.ModernCornerRadius or 8
+    local corner = Window.Holder:FindFirstChild("ModernUICorner")
+    if corner and corner:IsA("UICorner") then
+        baseRadius = corner.CornerRadius.Offset
+    end
+
+    local newGlow = Instance.new("Frame")
     newGlow.Name = "WindowGlow"
     newGlow.BackgroundTransparency = 1
-    newGlow.Image = "http://www.roblox.com/asset/?id=18245826428"
-    newGlow.ScaleType = Enum.ScaleType.Slice
-    newGlow.SliceCenter = Rect.new(Vector2.new(21, 21), Vector2.new(79, 79))
-    newGlow.ImageColor3 = getgenv().MenuGlowColor or Color3.fromRGB(0, 85, 255)
-    newGlow.ImageTransparency = 1 - (getgenv().MenuGlowTransparency or 0.85)
-    newGlow.Position = UDim2.new(0, -20, 0, -20)
-    newGlow.Size = UDim2.new(1, 40, 1, 40)
+    newGlow.BorderSizePixel = 0
+    newGlow.Position = UDim2.new(0, 0, 0, 0)
+    newGlow.Size = UDim2.new(1, 0, 1, 0)
     newGlow.ZIndex = 0
     newGlow.Visible = getgenv().MenuGlowEnabled ~= false
     newGlow.Parent = Window.Holder
+
+    for i = 1, glowLayers do
+        local t = i / glowLayers
+        local inset = glowMaxInset * t
+
+        local layer = Instance.new("Frame")
+        layer.Name = "GlowLayer" .. i
+        layer.BackgroundColor3 = glowColor
+        layer.BackgroundTransparency = perLayerTransparency
+        layer.BorderSizePixel = 0
+        layer.Position = UDim2.new(0, -inset, 0, -inset)
+        layer.Size = UDim2.new(1, inset * 2, 1, inset * 2)
+        layer.ZIndex = newGlow.ZIndex - (glowLayers - i)
+        layer.Parent = newGlow
+
+        local layerCorner = Instance.new("UICorner")
+        layerCorner.CornerRadius = UDim.new(0, baseRadius + inset)
+        layerCorner.Parent = layer
+    end
 end
 
 -- Apply the initial glow settings now
 UpdateMenuGlow()
 
 MenuGroup:AddToggle('MenuGlowEnabled', {
-    Text = "Enable Menu Glow",
+    Text = "Toggle Glow",
     Default = getgenv().MenuGlowEnabled,
     Callback = function(Value)
         getgenv().MenuGlowEnabled = Value
