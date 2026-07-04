@@ -164,6 +164,14 @@ function Library:SetModern(Enabled)
     end;
 end;
 
+function Library:UpdateToggleGlows()
+    for _, Toggle in next, Toggles do
+        if Toggle.Display then
+            Toggle:Display();
+        end;
+    end;
+end;
+
 local RainbowStep = 0
 local Hue = 0
 
@@ -1992,6 +2000,14 @@ do
             BorderColor3 = 'Black';
         });
 
+        local ToggleGlow = Library:Create('UIStroke', {
+            Color = (getgenv().MenuToggleGlowColor or Color3.fromRGB(0, 170, 255));
+            Thickness = 2;
+            Transparency = 0.5;
+            Enabled = false;
+            Parent = ToggleOuter;
+        });
+
         local ToggleInner = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
             BorderColor3 = Library.OutlineColor;
@@ -2050,6 +2066,11 @@ do
 
             Library.RegistryMap[ToggleInner].Properties.BackgroundColor3 = Toggle.Value and 'AccentColor' or 'MainColor';
             Library.RegistryMap[ToggleInner].Properties.BorderColor3 = Toggle.Value and 'AccentColorDark' or 'OutlineColor';
+
+            if ToggleGlow then
+                ToggleGlow.Enabled = Toggle.Value and (getgenv().MenuToggleGlowEnabled == true);
+                ToggleGlow.Color = getgenv().MenuToggleGlowColor or Color3.fromRGB(0, 170, 255);
+            end;
         end;
 
         function Toggle:OnChanged(Func)
