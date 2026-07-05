@@ -98,7 +98,6 @@ end;
 function Library:ApplyCorner(Inst)
     if not self:ShouldRound(Inst) then return end;
     if Inst:FindFirstChild('ModernUICorner') then return end;
-    if Inst.Name == 'WindowOuter' or Inst.Name == 'WindowInner' then return end;
 
     local Corner = Instance.new('UICorner');
     Corner.Name = 'ModernUICorner';
@@ -3112,7 +3111,6 @@ function Library:CreateWindow(...)
     };
 
     local Outer = Library:Create('Frame', {
-        Name = 'WindowOuter';
         AnchorPoint = Config.AnchorPoint,
         BackgroundColor3 = Color3.new(0, 0, 0);
         BorderSizePixel = 0;
@@ -3126,7 +3124,6 @@ function Library:CreateWindow(...)
     Library:MakeDraggable(Outer, 25);
 
     local Inner = Library:Create('Frame', {
-        Name = 'WindowInner';
         BackgroundColor3 = Library.MainColor;
         BorderColor3 = Library.AccentColor;
         BorderMode = Enum.BorderMode.Inset;
