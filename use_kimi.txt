@@ -12005,7 +12005,7 @@ VisualsHitLogs:AddToggle('HitLogsColorPlaceholders', {
 })
 
 VisualsHitLogs:AddLabel('Placeholders: {target} | {damage}')
-VisualsHitLogs:AddLabel('Use <font color="#hex">word</font> for any color')
+VisualsHitLogs:AddLabel('Color tags: [red]word[/red], [blue]word[/blue], [green], [yellow], [white], [pink], [cyan], [purple]')
 
 local notifications = {}
 local BASE_Y = -120
@@ -12057,6 +12057,18 @@ local function CreateScript2HitMessage(targetName, damage)
         return string.format("#%02X%02X%02X", math.floor(c.R * 255), math.floor(c.G * 255), math.floor(c.B * 255))
     end
 
+    local function applyColorTags(text)
+        local tags = {
+            red = "#FF4A4A", blue = "#4DA3FF", green = "#4DFF4D",
+            yellow = "#FFFF4D", white = "#EAEAEA", black = "#000000",
+            pink = "#FF4DFF", cyan = "#4DFFFF", purple = "#9D4DFF"
+        }
+        for name, hex in pairs(tags) do
+            text = text:gsub("%[" .. name .. "%](.-)%[/%" .. name .. "%]", string.format('<font color="%s">%%1</font>', hex))
+        end
+        return text
+    end
+
     local messageText
     if HitLogsScript2.CustomTextEnabled then
         local template = HitLogsScript2.CustomText or '[evolution] Hit "{target}" for {damage} damage.'
@@ -12065,9 +12077,9 @@ local function CreateScript2HitMessage(targetName, damage)
             local damageColor = colorToHex(HitLogsScript2.DamageColor or Color3.fromRGB(77, 163, 255))
             template = template:gsub("{target}", string.format('<font color="%s">%s</font>', targetColor, targetName))
             template = template:gsub("{damage}", string.format('<font color="%s">%s</font>', damageColor, tostring(math.floor(damage or 0))))
-            messageText = template
+            messageText = applyColorTags(template)
         else
-            messageText = template:gsub("{target}", targetName):gsub("{damage}", tostring(math.floor(damage or 0)))
+            messageText = applyColorTags(template:gsub("{target}", targetName):gsub("{damage}", tostring(math.floor(damage or 0))))
         end
     else
         messageText = string.format(
