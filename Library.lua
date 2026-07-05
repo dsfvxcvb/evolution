@@ -3322,6 +3322,9 @@ function Library:CreateWindow(...)
             end);
         end;
 
+        Tab.Button = TabButton;
+        Tab.Frame = TabFrame;
+
         function Tab:ShowTab()
             for _, Tab in next, Window.Tabs do
                 Tab:HideTab();
