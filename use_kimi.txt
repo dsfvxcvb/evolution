@@ -6988,17 +6988,32 @@ do
         line.Visible = true
 
         local cam = Camera
+        local vSize = cam.ViewportSize
+        local cx, cy = vSize.X / 2, vSize.Y / 2
+
+        local function getScreen(p)
+            local pos, on = cam:WorldToViewportPoint(p)
+            if pos.Z < 0 then
+                pos = Vector3.new(
+                    math.clamp(cx + (cx - pos.X), 0, vSize.X),
+                    math.clamp(cy + (cy - pos.Y), 0, vSize.Y),
+                    pos.Z
+                )
+            end
+            return Vector2.new(pos.X, pos.Y), on or pos.Z > 0
+        end
+
         local elapsed = 0
         local conn
         conn = RunService.RenderStepped:Connect(function(dt)
             elapsed = elapsed + dt
-            local s, onS = cam:WorldToViewportPoint(startPos)
-            local e, onE = cam:WorldToViewportPoint(endPos)
+            local s, onS = getScreen(startPos)
+            local e, onE = getScreen(endPos)
 
             if onS or onE then
                 line.Visible = true
-                line.From = Vector2.new(s.X, s.Y)
-                line.To = Vector2.new(e.X, e.Y)
+                line.From = s
+                line.To = e
 
                 if elapsed > (cfg.Lifetime or 0.8) then
                     local fade = math.clamp((elapsed - (cfg.Lifetime or 0.8)) / 0.3, 0, 1)
@@ -7077,7 +7092,7 @@ do
         local cfg = getgenv().FH_TracerConfig
         if not cfg or not cfg.Enabled then return end
         for _, desc in ipairs(workspace:GetDescendants()) do
-            if desc.Name == "BULLET_RAYS" and desc:IsA("Beam") then
+            if desc.Name == "BULLET_RAYS" then
                 pcall(function() desc:Destroy() end)
             end
         end
@@ -7090,7 +7105,7 @@ do
         end
 
         BulletRayConnection = workspace.DescendantAdded:Connect(function(child)
-            if child.Name ~= "BULLET_RAYS" or not child:IsA("Beam") then return end
+            if child.Name ~= "BULLET_RAYS" then return end
 
             local cfg = getgenv().FH_TracerConfig
             if not cfg or not cfg.Enabled then return end
