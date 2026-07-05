@@ -151,29 +151,36 @@ if not CommunicateGun then
     return
 end
 
-local oldFireServer = CommunicateGun.FireServer
-CommunicateGun.FireServer = function(self, event, ...)
-    if self ~= CommunicateGun or event ~= "Fired" or not Toggles.SilentAimEnabled.Value then
-        return oldFireServer(self, event, ...)
-    end
-
-    local args = {...}
-    local origin = args[1]
-    if typeof(origin) ~= "Vector3" then
-        return oldFireServer(self, event, ...)
-    end
-
-    local target = GetClosestTarget()
-    if target then
-        local direction = (target.Position - origin).Unit
-        args[2] = direction
-        args[3] = target.Position
-        if typeof(args[4]) == "table" and args[4][1] and typeof(args[4][1][2]) == "Vector3" then
-            args[4][1][2] = direction
-        end
-    end
-
-    return oldFireServer(self, event, unpack(args))
+local mt = getrawmetatable(game)
+if not mt or not mt.__namecall then
+    Library:Notify("Silent Aim: executor missing getrawmetatable", 5)
+    return
 end
+
+local oldNamecall = mt.__namecall
+setreadonly(mt, false)
+mt.__namecall = newcclosure(function(self, ...)
+    local method = getnamecallmethod()
+    if self == CommunicateGun and method == "FireServer" and Toggles.SilentAimEnabled.Value then
+        local args = {...}
+        if args[1] == "Fired" then
+            local origin = args[2]
+            if typeof(origin) == "Vector3" then
+                local target = GetClosestTarget()
+                if target then
+                    local direction = (target.Position - origin).Unit
+                    args[3] = direction
+                    args[4] = target.Position
+                    if typeof(args[5]) == "table" and args[5][1] and typeof(args[5][1][2]) == "Vector3" then
+                        args[5][1][2] = direction
+                    end
+                end
+            end
+        end
+        return oldNamecall(self, unpack(args))
+    end
+    return oldNamecall(self, ...)
+end)
+setreadonly(mt, true)
 
 Library:Notify("Silent Aim loaded", 3)
