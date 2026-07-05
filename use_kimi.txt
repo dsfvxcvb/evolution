@@ -10083,6 +10083,7 @@ do
     local AvatarMorph = {
         Enabled = false,
         UserId = 5042596195,
+        Originals = nil,
     }
 
     local function clearLocalAccessories(character)
@@ -10154,6 +10155,61 @@ do
         accessory.Parent = character
     end
 
+    local function saveOriginalAvatar(character)
+        if not character then return end
+        local data = {
+            accessories = {},
+            clothes = {},
+            sizes = {},
+        }
+        for _, item in ipairs(character:GetChildren()) do
+            if item:IsA("Accessory") then
+                table.insert(data.accessories, item:Clone())
+            elseif item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("ShirtGraphic") then
+                table.insert(data.clothes, item:Clone())
+            end
+        end
+        for _, part in ipairs(character:GetDescendants()) do
+            if part:IsA("MeshPart") then
+                data.sizes[part.Name] = part.Size
+            end
+        end
+        AvatarMorph.Originals = data
+    end
+
+    local function restoreOriginalAvatar(character)
+        if not character or not AvatarMorph.Originals then return end
+        clearLocalAccessories(character)
+
+        for _, acc in ipairs(AvatarMorph.Originals.accessories) do
+            local clone = acc:Clone()
+            if clone then
+                attachAccessory(character, clone)
+            end
+        end
+
+        for _, item in ipairs(AvatarMorph.Originals.clothes) do
+            local clone = item:Clone()
+            if clone then
+                clone.Parent = character
+            end
+        end
+
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            pcall(function()
+                humanoid:BuildRigFromAttachments()
+            end)
+        end
+
+        for name, size in pairs(AvatarMorph.Originals.sizes) do
+            local part = character:FindFirstChild(name)
+            if part and part:IsA("MeshPart") then
+                part.Size = size
+            end
+        end
+    end
+
     local function applyAvatarMorph(userId)
         local character = LocalPlayer.Character
         if not character then return end
@@ -10200,8 +10256,14 @@ do
         Default = false,
         Callback = function(Value)
             AvatarMorph.Enabled = Value
+            local character = LocalPlayer.Character
             if Value then
+                if character and not AvatarMorph.Originals then
+                    saveOriginalAvatar(character)
+                end
                 applyAvatarMorph(AvatarMorph.UserId)
+            else
+                restoreOriginalAvatar(character)
             end
         end
     })
@@ -10224,6 +10286,8 @@ do
     LocalPlayer.CharacterAdded:Connect(function(char)
         if AvatarMorph.Enabled then
             task.wait(0.5)
+            AvatarMorph.Originals = nil
+            saveOriginalAvatar(char)
             applyAvatarMorph(AvatarMorph.UserId)
         end
     end)
