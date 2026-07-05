@@ -8139,21 +8139,30 @@ local function Show3DHitmarker(worldPos, isLethal)
         elapsed = elapsed + dt
         local pos, onScreen = cam:WorldToViewportPoint(worldPos)
         if onScreen then
-            local px, py = pos.X, pos.Y
             for i = 1, 4 do
                 lines[i].Visible = true
                 outlines[i].Visible = true
             end
 
-            local s = size
-            lines[1].From = Vector2.new(px - s, py - s)
-            lines[1].To = Vector2.new(px - s/2, py - s/2)
-            lines[2].From = Vector2.new(px + s, py - s)
-            lines[2].To = Vector2.new(px + s/2, py - s/2)
-            lines[3].From = Vector2.new(px - s, py + s)
-            lines[3].To = Vector2.new(px - s/2, py + s/2)
-            lines[4].From = Vector2.new(px + s, py + s)
-            lines[4].To = Vector2.new(px + s/2, py + s/2)
+            local camCF = cam.CFrame
+            local half = size / 10
+            local quarter = half / 2
+            local markerCF = CFrame.new(worldPos, worldPos + camCF.LookVector)
+
+            local function worldToScreen(localOffset)
+                local wp = markerCF:PointToWorldSpace(localOffset)
+                local sp = cam:WorldToViewportPoint(wp)
+                return Vector2.new(sp.X, sp.Y)
+            end
+
+            lines[1].From = worldToScreen(Vector3.new(-half, -half, 0))
+            lines[1].To = worldToScreen(Vector3.new(-quarter, -quarter, 0))
+            lines[2].From = worldToScreen(Vector3.new(half, -half, 0))
+            lines[2].To = worldToScreen(Vector3.new(quarter, -quarter, 0))
+            lines[3].From = worldToScreen(Vector3.new(-half, half, 0))
+            lines[3].To = worldToScreen(Vector3.new(-quarter, quarter, 0))
+            lines[4].From = worldToScreen(Vector3.new(half, half, 0))
+            lines[4].To = worldToScreen(Vector3.new(quarter, quarter, 0))
 
             for i = 1, 4 do
                 local dir = lines[i].To - lines[i].From
