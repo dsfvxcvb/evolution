@@ -2931,6 +2931,42 @@ MiscUseStand:AddLabel('.unvanish - leave void platform')
 MiscUseStand:AddLabel('.bring <user> - bring player to owner')
 MiscUseStand:AddLabel('.stop - stop auto kill / aura')
 end
+getgenv().TargetUIHealthbarColorEnabled = getgenv().TargetUIHealthbarColorEnabled ~= false
+getgenv().TargetUIHealthbarStart = getgenv().TargetUIHealthbarStart or Color3.fromRGB(0, 255, 0)
+getgenv().TargetUIHealthbarMid = getgenv().TargetUIHealthbarMid or Color3.fromRGB(255, 170, 0)
+getgenv().TargetUIHealthbarEnd = getgenv().TargetUIHealthbarEnd or Color3.fromRGB(255, 0, 0)
+getgenv().TargetUIAmmoColorEnabled = getgenv().TargetUIAmmoColorEnabled ~= false
+getgenv().TargetUIAmmoStart = getgenv().TargetUIAmmoStart or Color3.fromRGB(255, 140, 0)
+getgenv().TargetUIAmmoMid = getgenv().TargetUIAmmoMid or Color3.fromRGB(255, 85, 0)
+getgenv().TargetUIAmmoEnd = getgenv().TargetUIAmmoEnd or Color3.fromRGB(255, 0, 0)
+local function UpdateTargetUIBarColors()
+local ui = Library._targetUIInstance
+if not ui then return end
+local main = ui:FindFirstChildOfClass("Frame")
+if not main then return end
+local hb = main:FindFirstChild("healthbarvalue", true)
+local ab = main:FindFirstChild("armorbarvalue", true)
+local function apply(bar, enabled, startCol, midCol, endCol, fallback)
+if not bar then return end
+local grad = bar:FindFirstChildOfClass("UIGradient")
+if not grad then return end
+if enabled ~= false then
+grad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, startCol),
+ColorSequenceKeypoint.new(0.5, midCol),
+ColorSequenceKeypoint.new(1, endCol),
+})
+else
+grad.Color = ColorSequence.new({
+ColorSequenceKeypoint.new(0, fallback),
+ColorSequenceKeypoint.new(0.5, fallback),
+ColorSequenceKeypoint.new(1, fallback),
+})
+end
+end
+apply(hb, getgenv().TargetUIHealthbarColorEnabled, getgenv().TargetUIHealthbarStart, getgenv().TargetUIHealthbarMid, getgenv().TargetUIHealthbarEnd, Color3.fromRGB(45, 195, 45))
+apply(ab, getgenv().TargetUIAmmoColorEnabled, getgenv().TargetUIAmmoStart, getgenv().TargetUIAmmoMid, getgenv().TargetUIAmmoEnd, Color3.fromRGB(255, 140, 0))
+end
 function Library:targetui_old()
 if Library._targetUIInstance then
 Library._targetUIInstance:Destroy()
@@ -4730,42 +4766,6 @@ end
 end
 end
 })
-getgenv().TargetUIHealthbarColorEnabled = getgenv().TargetUIHealthbarColorEnabled ~= false
-getgenv().TargetUIHealthbarStart = getgenv().TargetUIHealthbarStart or Color3.fromRGB(0, 255, 0)
-getgenv().TargetUIHealthbarMid = getgenv().TargetUIHealthbarMid or Color3.fromRGB(255, 170, 0)
-getgenv().TargetUIHealthbarEnd = getgenv().TargetUIHealthbarEnd or Color3.fromRGB(255, 0, 0)
-getgenv().TargetUIAmmoColorEnabled = getgenv().TargetUIAmmoColorEnabled ~= false
-getgenv().TargetUIAmmoStart = getgenv().TargetUIAmmoStart or Color3.fromRGB(255, 140, 0)
-getgenv().TargetUIAmmoMid = getgenv().TargetUIAmmoMid or Color3.fromRGB(255, 85, 0)
-getgenv().TargetUIAmmoEnd = getgenv().TargetUIAmmoEnd or Color3.fromRGB(255, 0, 0)
-local function UpdateTargetUIBarColors()
-local ui = Library._targetUIInstance
-if not ui then return end
-local main = ui:FindFirstChildOfClass("Frame")
-if not main then return end
-local hb = main:FindFirstChild("healthbarvalue", true)
-local ab = main:FindFirstChild("armorbarvalue", true)
-local function apply(bar, enabled, startCol, midCol, endCol, fallback)
-if not bar then return end
-local grad = bar:FindFirstChildOfClass("UIGradient")
-if not grad then return end
-if enabled ~= false then
-grad.Color = ColorSequence.new({
-ColorSequenceKeypoint.new(0, startCol),
-ColorSequenceKeypoint.new(0.5, midCol),
-ColorSequenceKeypoint.new(1, endCol),
-})
-else
-grad.Color = ColorSequence.new({
-ColorSequenceKeypoint.new(0, fallback),
-ColorSequenceKeypoint.new(0.5, fallback),
-ColorSequenceKeypoint.new(1, fallback),
-})
-end
-end
-apply(hb, getgenv().TargetUIHealthbarColorEnabled, getgenv().TargetUIHealthbarStart, getgenv().TargetUIHealthbarMid, getgenv().TargetUIHealthbarEnd, Color3.fromRGB(45, 195, 45))
-apply(ab, getgenv().TargetUIAmmoColorEnabled, getgenv().TargetUIAmmoStart, getgenv().TargetUIAmmoMid, getgenv().TargetUIAmmoEnd, Color3.fromRGB(255, 140, 0))
-end
 CombatTargetUITab:AddToggle('TargetUIHealthbarColor', {
 Text = "Healthbar Color",
 Default = true,
