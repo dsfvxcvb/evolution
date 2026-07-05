@@ -1,6 +1,7 @@
 -- ============================================
 -- MAIN SCRIPT
 print("evolution")
+print("niccer slave ass boy")
 -- ============================================
 local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
 print("aids")
