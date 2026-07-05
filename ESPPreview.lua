@@ -25,6 +25,7 @@ local previewGui = Instance.new("ScreenGui")
 previewGui.Name = "ESPPreview"
 previewGui.ResetOnSpawn = false
 previewGui.IgnoreGuiInset = true
+previewGui.DisplayOrder = 100
 previewGui.Enabled = false
 
 local parent = CoreGui
