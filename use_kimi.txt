@@ -68,7 +68,7 @@ local VisualsHitEffects = Tabs.Visuals:AddLeftGroupbox('Hit Effects')
 local VisualsHitLogs = Tabs.Visuals:AddLeftGroupbox('Hit logs')
 local VisualsHitVignette = Tabs.Visuals:AddLeftGroupbox('Hit Vignette')
 local VisualsHitIndicators = Tabs.Visuals:AddLeftGroupbox('Damage Numbers')
-local VisualsTracers = Tabs.Visuals:AddLeftGroupbox('Visualize Bullets')
+local VisualsTracers = Tabs.Visuals:AddLeftGroupbox('Forcehit Tracers')
 
 local VisualsWorld = Tabs.Visuals:AddRightGroupbox('World')
 local VisualsWeather = Tabs.Visuals:AddRightGroupbox('Weather')
@@ -6827,29 +6827,15 @@ ForceHitTracersSection:AddToggle('ForceHitTracersFadeOut',{Text = "Fade Out",
         end
     end})
 
-	ForceHitTracersSection:AddToggle('ForceHitTracersSolid', {
-    Text = "Solid Color (No Gradient)",
-    Default = true,
+	ForceHitTracersSection:AddToggle('ForceHitTracersGradient', {
+    Text = "Use Gradient",
+    Default = false,
     Callback = function(Value)
         if getgenv().FH_TracerConfig then
-            if (Toggles.ForceHitTracersSolid and Toggles.ForceHitTracersSolid.Value) then
-                getgenv().FH_TracerConfig.Transparency0 = 0
-                getgenv().FH_TracerConfig.Transparency1 = 0
-            else
-                getgenv().FH_TracerConfig.Transparency0 = 0
-                getgenv().FH_TracerConfig.Transparency1 = 1
-            end
+            getgenv().FH_TracerConfig.UseGradient = (Toggles.ForceHitTracersGradient and Toggles.ForceHitTracersGradient.Value)
         end
     end
 })
-
-ForceHitTracersSection:AddToggle('ForceHitTracersFaceCamera',{Text = "Face Camera",
-    Default = true,
-    Callback = function(Value)
-        if getgenv().FH_TracerConfig then
-            getgenv().FH_TracerConfig.FaceCamera = (Toggles.ForceHitTracersFaceCamera and Toggles.ForceHitTracersFaceCamera.Value)
-        end
-    end})
 
 ForceHitTracersSection:AddToggle('ForceHitTracersUseSpread',{Text = "Use Spread",
     Default = true,
@@ -6871,56 +6857,21 @@ ForceHitTracersSection:AddSlider('ForceHitTracersLifetime',{Text = "Lifetime",
     end})
 
 ForceHitTracersSection:AddDropdown('ForceHitTracersTexture',{Text = "Tracer Texture",
-    Values = {"Default", "Hoodcustoms", "laser", "light", "flow", "Line"},
+    Values = {"Default", "Hoodcustoms", "laser", "light", "flow"},
     Default = "Hoodcustoms",
     Callback = function(Value)
         if getgenv().FH_TracerConfig then
             local cfg = getgenv().FH_TracerConfig
             local selected = (Options.ForceHitTracersTexture and Options.ForceHitTracersTexture.Value) or "Hoodcustoms"
             cfg.TextureName = selected
-
-            if selected == "Line" then
-                cfg.Mode = "Line"
-            else
-                cfg.Mode = "Beam"
-                local textureMap = {
-                    ["Default"] = "rbxassetid://130791043",
-                    ["Hoodcustoms"] = "rbxassetid://130791043",
-                    ["laser"] = "rbxassetid://12781800668",
-                    ["light"] = "rbxassetid://2382169232",
-                    ["flow"] = "rbxassetid://12788927812"
-                }
-                cfg.Texture = textureMap[selected] or textureMap["Default"]
-            end
-        end
-    end})
-
-ForceHitTracersSection:AddLabel('Line Color'):AddColorPicker('BulletTracerLineColor',{
-    Title = "Line Color",
-    Default = Color3.fromRGB(133, 220, 255),
-    Callback = function(Value)
-        if getgenv().FH_TracerConfig then
-            getgenv().FH_TracerConfig.LineColor = Value
-        end
-    end})
-
-ForceHitTracersSection:AddLabel('Line Outline Color'):AddColorPicker('BulletTracerOutlineColor',{
-    Title = "Line Outline Color",
-    Default = Color3.fromRGB(15, 15, 15),
-    Callback = function(Value)
-        if getgenv().FH_TracerConfig then
-            getgenv().FH_TracerConfig.LineOutlineColor = Value
-        end
-    end})
-
-ForceHitTracersSection:AddSlider('BulletTracerThickness',{Text = "Line Thickness",
-    Min = 1,
-    Max = 10,
-    Default = 1,
-    Rounding = 0,
-    Callback = function(Value)
-        if getgenv().FH_TracerConfig then
-            getgenv().FH_TracerConfig.LineThickness = Value
+            local textureMap = {
+                ["Default"] = "rbxassetid://130791043",
+                ["Hoodcustoms"] = "rbxassetid://130791043",
+                ["laser"] = "rbxassetid://12781800668",
+                ["light"] = "rbxassetid://2382169232",
+                ["flow"] = "rbxassetid://12788927812"
+            }
+            cfg.Texture = textureMap[selected] or textureMap["Default"]
         end
     end})
 
@@ -6932,18 +6883,11 @@ do
             Color = Color3.fromRGB(255, 50, 50),
             EndColor = Color3.fromRGB(255, 50, 50),
             FadeOut = true,
-            Transparency0 = 0,
-            Transparency1 = 0,
-            FaceCamera = true,
+            UseGradient = false,
             UseSpread = true,
             Lifetime = 0.8,
             TextureName = "Hoodcustoms",
             Texture = "rbxassetid://130791043",
-            Mode = "Beam",
-            LineColor = Color3.fromRGB(133, 220, 255),
-            LineOutlineColor = Color3.fromRGB(15, 15, 15),
-            LineThickness = 1,
-            OutlineTransparency0 = 0,
         }
     end
 
@@ -6995,14 +6939,22 @@ do
         local beam = Instance.new("Beam")
         beam.Attachment0 = attA
         beam.Attachment1 = attB
-        beam.Color = ColorSequence.new(cfg.Color or Color3.fromRGB(255, 50, 50), cfg.EndColor or cfg.Color or Color3.fromRGB(255, 50, 50))
+
+        local startColor = cfg.Color or Color3.fromRGB(255, 50, 50)
+        local endColor = cfg.UseGradient and (cfg.EndColor or startColor) or startColor
+        beam.Color = ColorSequence.new(startColor, endColor)
+
         beam.Texture = cfg.Texture or "rbxassetid://130791043"
         beam.TextureMode = Enum.TextureMode.Stretch
         beam.TextureLength = 1
         beam.Width0 = 1
         beam.Width1 = 1
-        beam.FaceCamera = cfg.FaceCamera
-        beam.Transparency = NumberSequence.new(cfg.Transparency0 or 0, cfg.Transparency1 or 0)
+        beam.FaceCamera = true
+
+        local t0 = cfg.UseGradient and 0 or 0
+        local t1 = cfg.UseGradient and 1 or 0
+        beam.Transparency = NumberSequence.new(t0, t1)
+
         beam.Parent = TracerFolder
 
         if cfg.FadeOut then
@@ -7020,108 +6972,12 @@ do
 
 
 
-    local function DrawLineTracer(startPos, endPos, cfg)
-        local lineTransparency = 1 - (cfg.Transparency0 or 0)
-        local outlineTransparency = 1 - (cfg.OutlineTransparency0 or 0)
-        local lineColor = cfg.LineColor or cfg.Color or Color3.fromRGB(133, 220, 255)
-        local outlineColor = cfg.LineOutlineColor or Color3.fromRGB(15, 15, 15)
-        local lineThickness = cfg.LineThickness or 1
-        local lifetime = cfg.Lifetime or 0.8
-
-        local outline = Drawing.new("Line")
-        outline.Color = outlineColor
-        outline.Thickness = lineThickness + 2
-        outline.Transparency = outlineTransparency
-        outline.Visible = true
-
-        local line = Drawing.new("Line")
-        line.Color = lineColor
-        line.Thickness = lineThickness
-        line.Transparency = lineTransparency
-        line.Visible = true
-
-        local cam = Camera
-        local elapsed_time = 0
-        local conn
-        conn = RunService.Heartbeat:Connect(function(dt)
-            if not line or not outline then
-                if conn then conn:Disconnect() end
-                return
-            end
-
-            elapsed_time = elapsed_time + dt
-
-            local pos, on_screen = cam:WorldToViewportPoint(startPos)
-            local pos2, on_screen2 = cam:WorldToViewportPoint(endPos)
-
-            if not on_screen and not on_screen2 then
-                line.Visible = false
-                outline.Visible = false
-                return
-            end
-
-            line.Visible = true
-            outline.Visible = true
-
-            local size = cam.ViewportSize
-            local x_full = size.X
-            local y_full = size.Y
-            local x_half = x_full / 2
-            local y_half = y_full / 2
-
-            if pos.Z < 0 then
-                pos = Vector2.new(math.clamp(x_half + (x_half - pos.X), 0, x_full), math.clamp(y_half + (y_half - pos.Y), 0, y_full))
-            end
-
-            if pos2.Z < 0 then
-                pos2 = Vector2.new(math.clamp(x_half + (x_half - pos2.X), 0, x_full), math.clamp(y_half + (y_half - pos2.Y), 0, y_full))
-            end
-
-            local to = Vector2.new(pos2.X, pos2.Y)
-            local from = Vector2.new(pos.X, pos.Y)
-
-            if elapsed_time > lifetime then
-                local fadeElapsed = elapsed_time - lifetime
-                local value = math.clamp(fadeElapsed / 0.3, 0, 1)
-                local new_transparency = lineTransparency + (0 - lineTransparency) * value
-                line.Transparency = new_transparency
-                outline.Transparency = new_transparency
-                from = from + (line.From - from) * value
-                line.From = from
-            else
-                line.From = from
-            end
-
-            line.To = to
-
-            local offsetDir = (from - to)
-            if offsetDir.Magnitude > 0 then
-                local offset = offsetDir.Unit
-                outline.From = from + offset
-                outline.To = to - offset
-            else
-                outline.From = from
-                outline.To = to
-            end
-        end)
-
-        task.delay(lifetime + 0.3, function()
-            if conn then conn:Disconnect() end
-            if line then line:Destroy() end
-            if outline then outline:Destroy() end
-        end)
-    end
-
     local function DrawTracer(startPos, endPos)
         local cfg = getgenv().FH_TracerConfig
         if not cfg or not cfg.Enabled then return end
         if (startPos - endPos).Magnitude < 0.1 then return end
 
-        if cfg.Mode == "Line" then
-            DrawLineTracer(startPos, endPos, cfg)
-        else
-            DrawBeamTracer(startPos, endPos, cfg)
-        end
+        DrawBeamTracer(startPos, endPos, cfg)
     end
 
     local function ResolveShooterPlayer(arg)
@@ -10548,6 +10404,8 @@ do
     local HitVignetteSettings = {
         Enabled = false,
         Color = Color3.fromRGB(180, 0, 0),
+        Strength = 0.35,
+        Lifetime = 0.12,
     }
 
     local playerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -10616,10 +10474,12 @@ do
 
     local function flashVignette()
         if not HitVignetteSettings.Enabled then return end
+        local strength = math.clamp(HitVignetteSettings.Strength or 0.35, 0.05, 1)
+        local lifetime = math.clamp(HitVignetteSettings.Lifetime or 0.12, 0.05, 2)
         for _, f in ipairs(edges) do
-            TweenService:Create(f, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 0.35}):Play()
+            TweenService:Create(f, TweenInfo.new(0.12, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1 - strength}):Play()
         end
-        task.delay(0.12, function()
+        task.delay(lifetime, function()
             for _, f in ipairs(edges) do
                 TweenService:Create(f, TweenInfo.new(0.45, Enum.EasingStyle.Quad, Enum.EasingDirection.In), {BackgroundTransparency = 1}):Play()
             end
@@ -10631,7 +10491,7 @@ do
     local VignetteSection = VisualsHitVignette
 
     VignetteSection:AddToggle('HitVignetteEnabled', {
-        Text = "Hit Vignette",
+        Text = "Use",
         Default = false,
         Callback = function(Value)
             HitVignetteSettings.Enabled = (Toggles.HitVignetteEnabled and Toggles.HitVignetteEnabled.Value)
@@ -10642,6 +10502,29 @@ do
         Callback = function(Value)
             HitVignetteSettings.Color = Value or Color3.fromRGB(180, 0, 0)
             updateVignetteColor()
+        end
+    })
+
+    VignetteSection:AddSlider('HitVignetteStrength', {
+        Text = "Strength",
+        Min = 0.1,
+        Max = 1,
+        Default = 0.35,
+        Rounding = 2,
+        Callback = function(Value)
+            HitVignetteSettings.Strength = (Options.HitVignetteStrength and Options.HitVignetteStrength.Value) or 0.35
+        end
+    })
+
+    VignetteSection:AddSlider('HitVignetteLifetime', {
+        Text = "Lifetime",
+        Min = 0.05,
+        Max = 2,
+        Default = 0.12,
+        Rounding = 2,
+        Suffix = "s",
+        Callback = function(Value)
+            HitVignetteSettings.Lifetime = (Options.HitVignetteLifetime and Options.HitVignetteLifetime.Value) or 0.12
         end
     })
 end
@@ -12054,7 +11937,9 @@ task.wait(1)
 ApplyBeamColors()
 
 local HitLogsScript2 = {
-    Enabled = false
+    Enabled = false,
+    CustomTextEnabled = false,
+    CustomText = '[evolution] Hit "{target}" for {damage} damage.'
 }
 
 VisualsHitLogs:AddToggle('HitLogsScript2Enabled', {
@@ -12062,6 +11947,23 @@ VisualsHitLogs:AddToggle('HitLogsScript2Enabled', {
     Default = false,
     Callback = function(Value)
         HitLogsScript2.Enabled = Value
+    end
+})
+
+VisualsHitLogs:AddToggle('HitLogsCustomTextEnabled', {
+    Text = "Custom Text",
+    Default = false,
+    Callback = function(Value)
+        HitLogsScript2.CustomTextEnabled = Value
+    end
+})
+
+VisualsHitLogs:AddInput('HitLogsCustomText', {
+    Text = "Text",
+    Default = '[evolution] Hit "{target}" for {damage} damage.',
+    Numeric = false,
+    Callback = function(Value)
+        HitLogsScript2.CustomText = Value
     end
 })
 
@@ -12111,11 +12013,18 @@ local function CreateScript2HitMessage(targetName, damage)
     label.TextSize = 16
     label.TextXAlignment = Enum.TextXAlignment.Center
     label.TextYAlignment = Enum.TextYAlignment.Center
-    label.Text = string.format(
-        '<font color="#EAEAEA">[evolution] Hit </font><font color="#FF4A4A">"%s"</font><font color="#4DA3FF"> for %d </font><font color="#EAEAEA">damage.</font>',
-        targetName,
-        math.floor(damage or 0)
-    )
+    local messageText
+    if HitLogsScript2.CustomTextEnabled then
+        local template = HitLogsScript2.CustomText or '[evolution] Hit "{target}" for {damage} damage.'
+        messageText = template:gsub("{target}", targetName):gsub("{damage}", tostring(math.floor(damage or 0)))
+    else
+        messageText = string.format(
+            '<font color="#EAEAEA">[evolution] Hit </font><font color="#FF4A4A">"%s"</font><font color="#4DA3FF"> for %d </font><font color="#EAEAEA">damage.</font>',
+            targetName,
+            math.floor(damage or 0)
+        )
+    end
+    label.Text = messageText
     label.Parent = gui
     
     local stroke = Instance.new("UIStroke")
