@@ -72,7 +72,7 @@ local VisualsTracers = Tabs.Visuals:AddLeftGroupbox('Forcehit Tracers')
 
 local VisualsWorld = Tabs.Visuals:AddRightGroupbox('World')
 local VisualsWeather = Tabs.Visuals:AddRightGroupbox('Weather')
-local Visuals3DHitmarker = Tabs.Visuals:AddRightGroupbox('3D Hitmarker')
+local Visuals3DHitmarker = Tabs.Visuals:AddLeftGroupbox('3D Hitmarker')
 local VisualsCrosshair = Tabs.Visuals:AddRightGroupbox('Crosshair')
 local VisualsClient = Tabs.Visuals:AddRightGroupbox('Client')
 local VisualsGunMaterial = Tabs.Visuals:AddRightGroupbox('Gun Material')
@@ -6765,6 +6765,7 @@ do
     D3HitmarkerSettings.OutlineColor = Color3.fromRGB(0, 0, 0)
     D3HitmarkerSettings.LethalColor = Color3.fromRGB(255, 0, 0)
     D3HitmarkerSettings.Thickness = 1
+    D3HitmarkerSettings.OutlineThickness = 3
     D3HitmarkerSettings.Size = 10
     D3HitmarkerSettings.Lifetime = 0.5
     
@@ -7009,35 +7010,42 @@ do
         DrawTracer(startPos, endPos)
     end
 
-    if UnreliableMainEvent then
-        UnreliableMainEvent.OnClientEvent:Connect(OnBulletRayReplicated)
-    end
-    local mainEvent = ReplicatedStorage:FindFirstChild("MainEvent")
-    if mainEvent and mainEvent:IsA("RemoteEvent") and mainEvent ~= UnreliableMainEvent then
-        mainEvent.OnClientEvent:Connect(OnBulletRayReplicated)
+    local lastRayTick = 0
+    local function OnBulletRayDebounced(...)
+        local now = tick()
+        if now - lastRayTick < 0.03 then return end
+        lastRayTick = now
+        OnBulletRayReplicated(...)
     end
 
-    local function GetBulletRayContainer()
-        local ignored = workspace:FindFirstChild("Ignored")
-        if not ignored then return nil end
-        local siren = ignored:FindFirstChild("Siren")
-        if not siren then return nil end
-        return siren:FindFirstChild("Radius")
+    if UnreliableMainEvent and UnreliableMainEvent:IsA("RemoteEvent") then
+        UnreliableMainEvent.OnClientEvent:Connect(OnBulletRayDebounced)
+    else
+        local mainEvent = ReplicatedStorage:FindFirstChild("MainEvent")
+        if mainEvent and mainEvent:IsA("RemoteEvent") then
+            mainEvent.OnClientEvent:Connect(OnBulletRayDebounced)
+        end
     end
 
     local BulletRayConnection = nil
+    local function DestroyDefaultBulletRays()
+        local cfg = getgenv().FH_TracerConfig
+        if not cfg or not cfg.Enabled then return end
+        for _, desc in ipairs(workspace:GetDescendants()) do
+            if desc.Name == "BULLET_RAYS" and desc:IsA("Beam") then
+                pcall(function() desc:Destroy() end)
+            end
+        end
+    end
+
     local function HookBulletRays()
         if BulletRayConnection then
             BulletRayConnection:Disconnect()
             BulletRayConnection = nil
         end
 
-        local radius = GetBulletRayContainer()
-        if not radius then return end
-
-        BulletRayConnection = radius.ChildAdded:Connect(function(child)
-            if child.Name ~= "BULLET_RAYS" then return end
-            if child:GetAttribute("OwnerCharacter") ~= LocalPlayer.Name then return end
+        BulletRayConnection = workspace.DescendantAdded:Connect(function(child)
+            if child.Name ~= "BULLET_RAYS" or not child:IsA("Beam") then return end
 
             local cfg = getgenv().FH_TracerConfig
             if not cfg or not cfg.Enabled then return end
@@ -7048,12 +7056,8 @@ do
         end)
     end
 
+    DestroyDefaultBulletRays()
     HookBulletRays()
-    workspace.DescendantAdded:Connect(function(desc)
-        if desc.Name == "Radius" and desc.Parent and desc.Parent.Name == "Siren" then
-            HookBulletRays()
-        end
-    end)
 end
 
 
@@ -7739,6 +7743,15 @@ HitChamsSection:AddDropdown('HitChamsMaterial', {
             D3HitmarkerSettings.Thickness = (Options.D3HitmarkerThickness and Options.D3HitmarkerThickness.Value) or 1
         end})
 
+    D3HitmarkerSection:AddSlider('D3HitmarkerOutlineThickness',{Text = "Outline Thickness",
+    Min = 1,
+    Max = 15,
+    Default = 3,
+    Rounding = 0,
+    Callback = function(Value)
+            D3HitmarkerSettings.OutlineThickness = (Options.D3HitmarkerOutlineThickness and Options.D3HitmarkerOutlineThickness.Value) or 3
+        end})
+
     D3HitmarkerSection:AddSlider('D3HitmarkerSize',{Text = "Size",
     Min = 4,
     Max = 40,
@@ -7969,6 +7982,7 @@ local function Show3DHitmarker(worldPos, isLethal)
     local cam = Camera
     local size = D3HitmarkerSettings.Size or 10
     local thickness = D3HitmarkerSettings.Thickness or 1
+    local outlineThickness = D3HitmarkerSettings.OutlineThickness or (thickness + 2)
     local color = isLethal and D3HitmarkerSettings.LethalColor or D3HitmarkerSettings.Color
     local outlineColor = D3HitmarkerSettings.OutlineColor
     local lifetime = D3HitmarkerSettings.Lifetime or 0.5
@@ -7983,7 +7997,7 @@ local function Show3DHitmarker(worldPos, isLethal)
         lines[i].Visible = true
 
         outlines[i] = Drawing.new("Line")
-        outlines[i].Thickness = thickness + 2
+        outlines[i].Thickness = outlineThickness
         outlines[i].Color = outlineColor
         outlines[i].Transparency = 1
         outlines[i].Visible = true
@@ -11966,6 +11980,8 @@ VisualsHitLogs:AddInput('HitLogsCustomText', {
         HitLogsScript2.CustomText = Value
     end
 })
+
+VisualsHitLogs:AddLabel('Placeholders: {target} | {damage}')
 
 local notifications = {}
 local BASE_Y = -120
