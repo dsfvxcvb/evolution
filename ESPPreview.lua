@@ -89,6 +89,21 @@ title.TextSize = 14
 title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = topBar
 
+local closeButton = Instance.new("TextButton")
+closeButton.Name = "CloseButton"
+closeButton.Size = UDim2.new(0, 22, 0, 22)
+closeButton.Position = UDim2.new(1, -26, 0, 2)
+closeButton.Text = "X"
+closeButton.TextColor3 = FontColor
+closeButton.Font = Enum.Font.Code
+closeButton.TextSize = 12
+closeButton.BackgroundTransparency = 1
+closeButton.BorderSizePixel = 0
+closeButton.Parent = topBar
+closeButton.MouseButton1Click:Connect(function()
+	previewGui.Enabled = false
+end)
+
 local viewport = Instance.new("ViewportFrame")
 viewport.Name = "Viewport"
 viewport.Size = UDim2.new(1, -10, 1, -36)
@@ -575,6 +590,7 @@ local function createEspOverlay()
 	local healthBar = newFrame("HealthBar", {
 		Parent = healthBarOutline,
 		ZIndex = 6,
+		BackgroundTransparency = 0,
 		AnchorPoint = Vector2.new(0, 1),
 		Position = UDim2.new(0, 0, 1, 0),
 		Size = UDim2.new(1, 0, 1, 0),
@@ -780,7 +796,9 @@ local function updatePreview()
 	local gradBot = boxesCfg["Gradients"] and boxesCfg["Gradients"]["Bot"] or Color3.fromRGB(0, 85, 255)
 
 	local glowCfg = boxesCfg["Box Glow"]
-	if glowCfg and glowCfg["Enabled"] then
+	local useGlow = getgenv().ESPPreviewUseGlow
+	if useGlow == nil then useGlow = true end
+	if glowCfg and glowCfg["Enabled"] and useGlow then
 		Objects["BoxGlow"].ImageTransparency = 0
 		local glowTop = glowCfg["Top"] or gradTop
 		local glowBot = glowCfg["Bot"] or gradBot
@@ -1016,15 +1034,40 @@ if Library and typeof(Library.AddToRegistry) == "function" then
 	end)
 end
 
-if VisualsTab and VisualsTab.Frame then
-	local function onTabVisibility()
-		previewGui.Enabled = VisualsTab.Frame.Visible
+local function updatePreviewVisibility()
+	local enabled = getgenv().ESPPreviewEnabled
+	if enabled == nil then enabled = true end
+	if not enabled then
+		previewGui.Enabled = false
+		return
 	end
-	VisualsTab.Frame:GetPropertyChangedSignal("Visible"):Connect(onTabVisibility)
-	onTabVisibility()
-else
-	previewGui.Enabled = true
+	local alwaysShow = getgenv().ESPPreviewAlwaysShow
+	if alwaysShow then
+		previewGui.Enabled = true
+		return
+	end
+	if VisualsTab and VisualsTab.Frame then
+		previewGui.Enabled = VisualsTab.Frame.Visible
+	else
+		previewGui.Enabled = true
+	end
 end
+
+if VisualsTab and VisualsTab.Frame then
+	VisualsTab.Frame:GetPropertyChangedSignal("Visible"):Connect(updatePreviewVisibility)
+end
+updatePreviewVisibility()
+
+local lastPreviewEnabled, lastPreviewAlwaysShow = getgenv().ESPPreviewEnabled, getgenv().ESPPreviewAlwaysShow
+RunService.RenderStepped:Connect(function()
+	local enabled = getgenv().ESPPreviewEnabled
+	local alwaysShow = getgenv().ESPPreviewAlwaysShow
+	if enabled ~= lastPreviewEnabled or alwaysShow ~= lastPreviewAlwaysShow then
+		lastPreviewEnabled = enabled
+		lastPreviewAlwaysShow = alwaysShow
+		updatePreviewVisibility()
+	end
+end)
 
 local dragging, dragStart, startPos = false, nil, nil
 topBar.InputBegan:Connect(function(input)

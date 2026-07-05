@@ -3164,6 +3164,9 @@ HealthBarValue.BorderSizePixel = 0
 HealthBarValue.Size = UDim2.new(1, 0, 1, 0)
 HealthBarValue.Name = "healthbarvalue"
 HealthBarValue.Parent = HealthInner2
+local HealthBarGradient = Instance.new("UIGradient")
+HealthBarGradient.Rotation = 0
+HealthBarGradient.Parent = HealthBarValue
 local HealthText = Instance.new("TextLabel")
 HealthText.Font = Enum.Font.SourceSans
 HealthText.Text = "100/100"
@@ -3243,6 +3246,9 @@ ArmorBarValue.BorderSizePixel = 0
 ArmorBarValue.Size = UDim2.new(1, 0, 1, 0)
 ArmorBarValue.Name = "armorbarvalue"
 ArmorBarValue.Parent = ArmorInner2
+local AmmoBarGradient = Instance.new("UIGradient")
+AmmoBarGradient.Rotation = 0
+AmmoBarGradient.Parent = ArmorBarValue
 local ArmorText = Instance.new("TextLabel")
 ArmorText.Font = Enum.Font.SourceSans
 ArmorText.Text = "0/0"
@@ -3303,6 +3309,13 @@ return ammo.Value, maxAmmo.Value
 end
 return 0, 0
 end
+local function makeGradient(startCol, midCol, endCol)
+return ColorSequence.new({
+ColorSequenceKeypoint.new(0, startCol),
+ColorSequenceKeypoint.new(0.5, midCol),
+ColorSequenceKeypoint.new(1, endCol),
+})
+end
 local connection
 connection = game:GetService("RunService").RenderStepped:Connect(function()
 if not IndicatorUI or not IndicatorUI.Parent then
@@ -3326,6 +3339,19 @@ if humanoid then
 local healthPercent = math.clamp(humanoid.Health / humanoid.MaxHealth, 0, 1)
 HealthBarValue.Size = UDim2.new(healthPercent, 0, 1, 0)
 HealthText.Text = math.floor(humanoid.Health) .. "/" .. math.floor(humanoid.MaxHealth)
+if getgenv().TargetUIHealthbarColorEnabled ~= false then
+HealthBarGradient.Color = makeGradient(
+getgenv().TargetUIHealthbarStart or Color3.fromRGB(0, 255, 0),
+getgenv().TargetUIHealthbarMid or Color3.fromRGB(255, 170, 0),
+getgenv().TargetUIHealthbarEnd or Color3.fromRGB(255, 0, 0)
+)
+else
+HealthBarGradient.Color = makeGradient(
+Color3.fromRGB(45, 195, 45),
+Color3.fromRGB(45, 195, 45),
+Color3.fromRGB(45, 195, 45)
+)
+end
 end
 if targetPlayer ~= lastTarget then
 PlayerIcon.Image = "rbxthumb://type=AvatarHeadShot&id=" .. targetPlayer.UserId .. "&w=420&h=420"
@@ -3345,6 +3371,19 @@ ArmorFrame.Visible = true
 local ammoPercent = (ammoMax > 0) and math.clamp(ammoCurrent / ammoMax, 0, 1) or 0
 ArmorBarValue.Size = UDim2.new(ammoPercent, 0, 1, 0)
 ArmorText.Text = math.floor(ammoCurrent) .. "/" .. math.floor(ammoMax)
+if getgenv().TargetUIAmmoColorEnabled ~= false then
+AmmoBarGradient.Color = makeGradient(
+getgenv().TargetUIAmmoStart or Color3.fromRGB(255, 140, 0),
+getgenv().TargetUIAmmoMid or Color3.fromRGB(255, 85, 0),
+getgenv().TargetUIAmmoEnd or Color3.fromRGB(255, 0, 0)
+)
+else
+AmmoBarGradient.Color = makeGradient(
+Color3.fromRGB(255, 140, 0),
+Color3.fromRGB(255, 140, 0),
+Color3.fromRGB(255, 140, 0)
+)
+end
 -- Position handling: Free (draggable) or Follow Target.
 -- Re-assert fixed size every frame so nothing else can drift it.
 MainFrame.Size = UDim2.new(0, 322, 0, 147)
@@ -4688,6 +4727,56 @@ if main then
 main.Draggable = (Value == "Free")
 end
 end
+end
+})
+CombatTargetUITab:AddToggle('TargetUIHealthbarColor', {
+Text = "Healthbar Color",
+Default = true,
+Callback = function(Value)
+getgenv().TargetUIHealthbarColorEnabled = Value
+end
+}):AddColorPicker('TargetUIHealthbarStart', {
+Title = "Start",
+Default = Color3.fromRGB(0, 255, 0),
+Callback = function(Value)
+getgenv().TargetUIHealthbarStart = Value
+end
+}):AddColorPicker('TargetUIHealthbarMid', {
+Title = "Middle",
+Default = Color3.fromRGB(255, 170, 0),
+Callback = function(Value)
+getgenv().TargetUIHealthbarMid = Value
+end
+}):AddColorPicker('TargetUIHealthbarEnd', {
+Title = "End",
+Default = Color3.fromRGB(255, 0, 0),
+Callback = function(Value)
+getgenv().TargetUIHealthbarEnd = Value
+end
+})
+CombatTargetUITab:AddToggle('TargetUIAmmoColor', {
+Text = "Ammo Color",
+Default = true,
+Callback = function(Value)
+getgenv().TargetUIAmmoColorEnabled = Value
+end
+}):AddColorPicker('TargetUIAmmoStart', {
+Title = "Start",
+Default = Color3.fromRGB(255, 140, 0),
+Callback = function(Value)
+getgenv().TargetUIAmmoStart = Value
+end
+}):AddColorPicker('TargetUIAmmoMid', {
+Title = "Middle",
+Default = Color3.fromRGB(255, 85, 0),
+Callback = function(Value)
+getgenv().TargetUIAmmoMid = Value
+end
+}):AddColorPicker('TargetUIAmmoEnd', {
+Title = "End",
+Default = Color3.fromRGB(255, 0, 0),
+Callback = function(Value)
+getgenv().TargetUIAmmoEnd = Value
 end
 })
 local function RefreshHighlight()
@@ -9448,6 +9537,27 @@ Rounding = 0,
 Callback = function(Value)
 getgenv().MenuGlowTransparency = Value / 100
 UpdateMenuGlow()
+end
+})
+MenuGroup:AddToggle('EspPreviewEnabled', {
+Text = "Esp Preview",
+Default = true,
+Callback = function(Value)
+getgenv().ESPPreviewEnabled = Value
+end
+})
+MenuGroup:AddToggle('EspPreviewUseGlow', {
+Text = "Use Glow",
+Default = true,
+Callback = function(Value)
+getgenv().ESPPreviewUseGlow = Value
+end
+})
+MenuGroup:AddToggle('EspPreviewAlwaysShow', {
+Text = "Always Show",
+Default = false,
+Callback = function(Value)
+getgenv().ESPPreviewAlwaysShow = Value
 end
 })
 -- Hood Customs Addons integration for existing Linoria UI
