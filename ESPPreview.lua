@@ -556,8 +556,7 @@ local function createEspOverlay()
 		Parent = healthBarHolder,
 		ZIndex = 5,
 		Visible = false,
-		BackgroundTransparency = 0,
-		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+		BackgroundTransparency = 1,
 		Position = UDim2.fromOffset(0, 0),
 		Size = UDim2.new(1, 0, 1, 0),
 		ClipsDescendants = false,
@@ -567,6 +566,8 @@ local function createEspOverlay()
 	local outlineStroke = Instance.new("UIStroke")
 	outlineStroke.Thickness = 1
 	outlineStroke.LineJoinMode = Enum.LineJoinMode.Miter
+	outlineStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	outlineStroke.Color = Color3.fromRGB(0, 0, 0)
 	outlineStroke.Parent = healthBarOutline
 
 	local healthBar = newFrame("HealthBar", {

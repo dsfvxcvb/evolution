@@ -11361,6 +11361,8 @@ self:CreateObjects("UIStroke", {
 Parent = Objects["HealthBarOutline"],
 Thickness = 1,
 LineJoinMode = Enum.LineJoinMode.Miter,
+ApplyStrokeMode = Enum.ApplyStrokeMode.Border,
+Color = Color3.fromRGB(0, 0, 0),
 })
 Objects["HealthBar"] = self:CreateObjects("Frame", {
 Parent = Objects["HealthBarOutline"],
