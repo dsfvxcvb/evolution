@@ -11988,8 +11988,7 @@ VisualsHitLogs:AddInput('HitLogsCustomText', {
     end
 })
 
-VisualsHitLogs:AddLabel('Placeholders: {target} | {damage}')
-VisualsHitLogs:AddLabel('Use [1]word[/1], [2]word[/2], etc.')
+VisualsHitLogs:AddLabel('Words are colored 1, 2, 3...')
 
 VisualsHitLogs:AddToggle('HitLogsWordColorsToggle', {
     Text = "",
@@ -12077,19 +12076,24 @@ local function CreateScript2HitMessage(targetName, damage)
         return string.format("#%02X%02X%02X", math.floor(c.R * 255), math.floor(c.G * 255), math.floor(c.B * 255))
     end
 
-    local function applyWordColors(text)
-        for i, color in ipairs(HitLogsScript2.WordColors) do
-            local hex = colorToHex(color)
-            text = text:gsub("%[" .. i .. "%](.-)%[/" .. i .. "%]", string.format('<font color="%s">%%1</font>', hex))
+    local function colorWords(text)
+        local out = {}
+        local wordIndex = 0
+        for word, space in text:gmatch("(%S+)(%s*)") do
+            wordIndex = wordIndex + 1
+            local colorIndex = ((wordIndex - 1) % #HitLogsScript2.WordColors) + 1
+            local hex = colorToHex(HitLogsScript2.WordColors[colorIndex])
+            table.insert(out, string.format('<font color="%s">%s</font>', hex, word))
+            table.insert(out, space)
         end
-        return text
+        return table.concat(out)
     end
 
     local messageText
     if HitLogsScript2.CustomTextEnabled then
         local template = HitLogsScript2.CustomText or '[evolution] Hit "{target}" for {damage} damage.'
         template = template:gsub("{target}", targetName):gsub("{damage}", tostring(math.floor(damage or 0)))
-        messageText = applyWordColors(template)
+        messageText = colorWords(template)
     else
         messageText = string.format(
             '<font color="#EAEAEA">[evolution] Hit </font><font color="#FF4A4A">"%s"</font><font color="#4DA3FF"> for %d </font><font color="#EAEAEA">damage.</font>',
