@@ -291,6 +291,7 @@ function Library:MakeDraggable(Instance, Cutoff)
     local dragging = false;
     local dragOffset = nil;
     local anchorOffset = nil;
+    local lastUpdate = 0;
 
     Instance.InputBegan:Connect(function(Input)
         if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then
@@ -316,8 +317,11 @@ function Library:MakeDraggable(Instance, Cutoff)
         if dragConn then dragConn:Disconnect(); dragConn = nil; end;
         if endConn then endConn:Disconnect(); endConn = nil; end;
 
-        dragConn = RunService.RenderStepped:Connect(function()
+        dragConn = RunService.Heartbeat:Connect(function()
             if not dragging then return end;
+            local now = tick();
+            if now - lastUpdate < (1 / 30) then return end;
+            lastUpdate = now;
             local Pos = InputService:GetMouseLocation();
             Instance.Position = UDim2.new(
                 0,
