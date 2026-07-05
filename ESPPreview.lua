@@ -148,7 +148,7 @@ local function setupModel(char)
 	if not ok2 or not clone then return end
 
 	for _, desc in ipairs(clone:GetDescendants()) do
-		if desc:IsA("Script") or desc:IsA("LocalScript") or desc:IsA("ModuleScript") or desc:IsA("Humanoid") then
+		if desc:IsA("Script") or desc:IsA("LocalScript") or desc:IsA("ModuleScript") then
 			desc:Destroy()
 		end
 	end
