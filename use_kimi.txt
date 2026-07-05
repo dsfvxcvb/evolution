@@ -11339,8 +11339,8 @@ Parent = Objects["TargetHolder"],
 ZIndex = 5,
 Visible = false,
 BackgroundTransparency = 1,
-Position = Dim2(0, -5, 0, 0),
-Size = Dim2(0, 2, 1, 0),
+Position = Dim2(0, -8, 0, -1),
+Size = Dim2(0, 2, 1, 2),
 BorderSizePixel = 0,
 BorderColor3 = Color3.fromRGB(0, 0, 0),
 BackgroundColor3 = Color3.fromRGB(255, 255, 255),
@@ -12111,9 +12111,9 @@ Objects['HealthBarOutline'].Visible = true
 end
 if Data['LastHealthPosition'] ~= Position then
 local Layouts = {
-Left = {HolderPos = Dim2(0, -8, 0, 0), HolderSize = Dim2(0, 2, 1, 0), BarAnchor = NewVector2(0, 1), BarPos = Dim2(0, 0, 1, 0), Rotation = 90},
-Right = {HolderPos = Dim2(1, 6, 0, 0), HolderSize = Dim2(0, 2, 1, 0), BarAnchor = NewVector2(0, 1), BarPos = Dim2(0, 0, 1, 0), Rotation = 90},
-Bottom = {HolderPos = Dim2(0, 0, 1, 6), HolderSize = Dim2(1, 0, 0, 2), BarAnchor = NewVector2(0, 0), BarPos = Dim2(0, 0, 0, 0), Rotation = 0},
+Left = {HolderPos = Dim2(0, -8, 0, -1), HolderSize = Dim2(0, 2, 1, 2), BarAnchor = NewVector2(0, 1), BarPos = Dim2(0, 0, 1, 0), Rotation = 90},
+Right = {HolderPos = Dim2(1, 6, 0, -1), HolderSize = Dim2(0, 2, 1, 2), BarAnchor = NewVector2(0, 1), BarPos = Dim2(0, 0, 1, 0), Rotation = 90},
+Bottom = {HolderPos = Dim2(0, -1, 1, 6), HolderSize = Dim2(1, 2, 0, 2), BarAnchor = NewVector2(0, 0), BarPos = Dim2(0, 0, 0, 0), Rotation = 0},
 }
 local L = Layouts[Position] or Layouts.Left
 Objects['HealthBarHolder'].Position = L.HolderPos

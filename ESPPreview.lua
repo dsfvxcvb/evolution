@@ -548,8 +548,8 @@ local function createEspOverlay()
 		Parent = targetHolder,
 		ZIndex = 5,
 		Visible = false,
-		Position = UDim2.new(0, -5, 0, 0),
-		Size = UDim2.new(0, 2, 1, 0),
+		Position = UDim2.new(0, -8, 0, -1),
+		Size = UDim2.new(0, 2, 1, 2),
 	})
 	Objects["HealthBarHolder"] = healthBarHolder
 
@@ -557,7 +557,8 @@ local function createEspOverlay()
 		Parent = healthBarHolder,
 		ZIndex = 5,
 		Visible = false,
-		BackgroundTransparency = 1,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
 		Position = UDim2.fromOffset(0, 0),
 		Size = UDim2.new(1, 0, 1, 0),
 		ClipsDescendants = false,
@@ -933,22 +934,22 @@ local function updatePreview()
 
 		local layouts = {
 			Left = {
-				HolderPos = UDim2.new(0, -8, 0, 0),
-				HolderSize = UDim2.new(0, 2, 1, 0),
+				HolderPos = UDim2.new(0, -8, 0, -1),
+				HolderSize = UDim2.new(0, 2, 1, 2),
 				BarAnchor = Vector2.new(0, 1),
 				BarPos = UDim2.new(0, 0, 1, 0),
 				Rotation = 90,
 			},
 			Right = {
-				HolderPos = UDim2.new(1, 6, 0, 0),
-				HolderSize = UDim2.new(0, 2, 1, 0),
+				HolderPos = UDim2.new(1, 6, 0, -1),
+				HolderSize = UDim2.new(0, 2, 1, 2),
 				BarAnchor = Vector2.new(0, 1),
 				BarPos = UDim2.new(0, 0, 1, 0),
 				Rotation = 90,
 			},
 			Bottom = {
-				HolderPos = UDim2.new(0, 0, 1, 6),
-				HolderSize = UDim2.new(1, 0, 0, 2),
+				HolderPos = UDim2.new(0, -1, 1, 6),
+				HolderSize = UDim2.new(1, 2, 0, 2),
 				BarAnchor = Vector2.new(0, 0),
 				BarPos = UDim2.new(0, 0, 0, 0),
 				Rotation = 0,
