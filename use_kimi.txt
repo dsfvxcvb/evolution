@@ -10284,7 +10284,7 @@ do
     end
 
     VisualsClient:AddInput('AvatarMorphUserId', {
-        Text = "Morph User ID / Username",
+        Text = "ID / Username",
         Default = "5042596195",
         Numeric = false,
         Callback = function(Value)
@@ -10298,6 +10298,123 @@ do
         end
     })
 
+    local AvatarMorphAddEnabled = false
+    local addAccessoryDebounce = 0
+
+    local function refreshAccessoryDropdown(character)
+        if not character then return end
+        local list = {}
+        for _, child in ipairs(character:GetChildren()) do
+            if child:IsA("Accessory") then
+                table.insert(list, child.Name)
+            end
+        end
+        if Options.AvatarMorphAccessories then
+            Options.AvatarMorphAccessories:SetValues(list)
+            pcall(function()
+                Options.AvatarMorphAccessories:SetValue(nil)
+            end)
+        end
+    end
+
+    local function addAccessoryById(assetId)
+        local idNum = tonumber(assetId)
+        if not idNum then return end
+
+        local success, objects = pcall(function()
+            return game:GetObjects("rbxassetid://" .. idNum)
+        end)
+
+        if not success or not objects or #objects == 0 then
+            warn("[AvatarMorph] Failed to load accessory asset:", assetId)
+            return
+        end
+
+        local model = objects[1]
+        local accessory = nil
+        if model:IsA("Accessory") then
+            accessory = model
+        else
+            for _, desc in ipairs(model:GetDescendants()) do
+                if desc:IsA("Accessory") then
+                    accessory = desc
+                    break
+                end
+            end
+        end
+
+        if not accessory then
+            warn("[AvatarMorph] No accessory found in asset:", assetId)
+            return
+        end
+
+        local character = LocalPlayer.Character
+        if not character then return end
+
+        local clone = accessory:Clone()
+        attachAccessory(character, clone)
+        refreshAccessoryDropdown(character)
+    end
+
+    VisualsClient:AddToggle('AvatarMorphAddAccessory', {
+        Text = "Add Accessories",
+        Default = false,
+        Callback = function(Value)
+            AvatarMorphAddEnabled = Value
+        end
+    })
+
+    VisualsClient:AddInput('AvatarMorphAccessoryId', {
+        Text = "ID",
+        Default = "",
+        Numeric = true,
+        Callback = function(Value)
+            if not AvatarMorphAddEnabled then return end
+            local num = tonumber(Value)
+            if not num then return end
+
+            addAccessoryDebounce += 1
+            local current = addAccessoryDebounce
+            task.delay(0.5, function()
+                if current == addAccessoryDebounce then
+                    addAccessoryById(num)
+                end
+            end)
+        end
+    })
+
+    VisualsClient:AddDropdown('AvatarMorphAccessories', {
+        Text = "Current Accessories",
+        Values = {},
+        Callback = function(Value)
+            local character = LocalPlayer.Character
+            if not character then return end
+            local accessory = character:FindFirstChild(Value)
+            if accessory and accessory:IsA("Accessory") then
+                accessory:Destroy()
+                refreshAccessoryDropdown(character)
+            end
+        end
+    })
+
+    local function connectAccessoryWatcher(char)
+        char.ChildAdded:Connect(function(child)
+            if child:IsA("Accessory") then
+                refreshAccessoryDropdown(char)
+            end
+        end)
+        char.ChildRemoved:Connect(function(child)
+            if child:IsA("Accessory") then
+                refreshAccessoryDropdown(char)
+            end
+        end)
+        refreshAccessoryDropdown(char)
+    end
+
+    if LocalPlayer.Character then
+        connectAccessoryWatcher(LocalPlayer.Character)
+    end
+
     LocalPlayer.CharacterAdded:Connect(function(char)
         if AvatarMorph.Enabled then
             task.wait(0.5)
@@ -10305,6 +10422,7 @@ do
             saveOriginalAvatar(char)
             applyAvatarMorph(AvatarMorph.UserId)
         end
+        connectAccessoryWatcher(char)
     end)
 
     local oldUnload = Library.Unload
