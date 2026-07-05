@@ -2000,13 +2000,46 @@ do
             BorderColor3 = 'Black';
         });
 
-        local ToggleGlow = Library:Create('UIStroke', {
-            Color = (getgenv().MenuToggleGlowColor or Color3.fromRGB(0, 170, 255));
-            Thickness = 2;
-            Transparency = 0.5;
-            Enabled = false;
-            Parent = ToggleOuter;
-        });
+        local ToggleGlow = Instance.new('Frame');
+        ToggleGlow.Name = 'ToggleGlow';
+        ToggleGlow.BackgroundTransparency = 1;
+        ToggleGlow.BorderSizePixel = 0;
+        ToggleGlow.Position = UDim2.new(0, 0, 0, 0);
+        ToggleGlow.Size = UDim2.new(1, 0, 1, 0);
+        ToggleGlow.ZIndex = 4;
+        ToggleGlow.Visible = false;
+        ToggleGlow.Parent = ToggleOuter;
+
+        do
+            local glowLayers = 4;
+            local glowMaxInset = 6;
+            local targetCombinedTransparency = 0.5;
+            local perLayerTransparency = targetCombinedTransparency ^ (1 / glowLayers);
+            local baseRadius = 2;
+            local corner = ToggleOuter:FindFirstChild('ModernUICorner');
+            if corner and corner:IsA('UICorner') then
+                baseRadius = corner.CornerRadius.Offset;
+            end;
+
+            for i = 1, glowLayers do
+                local t = i / glowLayers;
+                local inset = glowMaxInset * t;
+
+                local layer = Instance.new('Frame');
+                layer.Name = 'GlowLayer' .. i;
+                layer.BackgroundColor3 = getgenv().MenuToggleGlowColor or Color3.fromRGB(0, 170, 255);
+                layer.BackgroundTransparency = perLayerTransparency;
+                layer.BorderSizePixel = 0;
+                layer.Position = UDim2.new(0, -inset, 0, -inset);
+                layer.Size = UDim2.new(1, inset * 2, 1, inset * 2);
+                layer.ZIndex = ToggleGlow.ZIndex - (glowLayers - i);
+                layer.Parent = ToggleGlow;
+
+                local layerCorner = Instance.new('UICorner');
+                layerCorner.CornerRadius = UDim.new(0, baseRadius + inset);
+                layerCorner.Parent = layer;
+            end;
+        end;
 
         local ToggleInner = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
@@ -2068,8 +2101,13 @@ do
             Library.RegistryMap[ToggleInner].Properties.BorderColor3 = Toggle.Value and 'AccentColorDark' or 'OutlineColor';
 
             if ToggleGlow then
-                ToggleGlow.Enabled = Toggle.Value and (getgenv().MenuToggleGlowEnabled == true);
-                ToggleGlow.Color = getgenv().MenuToggleGlowColor or Color3.fromRGB(0, 170, 255);
+                ToggleGlow.Visible = Toggle.Value and (getgenv().MenuToggleGlowEnabled == true);
+                local glowColor = getgenv().MenuToggleGlowColor or Color3.fromRGB(0, 170, 255);
+                for _, child in ipairs(ToggleGlow:GetChildren()) do
+                    if child:IsA('Frame') and child.Name:sub(1, 9) == 'GlowLayer' then
+                        child.BackgroundColor3 = glowColor;
+                    end;
+                end;
             end;
         end;
 
