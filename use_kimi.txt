@@ -9592,27 +9592,6 @@ getgenv().MenuGlowTransparency = Value / 100
 UpdateMenuGlow()
 end
 })
-MenuGroup:AddToggle('EspPreviewEnabled', {
-Text = "Esp Preview",
-Default = true,
-Callback = function(Value)
-getgenv().ESPPreviewEnabled = Value
-end
-})
-MenuGroup:AddToggle('EspPreviewUseGlow', {
-Text = "Use Glow",
-Default = true,
-Callback = function(Value)
-getgenv().ESPPreviewUseGlow = Value
-end
-})
-MenuGroup:AddToggle('EspPreviewAlwaysShow', {
-Text = "Always Show",
-Default = false,
-Callback = function(Value)
-getgenv().ESPPreviewAlwaysShow = Value
-end
-})
 -- Hood Customs Addons integration for existing Linoria UI
 -- Uses Library, Tabs, Options, Toggles, Window from the host script
 local function HoodAddonsIntegration()
@@ -12425,9 +12404,7 @@ Clear(self['Cache']);
 end
 end
 end
-getgenv().VisualsTab = Tabs.Visuals
 InitializeESP()
-loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/evolution/main/ESPPreview.lua?nocache=' .. tostring(tick())))()
 SaveManager:LoadAutoloadConfig()
 -- Force the knife hitbox expander on by default so aura modes don't whiff.
 if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then
