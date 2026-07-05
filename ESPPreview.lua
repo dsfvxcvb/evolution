@@ -219,119 +219,498 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
-local function createGradientFrame(name, parentFrame, z)
+local CornerLayout = {
+	{UDim2.new(0, -1, 0, -1), UDim2.new(0.3, 0, 0, 1), Vector2.new(0, 0), 0},
+	{UDim2.new(0, -1, 0, -1), UDim2.new(0, 1, 0.3, 0), Vector2.new(0, 0), 180},
+	{UDim2.new(1, 1, 0, -1), UDim2.new(0.3, 0, 0, 1), Vector2.new(1, 0), 0},
+	{UDim2.new(1, 1, 0, -1), UDim2.new(0, 1, 0.3, 0), Vector2.new(1, 0), 180},
+	{UDim2.new(0, -1, 1, 1), UDim2.new(0.3, 0, 0, 1), Vector2.new(0, 1), 0},
+	{UDim2.new(0, -1, 1, 1), UDim2.new(0, 1, 0.3, 0), Vector2.new(0, 1), -180},
+	{UDim2.new(1, 1, 1, 1), UDim2.new(0.3, 0, 0, 1), Vector2.new(1, 1), 0},
+	{UDim2.new(1, 1, 1, 1), UDim2.new(0, 1, 0.3, 0), Vector2.new(1, 1), -180},
+}
+
+local Objects = {}
+
+local function newFrame(name, props)
 	local f = Instance.new("Frame")
 	f.Name = name
+	f.BackgroundTransparency = 1
 	f.BorderSizePixel = 0
-	f.BackgroundColor3 = Color3.new(1, 1, 1)
-	f.Visible = false
-	f.ZIndex = z or 1
-	f.Parent = parentFrame
+	f.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+	for k, v in pairs(props or {}) do
+		f[k] = v
+	end
+	return f
+end
 
+local function newText(name, props)
+	local t = Instance.new("TextLabel")
+	t.Name = name
+	t.Text = ""
+	t.TextSize = 12
+	t.BackgroundTransparency = 1
+	t.BorderSizePixel = 0
+	t.TextXAlignment = Enum.TextXAlignment.Center
+	t.TextYAlignment = Enum.TextYAlignment.Center
+	t.ZIndex = 5
+	t.AutomaticSize = Enum.AutomaticSize.XY
+	t.Size = UDim2.fromOffset(0, 0)
+	for k, v in pairs(props or {}) do
+		t[k] = v
+	end
+	local stroke = Instance.new("UIStroke")
+	stroke.Color = Color3.fromRGB(0, 0, 0)
+	stroke.LineJoinMode = Enum.LineJoinMode.Miter
+	stroke.Parent = t
+	return t
+end
+
+local function newListLayout(props)
+	local l = Instance.new("UIListLayout")
+	for k, v in pairs(props or {}) do
+		l[k] = v
+	end
+	return l
+end
+
+local function newPadding(props)
+	local p = Instance.new("UIPadding")
+	for k, v in pairs(props or {}) do
+		p[k] = v
+	end
+	return p
+end
+
+local function newGradient(props)
 	local g = Instance.new("UIGradient")
-	g.Name = "Gradient"
-	g.Parent = f
-
-	local c = Instance.new("UICorner")
-	c.CornerRadius = UDim.new(0, 2)
-	c.Parent = f
-	return f, g
+	g.Rotation = 90
+	for k, v in pairs(props or {}) do
+		g[k] = v
+	end
+	return g
 end
 
-local glowFrame, glowGradient = createGradientFrame("Glow", viewport, 5)
-local boxFrame, boxGradient = createGradientFrame("BoxFill", viewport, 6)
-local boxStroke = Instance.new("UIStroke")
-boxStroke.Thickness = 1
-boxStroke.Parent = boxFrame
-
-local healthHolder = Instance.new("Frame")
-healthHolder.Name = "HealthHolder"
-healthHolder.BorderSizePixel = 0
-healthHolder.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
-healthHolder.Visible = false
-healthHolder.ZIndex = 6
-healthHolder.Parent = viewport
-
-local healthFill = Instance.new("Frame")
-healthFill.Name = "HealthFill"
-healthFill.BorderSizePixel = 0
-healthFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-healthFill.Size = UDim2.new(1, 0, 1, 0)
-healthFill.Position = UDim2.new(0, 0, 0, 0)
-healthFill.ZIndex = 7
-healthFill.Parent = healthHolder
-
-local function createText(name)
-	local lbl = Instance.new("TextLabel")
-	lbl.Name = name
-	lbl.Font = Enum.Font.Code
-	lbl.TextSize = 12
-	lbl.BackgroundTransparency = 1
-	lbl.Size = UDim2.fromOffset(120, 14)
-	lbl.Visible = false
-	lbl.TextXAlignment = Enum.TextXAlignment.Left
-	lbl.ZIndex = 8
-	lbl.Parent = viewport
-	return lbl
+local function getFontFace(libraryFont, fallbackEnum)
+	if typeof(libraryFont) == "Font" then
+		return libraryFont
+	end
+	if typeof(fallbackEnum) == "EnumItem" then
+		local ok, face = pcall(function() return Font.fromEnum(fallbackEnum) end)
+		if ok then return face end
+	end
+	return nil
 end
 
-local nameLabel = createText("ESPName")
-local distLabel = createText("ESPDistance")
-local weaponLabel = createText("ESPWeapon")
+local function createEspOverlay()
+	local targetHolder = newFrame("TargetHolder", {
+		Parent = viewport,
+		Visible = false,
+		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.fromOffset(0, 0),
+	})
+	Objects["TargetHolder"] = targetHolder
+
+	local topHolder = newFrame("TopHolder", {
+		Parent = targetHolder,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, -2, 0, -5),
+		Size = UDim2.new(1, 4, 0, 0),
+	})
+	Objects["TopHolder"] = topHolder
+
+	local bottomHolder = newFrame("BottomHolder", {
+		Parent = targetHolder,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Position = UDim2.new(0, -2, 1, 3),
+		Size = UDim2.new(1, 4, 0, 0),
+	})
+	Objects["BottomHolder"] = bottomHolder
+
+	local leftHolder = newFrame("LeftHolder", {
+		Parent = targetHolder,
+		AutomaticSize = Enum.AutomaticSize.X,
+		AnchorPoint = Vector2.new(1, 0),
+		Position = UDim2.new(0, -5, 0, -2),
+		Size = UDim2.new(0, 0, 1, 4),
+	})
+	Objects["LeftHolder"] = leftHolder
+
+	local rightHolder = newFrame("RightHolder", {
+		Parent = targetHolder,
+		AutomaticSize = Enum.AutomaticSize.X,
+		Position = UDim2.new(1, 5, 0, -2),
+		Size = UDim2.new(0, 0, 1, 4),
+	})
+	Objects["RightHolder"] = rightHolder
+
+	local topTextHolder = newFrame("TopTextHolder", {
+		Parent = topHolder,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, 0),
+	})
+	Objects["TopTextHolder"] = topTextHolder
+
+	local bottomTextHolder = newFrame("BottomTextHolder", {
+		Parent = bottomHolder,
+		LayoutOrder = 2,
+		AutomaticSize = Enum.AutomaticSize.Y,
+		Size = UDim2.new(1, 0, 0, 0),
+	})
+	Objects["BottomTextHolder"] = bottomTextHolder
+
+	local leftTextHolder = newFrame("LeftTextHolder", {
+		Parent = leftHolder,
+		AutomaticSize = Enum.AutomaticSize.XY,
+		Size = UDim2.new(1, 0, 0, 0),
+	})
+	Objects["LeftTextHolder"] = leftTextHolder
+
+	local rightTextHolder = newFrame("RightTextHolder", {
+		Parent = rightHolder,
+		LayoutOrder = 2,
+		AutomaticSize = Enum.AutomaticSize.XY,
+		Size = UDim2.new(0, 0, 0, 0),
+	})
+	Objects["RightTextHolder"] = rightTextHolder
+
+	newListLayout({
+		Parent = topTextHolder,
+		VerticalAlignment = Enum.VerticalAlignment.Bottom,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		Padding = UDim.new(0, 1),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+	newListLayout({
+		Parent = bottomTextHolder,
+		HorizontalAlignment = Enum.HorizontalAlignment.Center,
+		Padding = UDim.new(0, -1),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+	newListLayout({
+		Parent = leftTextHolder,
+		HorizontalAlignment = Enum.HorizontalAlignment.Right,
+		Padding = UDim.new(0, 0),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+	newListLayout({
+		Parent = rightTextHolder,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		Padding = UDim.new(0, 0),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+	newListLayout({
+		Parent = topHolder,
+		VerticalAlignment = Enum.VerticalAlignment.Bottom,
+		Padding = UDim.new(0, 1),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+	newListLayout({
+		Parent = bottomHolder,
+		Padding = UDim.new(0, 1),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+	newListLayout({
+		Parent = leftHolder,
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		Padding = UDim.new(0, 1),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+	newListLayout({
+		Parent = rightHolder,
+		FillDirection = Enum.FillDirection.Horizontal,
+		HorizontalAlignment = Enum.HorizontalAlignment.Left,
+		Padding = UDim.new(0, 1),
+		SortOrder = Enum.SortOrder.LayoutOrder,
+	})
+
+	newPadding({ Parent = topTextHolder, PaddingBottom = UDim.new(0, 0) })
+	newPadding({ Parent = bottomTextHolder, PaddingTop = UDim.new(0, -1) })
+	newPadding({ Parent = leftTextHolder, PaddingTop = UDim.new(0, -3) })
+	newPadding({ Parent = rightTextHolder, PaddingTop = UDim.new(0, -3) })
+	newPadding({ Parent = leftHolder, PaddingRight = UDim.new(0, 1) })
+
+	local boxGlow = Instance.new("ImageLabel")
+	boxGlow.Name = "BoxGlow"
+	boxGlow.Parent = targetHolder
+	boxGlow.Image = "rbxassetid://110204605000367"
+	boxGlow.ScaleType = Enum.ScaleType.Slice
+	boxGlow.SliceCenter = Rect.new(Vector2.new(21, 21), Vector2.new(79, 79))
+	boxGlow.AutomaticSize = Enum.AutomaticSize.XY
+	boxGlow.ImageTransparency = 0.65
+	boxGlow.ResampleMode = Enum.ResamplerMode.Pixelated
+	boxGlow.Visible = true
+	boxGlow.BackgroundTransparency = 1
+	boxGlow.Position = UDim2.new(0, -21, 0, -21)
+	boxGlow.Size = UDim2.fromOffset(0, 0)
+	boxGlow.BorderSizePixel = 0
+	Objects["BoxGlow"] = boxGlow
+
+	Objects["BoxGlowGradient"] = newGradient({
+		Parent = boxGlow,
+		Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromRGB(0, 0, 0)),
+		Transparency = NumberSequence.new(0, 0),
+	})
+
+	newPadding({
+		Parent = boxGlow,
+		PaddingTop = UDim.new(0, 21),
+		PaddingBottom = UDim.new(0, 20),
+		PaddingLeft = UDim.new(0, 21),
+		PaddingRight = UDim.new(0, 20),
+	})
+
+	local boxOutlineHolder = newFrame("BoxOutlineHolder", {
+		Parent = boxGlow,
+		Visible = false,
+		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.fromOffset(0, 0),
+	})
+	Objects["BoxOutlineHolder"] = boxOutlineHolder
+
+	local boxOutline = Instance.new("UIStroke")
+	boxOutline.Name = "BoxOutline"
+	boxOutline.Parent = boxOutlineHolder
+	boxOutline.Thickness = 3
+	boxOutline.LineJoinMode = Enum.LineJoinMode.Miter
+	Objects["BoxOutline"] = boxOutline
+
+	Objects["BoxOutlineGradient"] = newGradient({
+		Parent = boxOutline,
+		Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromRGB(0, 0, 0)),
+		Transparency = NumberSequence.new(0, 0),
+	})
+
+	local boxInlineHolder = newFrame("BoxInlineHolder", {
+		Parent = boxGlow,
+		Visible = false,
+		Position = UDim2.new(0, -1, 0, -1),
+		Size = UDim2.fromOffset(0, 0),
+	})
+	Objects["BoxInlineHolder"] = boxInlineHolder
+
+	local boxInline = Instance.new("UIStroke")
+	boxInline.Name = "BoxInline"
+	boxInline.Parent = boxInlineHolder
+	boxInline.Color = Color3.fromRGB(255, 255, 255)
+	boxInline.Thickness = 2
+	boxInline.LineJoinMode = Enum.LineJoinMode.Miter
+	Objects["BoxInline"] = boxInline
+
+	Objects["BoxInlineGradient"] = newGradient({
+		Parent = boxInline,
+		Color = ColorSequence.new(Color3.fromRGB(0, 255, 255), Color3.fromRGB(0, 85, 255)),
+		Transparency = NumberSequence.new(0, 0),
+	})
+
+	local boxFill = newFrame("BoxFill", {
+		Parent = boxGlow,
+		Visible = false,
+		BackgroundTransparency = 0,
+		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.fromOffset(0, 0),
+	})
+	Objects["BoxFill"] = boxFill
+
+	Objects["BoxFillGradient"] = newGradient({
+		Parent = boxFill,
+		Color = ColorSequence.new(Color3.fromRGB(0, 0, 0), Color3.fromRGB(255, 255, 255)),
+		Transparency = NumberSequence.new(1, 1),
+	})
+
+	local cornerHolder = newFrame("CornerHolder", {
+		Parent = boxGlow,
+		Visible = false,
+		Position = UDim2.new(0, -1, 0, -1),
+		Size = UDim2.fromOffset(0, 0),
+	})
+	Objects["CornerHolder"] = cornerHolder
+
+	for i = 1, 8 do
+		local line = newFrame("Line_" .. i, {
+			Parent = cornerHolder,
+			Visible = false,
+			BackgroundTransparency = 0,
+			Position = UDim2.fromOffset(0, 0),
+			Size = UDim2.fromOffset(0, 0),
+		})
+		Objects["Line_" .. i] = line
+		local stroke = Instance.new("UIStroke")
+		stroke.Thickness = 1
+		stroke.LineJoinMode = Enum.LineJoinMode.Miter
+		stroke.Parent = line
+	end
+
+	local healthBarHolder = newFrame("HealthBarHolder", {
+		Parent = targetHolder,
+		ZIndex = 5,
+		Visible = false,
+		Position = UDim2.new(0, -5, 0, 0),
+		Size = UDim2.new(0, 2, 1, 0),
+	})
+	Objects["HealthBarHolder"] = healthBarHolder
+
+	local healthBarOutline = newFrame("HealthBarOutline", {
+		Parent = healthBarHolder,
+		ZIndex = 5,
+		Visible = false,
+		BackgroundTransparency = 0,
+		BackgroundColor3 = Color3.fromRGB(0, 0, 0),
+		Position = UDim2.fromOffset(0, 0),
+		Size = UDim2.new(1, 0, 1, 0),
+		ClipsDescendants = false,
+	})
+	Objects["HealthBarOutline"] = healthBarOutline
+
+	local outlineStroke = Instance.new("UIStroke")
+	outlineStroke.Thickness = 1
+	outlineStroke.LineJoinMode = Enum.LineJoinMode.Miter
+	outlineStroke.Parent = healthBarOutline
+
+	local healthBar = newFrame("HealthBar", {
+		Parent = healthBarOutline,
+		ZIndex = 6,
+		AnchorPoint = Vector2.new(0, 1),
+		Position = UDim2.new(0, 0, 1, 0),
+		Size = UDim2.new(1, 0, 1, 0),
+		ClipsDescendants = true,
+	})
+	Objects["HealthBar"] = healthBar
+
+	Objects["HealthBarGradient"] = newGradient({
+		Parent = healthBar,
+		Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 0)),
+			ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 170, 0)),
+			ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+		}),
+		Transparency = NumberSequence.new(0, 0),
+	})
+
+	local healthBarText = newText("HealthBarText", {
+		Parent = healthBarOutline,
+		FontFace = getFontFace(EspLibrary and EspLibrary.SmallestPixel, Enum.Font.SourceSans),
+		TextSize = 9,
+		ZIndex = 10,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		Text = "",
+		AnchorPoint = Vector2.new(0.5, 0.5),
+		Position = UDim2.new(0.5, 0, 1, 0),
+	})
+	Objects["HealthBarText"] = healthBarText
+
+	local targetName = newText("TargetName", {
+		Parent = topTextHolder,
+		FontFace = getFontFace(EspLibrary and EspLibrary.TahomaBold, Enum.Font.Code),
+		TextSize = 12,
+		LayoutOrder = 2,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		Visible = false,
+	})
+	Objects["TargetName"] = targetName
+
+	local distance = newText("Distance", {
+		Parent = bottomTextHolder,
+		FontFace = getFontFace(EspLibrary and EspLibrary.SmallestPixel, Enum.Font.SourceSans),
+		TextSize = 9,
+		LayoutOrder = 2,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		Visible = false,
+	})
+	Objects["Distance"] = distance
+
+	local walkFlag = newText("WalkFlag", {
+		Parent = rightTextHolder,
+		FontFace = getFontFace(EspLibrary and EspLibrary.SmallestPixel, Enum.Font.SourceSans),
+		TextSize = 9,
+		LayoutOrder = 1,
+		TextColor3 = Color3.fromRGB(255, 0, 0),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Text = "Walking",
+		Visible = false,
+	})
+	Objects["WalkFlag"] = walkFlag
+
+	local jumpFlag = newText("JumpFlag", {
+		Parent = rightTextHolder,
+		FontFace = getFontFace(EspLibrary and EspLibrary.SmallestPixel, Enum.Font.SourceSans),
+		TextSize = 9,
+		LayoutOrder = 2,
+		TextColor3 = Color3.fromRGB(144, 238, 144),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Text = "Jumping",
+		Visible = false,
+	})
+	Objects["JumpFlag"] = jumpFlag
+
+	local swimmingFlag = newText("SwimmingFlag", {
+		Parent = rightTextHolder,
+		FontFace = getFontFace(EspLibrary and EspLibrary.SmallestPixel, Enum.Font.SourceSans),
+		TextSize = 9,
+		LayoutOrder = 4,
+		TextColor3 = Color3.fromRGB(0, 255, 255),
+		TextXAlignment = Enum.TextXAlignment.Left,
+		Text = "Swimming",
+		Visible = false,
+	})
+	Objects["SwimmingFlag"] = swimmingFlag
+
+	local weapon = newText("Weapon", {
+		Parent = bottomTextHolder,
+		FontFace = getFontFace(EspLibrary and EspLibrary.SmallestPixel, Enum.Font.SourceSans),
+		TextSize = 9,
+		LayoutOrder = 3,
+		TextColor3 = Color3.fromRGB(255, 255, 255),
+		Text = "none",
+		Visible = false,
+	})
+	Objects["Weapon"] = weapon
+end
+
+createEspOverlay()
 
 local function getTable()
 	return EspLibrary and EspLibrary["Table"]
 end
 
-local function lerpColor(a, b, t)
-	return Color3.new(
-		a.R + (b.R - a.R) * t,
-		a.G + (b.G - a.G) * t,
-		a.B + (b.B - a.B) * t
-	)
-end
-
-local function getHealthPercent()
+local function getHealthData()
 	local char = LocalPlayer.Character
-	if not char then return 1 end
+	if not char then return 100, 100 end
 	local hum = char:FindFirstChildOfClass("Humanoid")
-	if not hum then return 1 end
-	return math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+	if not hum then return 100, 100 end
+	return hum.Health, hum.MaxHealth
 end
 
 local function getWeaponName()
 	local char = LocalPlayer.Character
-	if not char then return "" end
+	if not char then return "none" end
 	for _, c in ipairs(char:GetChildren()) do
 		if c:IsA("Tool") then
 			return c.Name
 		end
 	end
-	return "None"
+	return "none"
+end
+
+local function setVisible(obj, visible)
+	if obj and obj.Visible ~= visible then
+		obj.Visible = visible
+	end
 end
 
 local function updatePreview()
 	local Table = getTable()
-	if not Table then
-		glowFrame.Visible = false
-		boxFrame.Visible = false
-		healthHolder.Visible = false
-		nameLabel.Visible = false
-		distLabel.Visible = false
-		weaponLabel.Visible = false
+	if not Table or not previewModel or #previewParts == 0 or not viewport.CurrentCamera then
+		setVisible(Objects["TargetHolder"], false)
 		return
 	end
 
 	local espEnabled = Table["Enabled"]
-	local boxes = Table["Boxes"]
-	local boxesEnabled = boxes and boxes["Enabled"]
-	if not (espEnabled and boxesEnabled and previewModel and #previewParts > 0 and viewport.CurrentCamera) then
-		glowFrame.Visible = false
-		boxFrame.Visible = false
-		healthHolder.Visible = false
-		nameLabel.Visible = false
-		distLabel.Visible = false
-		weaponLabel.Visible = false
+	local boxesCfg = Table["Boxes"]
+	if not (espEnabled and boxesCfg and boxesCfg["Enabled"]) then
+		setVisible(Objects["TargetHolder"], false)
 		return
 	end
 
@@ -342,20 +721,24 @@ local function updatePreview()
 	local anyVisible = false
 
 	for _, part in ipairs(previewParts) do
-		local size = part.Size
-		local cf = part.CFrame
-		local sx, sy, sz = size.X * 0.5, size.Y * 0.5, size.Z * 0.5
-		for x = -1, 1, 2 do
-			for y = -1, 1, 2 do
-				for z = -1, 1, 2 do
-					local corner = cf * CFrame.new(x * sx, y * sy, z * sz)
-					local pos, on = camObj:WorldToViewportPoint(corner.Position)
-					if on and pos.Z > 0 then
-						anyVisible = true
-						minX = math.min(minX, pos.X * vpSize.X)
-						minY = math.min(minY, pos.Y * vpSize.Y)
-						maxX = math.max(maxX, pos.X * vpSize.X)
-						maxY = math.max(maxY, pos.Y * vpSize.Y)
+		if part:IsA("BasePart") and part.Transparency < 1 then
+			local size = part.Size
+			local cf = part.CFrame
+			local sx, sy, sz = size.X * 0.5, size.Y * 0.5, size.Z * 0.5
+			for x = -1, 1, 2 do
+				for y = -1, 1, 2 do
+					for z = -1, 1, 2 do
+						local corner = cf * CFrame.new(x * sx, y * sy, z * sz)
+						local pos, on = camObj:WorldToViewportPoint(corner.Position)
+						if on and pos.Z > 0 then
+							anyVisible = true
+							local px = pos.X * vpSize.X
+							local py = pos.Y * vpSize.Y
+							if px < minX then minX = px end
+							if py < minY then minY = py end
+							if px > maxX then maxX = px end
+							if py > maxY then maxY = py end
+						end
 					end
 				end
 			end
@@ -363,134 +746,250 @@ local function updatePreview()
 	end
 
 	if not anyVisible then
-		glowFrame.Visible = false
-		boxFrame.Visible = false
-		healthHolder.Visible = false
-		nameLabel.Visible = false
-		distLabel.Visible = false
-		weaponLabel.Visible = false
+		setVisible(Objects["TargetHolder"], false)
 		return
 	end
 
-	local pad = 2
-	local boxX = minX
-	local boxY = minY
-	local boxW = math.max(maxX - minX, 2)
-	local boxH = math.max(maxY - minY, 2)
+	local bboxCfg = boxesCfg["Bounding Box"] or {}
+	local padX = bboxCfg["BoxX"] or 0
+	local padY = bboxCfg["BoxY"] or 0
+	local W = math.max(math.floor((maxX - minX) + padX), 2)
+	local H = math.max(math.floor((maxY - minY) + padY), 2)
+	local X = math.floor(minX - (padX * 0.5))
+	local Y = math.floor(minY - (padY * 0.5))
 
-	local gradTop = boxes["Gradients"] and boxes["Gradients"]["Top"] or Color3.fromRGB(0, 255, 255)
-	local gradBot = boxes["Gradients"] and boxes["Gradients"]["Bot"] or Color3.fromRGB(0, 85, 255)
+	local targetHolder = Objects["TargetHolder"]
+	targetHolder.Position = UDim2.fromOffset(X, Y)
+	targetHolder.Size = UDim2.fromOffset(W, H)
+	setVisible(targetHolder, true)
 
-	local boxCfg = boxes
-	local glowCfg = boxCfg["Box Glow"]
+	Objects["BoxGlow"].Size = UDim2.fromOffset(W, H)
+	Objects["BoxOutlineHolder"].Size = UDim2.fromOffset(W, H)
+	Objects["BoxInlineHolder"].Size = UDim2.fromOffset(W + 2, H + 2)
+	Objects["BoxFill"].Size = UDim2.fromOffset(W, H)
+	Objects["CornerHolder"].Size = UDim2.fromOffset(W + 2, H + 2)
+
+	local minDim = math.min(W, H)
+	Objects["BoxOutline"].Thickness = math.clamp(math.floor(minDim * 0.08 + 0.5), 1, 3)
+	Objects["BoxInline"].Thickness = math.clamp(math.floor(minDim * 0.05 + 0.5), 1, 2)
+
+	local gradTop = boxesCfg["Gradients"] and boxesCfg["Gradients"]["Top"] or Color3.fromRGB(0, 255, 255)
+	local gradBot = boxesCfg["Gradients"] and boxesCfg["Gradients"]["Bot"] or Color3.fromRGB(0, 85, 255)
+
+	local glowCfg = boxesCfg["Box Glow"]
 	if glowCfg and glowCfg["Enabled"] then
+		Objects["BoxGlow"].ImageTransparency = 0
 		local glowTop = glowCfg["Top"] or gradTop
 		local glowBot = glowCfg["Bot"] or gradBot
+		Objects["BoxGlowGradient"].Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, glowTop),
+			ColorSequenceKeypoint.new(1, glowBot),
+		})
 		local t1 = glowCfg["Transparency"] and glowCfg["Transparency"][1] or 0.75
 		local t2 = glowCfg["Transparency"] and glowCfg["Transparency"][2] or 0.75
-		glowGradient.Color = ColorSequence.new(glowTop, glowBot)
-		glowGradient.Transparency = NumberSequence.new(t1, t2)
-		glowFrame.Position = UDim2.fromOffset(boxX - pad - 4, boxY - pad - 4)
-		glowFrame.Size = UDim2.fromOffset(boxW + (pad + 4) * 2, boxH + (pad + 4) * 2)
-		glowFrame.Visible = true
+		Objects["BoxGlowGradient"].Transparency = NumberSequence.new(t1, t2)
 	else
-		glowFrame.Visible = false
+		Objects["BoxGlow"].ImageTransparency = 1
 	end
 
-	local filledCfg = boxCfg["Filled"]
-	if filledCfg and filledCfg["Enabled"] then
-		local fillTop = filledCfg["Top"] or gradTop
-		local fillBot = filledCfg["Bot"] or gradBot
-		local t1 = filledCfg["Transparency"] and filledCfg["Transparency"][1] or 1
-		local t2 = filledCfg["Transparency"] and filledCfg["Transparency"][2] or 0.65
-		boxGradient.Color = ColorSequence.new(fillTop, fillBot)
-		boxGradient.Transparency = NumberSequence.new(t1, t2)
-		boxFrame.BackgroundTransparency = 0
+	local boxType = boxesCfg["Type"]
+	if boxType == "Corner" then
+		setVisible(Objects["BoxOutlineHolder"], false)
+		setVisible(Objects["BoxInlineHolder"], false)
+		setVisible(Objects["BoxFill"], false)
+		setVisible(Objects["CornerHolder"], true)
+		for i = 1, 8 do
+			local line = Objects["Line_" .. i]
+			local layout = CornerLayout[i]
+			line.Position = layout[1]
+			line.Size = layout[2]
+			line.AnchorPoint = layout[3]
+			line.Rotation = layout[4]
+			line.BackgroundColor3 = gradTop
+			line.BackgroundTransparency = 0
+			local stroke = line:FindFirstChildOfClass("UIStroke")
+			if stroke then
+				stroke.Color = gradTop
+			end
+			setVisible(line, true)
+		end
 	else
-		boxGradient.Color = ColorSequence.new(gradTop, gradBot)
-		boxGradient.Transparency = NumberSequence.new(1, 1)
-		boxFrame.BackgroundTransparency = 1
-	end
+		setVisible(Objects["CornerHolder"], false)
+		for i = 1, 8 do
+			setVisible(Objects["Line_" .. i], false)
+		end
 
-	local outlineCfg = boxCfg["Outline"]
-	if outlineCfg and outlineCfg["Enabled"] then
-		boxStroke.Color = outlineCfg["Color"] or Color3.fromRGB(0, 0, 0)
-		boxStroke.Thickness = math.clamp(math.floor(math.min(boxW, boxH) * 0.08 + 0.5), 1, 3)
-		boxStroke.Enabled = true
-	else
-		boxStroke.Enabled = false
-	end
+		local outlineCfg = boxesCfg["Outline"]
+		if outlineCfg and outlineCfg["Enabled"] then
+			setVisible(Objects["BoxOutlineHolder"], true)
+			local outlineColor = outlineCfg["Color"] or Color3.fromRGB(0, 0, 0)
+			Objects["BoxOutlineGradient"].Color = ColorSequence.new(outlineColor, outlineColor)
+		else
+			setVisible(Objects["BoxOutlineHolder"], false)
+		end
 
-	boxFrame.Position = UDim2.fromOffset(boxX, boxY)
-	boxFrame.Size = UDim2.fromOffset(boxW, boxH)
-	boxFrame.Visible = true
+		setVisible(Objects["BoxInlineHolder"], true)
+		Objects["BoxInlineGradient"].Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, gradTop),
+			ColorSequenceKeypoint.new(1, gradBot),
+		})
+
+		local filledCfg = boxesCfg["Filled"]
+		if filledCfg and filledCfg["Enabled"] then
+			setVisible(Objects["BoxFill"], true)
+			local fillTop = filledCfg["Top"] or gradTop
+			local fillBot = filledCfg["Bot"] or gradBot
+			Objects["BoxFillGradient"].Color = ColorSequence.new({
+				ColorSequenceKeypoint.new(0, fillTop),
+				ColorSequenceKeypoint.new(1, fillBot),
+			})
+			local ft1 = filledCfg["Transparency"] and filledCfg["Transparency"][1] or 1
+			local ft2 = filledCfg["Transparency"] and filledCfg["Transparency"][2] or 0.65
+			Objects["BoxFillGradient"].Transparency = NumberSequence.new(ft1, ft2)
+		else
+			setVisible(Objects["BoxFill"], false)
+		end
+	end
 
 	local textsCfg = Table["Texts"]
-	local barX = boxX - 10
-	local barW = 4
-	local barH = boxH
-	local hpCfg = Table["Bars"] and Table["Bars"]["Health Bar"]
-	if hpCfg and hpCfg["Enabled"] then
-		healthHolder.Position = UDim2.fromOffset(barX, boxY)
-		healthHolder.Size = UDim2.fromOffset(barW, barH)
-		healthHolder.Visible = true
-		local hp = getHealthPercent()
-		healthFill.Size = UDim2.new(1, 0, hp, 0)
-		healthFill.Position = UDim2.new(0, 0, 1 - hp, 0)
-		local top = hpCfg["Top"] or Color3.fromRGB(0, 255, 0)
-		local mid = hpCfg["Mid"] or Color3.fromRGB(255, 170, 0)
-		local bot = hpCfg["Bot"] or Color3.fromRGB(255, 0, 0)
-		local col
-		if hp > 0.5 then
-			col = lerpColor(mid, top, (hp - 0.5) * 2)
-		else
-			col = lerpColor(bot, mid, hp * 2)
-		end
-		healthFill.BackgroundColor3 = col
-	else
-		healthHolder.Visible = false
-	end
-
 	if textsCfg then
 		local nameCfg = textsCfg["Name"]
 		if nameCfg and nameCfg["Enabled"] then
-			nameLabel.Text = LocalPlayer.DisplayName or LocalPlayer.Name
-			nameLabel.TextColor3 = nameCfg["Color"] or gradTop
-			local tw = TextService:GetTextSize(nameLabel.Text, nameLabel.TextSize, nameLabel.Font, Vector2.new(999, 999)).X
-			nameLabel.Size = UDim2.fromOffset(tw + 2, 14)
-			nameLabel.Position = UDim2.fromOffset(boxX, boxY - 16)
-			nameLabel.Visible = true
+			Objects["TargetName"].Text = LocalPlayer.DisplayName or LocalPlayer.Name
+			Objects["TargetName"].TextColor3 = nameCfg["Color"] or gradTop
+			setVisible(Objects["TargetName"], true)
 		else
-			nameLabel.Visible = false
+			setVisible(Objects["TargetName"], false)
 		end
 
 		local distCfg = textsCfg["Distance"]
 		if distCfg and distCfg["Enabled"] then
-			distLabel.Text = "0st"
-			distLabel.TextColor3 = distCfg["Color"] or Color3.fromRGB(255, 255, 255)
-			local tw = TextService:GetTextSize(distLabel.Text, distLabel.TextSize, distLabel.Font, Vector2.new(999, 999)).X
-			distLabel.Size = UDim2.fromOffset(tw + 2, 14)
-			distLabel.Position = UDim2.fromOffset(boxX, boxY - 30)
-			distLabel.Visible = true
+			Objects["Distance"].Text = "0st"
+			Objects["Distance"].TextColor3 = distCfg["Color"] or Color3.fromRGB(255, 255, 255)
+			setVisible(Objects["Distance"], true)
 		else
-			distLabel.Visible = false
+			setVisible(Objects["Distance"], false)
 		end
 
-		local wepCfg = textsCfg["Weapon"]
-		if wepCfg and wepCfg["Enabled"] then
-			weaponLabel.Text = getWeaponName()
-			weaponLabel.TextColor3 = wepCfg["Color"] or Color3.fromRGB(255, 255, 255)
-			local tw = TextService:GetTextSize(weaponLabel.Text, weaponLabel.TextSize, weaponLabel.Font, Vector2.new(999, 999)).X
-			weaponLabel.Size = UDim2.fromOffset(tw + 2, 14)
-			weaponLabel.Position = UDim2.fromOffset(boxX, boxY + boxH + 2)
-			weaponLabel.Visible = true
+		local weaponCfg = textsCfg["Weapon"]
+		if weaponCfg and weaponCfg["Enabled"] then
+			Objects["Weapon"].Text = getWeaponName()
+			Objects["Weapon"].TextColor3 = weaponCfg["Color"] or Color3.fromRGB(255, 255, 255)
+			setVisible(Objects["Weapon"], true)
 		else
-			weaponLabel.Visible = false
+			setVisible(Objects["Weapon"], false)
 		end
 	else
-		nameLabel.Visible = false
-		distLabel.Visible = false
-		weaponLabel.Visible = false
+		setVisible(Objects["TargetName"], false)
+		setVisible(Objects["Distance"], false)
+		setVisible(Objects["Weapon"], false)
+	end
+
+	local flagsCfg = Table["Flags"]
+	if flagsCfg then
+		local walkCfg = flagsCfg["Walking"]
+		if walkCfg and walkCfg["Enabled"] then
+			Objects["WalkFlag"].Text = walkCfg["Text"] or "Walking"
+			Objects["WalkFlag"].TextColor3 = walkCfg["Color"] or Color3.fromRGB(255, 0, 0)
+			setVisible(Objects["WalkFlag"], true)
+		else
+			setVisible(Objects["WalkFlag"], false)
+		end
+
+		local jumpCfg = flagsCfg["Jumping"]
+		if jumpCfg and jumpCfg["Enabled"] then
+			Objects["JumpFlag"].Text = jumpCfg["Text"] or "Jumping"
+			Objects["JumpFlag"].TextColor3 = jumpCfg["Color"] or Color3.fromRGB(144, 238, 144)
+			setVisible(Objects["JumpFlag"], true)
+		else
+			setVisible(Objects["JumpFlag"], false)
+		end
+
+		local swimCfg = flagsCfg["Swimming"]
+		if swimCfg and swimCfg["Enabled"] then
+			Objects["SwimmingFlag"].Text = swimCfg["Text"] or "Swimming"
+			Objects["SwimmingFlag"].TextColor3 = swimCfg["Color"] or Color3.fromRGB(0, 255, 255)
+			setVisible(Objects["SwimmingFlag"], true)
+		else
+			setVisible(Objects["SwimmingFlag"], false)
+		end
+	else
+		setVisible(Objects["WalkFlag"], false)
+		setVisible(Objects["JumpFlag"], false)
+		setVisible(Objects["SwimmingFlag"], false)
+	end
+
+	local barsCfg = Table["Bars"]
+	local healthCfg = barsCfg and barsCfg["Health Bar"]
+	if healthCfg and healthCfg["Enabled"] then
+		local health, maxHealth = getHealthData()
+		local ratio = math.clamp(health / maxHealth, 0, 1)
+		local position = healthCfg["Position"] or "Left"
+
+		setVisible(Objects["HealthBarHolder"], true)
+		setVisible(Objects["HealthBarOutline"], true)
+
+		local layouts = {
+			Left = {
+				HolderPos = UDim2.new(0, -5, 0, -1),
+				HolderSize = UDim2.new(0, 2, 1, 2),
+				BarAnchor = Vector2.new(0, 1),
+				BarPos = UDim2.new(0, 0, 1, 0),
+				Rotation = 90,
+			},
+			Right = {
+				HolderPos = UDim2.new(1, 3, 0, -1),
+				HolderSize = UDim2.new(0, 2, 1, 2),
+				BarAnchor = Vector2.new(0, 1),
+				BarPos = UDim2.new(0, 0, 1, 0),
+				Rotation = 90,
+			},
+			Bottom = {
+				HolderPos = UDim2.new(0, -1, 1, 3),
+				HolderSize = UDim2.new(1, 2, 0, 2),
+				BarAnchor = Vector2.new(0, 0),
+				BarPos = UDim2.new(0, 0, 0, 0),
+				Rotation = 0,
+			},
+		}
+		local layout = layouts[position] or layouts.Left
+		Objects["HealthBarHolder"].Position = layout.HolderPos
+		Objects["HealthBarHolder"].Size = layout.HolderSize
+		Objects["HealthBar"].AnchorPoint = layout.BarAnchor
+		Objects["HealthBar"].Position = layout.BarPos
+		Objects["HealthBarGradient"].Rotation = layout.Rotation
+
+		local fillSize = position == "Bottom" and UDim2.new(ratio, 0, 1, 0) or UDim2.new(1, 0, ratio, 0)
+		Objects["HealthBar"].Size = fillSize
+
+		local topCol = healthCfg["Top"] or Color3.fromRGB(0, 255, 0)
+		local midCol = healthCfg["Mid"] or Color3.fromRGB(255, 170, 0)
+		local botCol = healthCfg["Bot"] or Color3.fromRGB(255, 0, 0)
+		Objects["HealthBarGradient"].Color = ColorSequence.new({
+			ColorSequenceKeypoint.new(0, topCol),
+			ColorSequenceKeypoint.new(0.5, midCol),
+			ColorSequenceKeypoint.new(1, botCol),
+		})
+
+		local textCfg = healthCfg["Text"]
+		if textCfg and textCfg["Enabled"] then
+			Objects["HealthBarText"].TextColor3 = textCfg["Color"] or Color3.fromRGB(255, 255, 255)
+			Objects["HealthBarText"].Text = tostring(math.floor(health))
+			if position == "Bottom" then
+				Objects["HealthBarText"].Position = UDim2.new(ratio, 0, 1, 4)
+			elseif position == "Right" then
+				Objects["HealthBarText"].Position = UDim2.new(1, 4, 1 - ratio, 0)
+			else
+				Objects["HealthBarText"].Position = UDim2.new(0, -4, 1 - ratio, 0)
+			end
+			setVisible(Objects["HealthBarText"], true)
+		else
+			setVisible(Objects["HealthBarText"], false)
+		end
+	else
+		setVisible(Objects["HealthBarHolder"], false)
+		setVisible(Objects["HealthBarOutline"], false)
+		setVisible(Objects["HealthBarText"], false)
 	end
 end
 
