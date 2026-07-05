@@ -95,25 +95,25 @@ local function IsVisible(character, part)
     local params = RaycastParams.new()
     params.FilterType = Enum.RaycastFilterType.Blacklist
     params.FilterDescendantsInstances = { LocalPlayer.Character, Camera }
-    if Workspace:FindFirstChild("Spawned") and Workspace.Spawned:FindFirstChild("MouseIgnoreFolder") then
+    if Workspace.FindFirstChild(Workspace, "Spawned") and Workspace.Spawned.FindFirstChild(Workspace.Spawned, "MouseIgnoreFolder") then
         table.insert(params.FilterDescendantsInstances, Workspace.Spawned.MouseIgnoreFolder)
     end
 
-    local result = Workspace:Raycast(origin, direction * distance, params)
+    local result = Workspace.Raycast(Workspace, origin, direction * distance, params)
     if not result then
         return true
     end
-    return result.Instance:IsDescendantOf(character)
+    return result.Instance.IsDescendantOf(result.Instance, character)
 end
 
 local function GetClosestTarget()
     local closest = nil
     local closestDist = math.huge
-    local mousePos = UserInputService:GetMouseLocation()
+    local mousePos = UserInputService.GetMouseLocation(UserInputService)
     local fov = Options.SilentAimFov.Value or 100
     local maxDist = Options.SilentAimMaxDistance.Value or 1000
 
-    for _, player in ipairs(Players:GetPlayers()) do
+    for _, player in ipairs(Players.GetPlayers(Players)) do
         if player == LocalPlayer then continue end
         if IsTeammate(player) then continue end
         local character = player.Character
@@ -121,7 +121,7 @@ local function GetClosestTarget()
         local part = GetAimPart(character)
         if not part then continue end
 
-        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+        local screenPos, onScreen = Camera.WorldToViewportPoint(Camera, part.Position)
         if not onScreen then continue end
 
         local screenDist = (Vector2.new(screenPos.X, screenPos.Y) - mousePos).Magnitude
