@@ -10386,6 +10386,7 @@ do
     VisualsClient:AddDropdown('AvatarMorphAccessories', {
         Text = "Current Accessories",
         Values = {},
+        AllowNull = true,
         Callback = function(Value)
             local character = LocalPlayer.Character
             if not character then return end
