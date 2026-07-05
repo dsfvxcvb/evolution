@@ -796,9 +796,7 @@ local function updatePreview()
 	local gradBot = boxesCfg["Gradients"] and boxesCfg["Gradients"]["Bot"] or Color3.fromRGB(0, 85, 255)
 
 	local glowCfg = boxesCfg["Box Glow"]
-	local useGlow = getgenv().ESPPreviewUseGlow
-	if useGlow == nil then useGlow = true end
-	if glowCfg and glowCfg["Enabled"] and useGlow then
+	if glowCfg and glowCfg["Enabled"] then
 		Objects["BoxGlow"].ImageTransparency = 0
 		local glowTop = glowCfg["Top"] or gradTop
 		local glowBot = glowCfg["Bot"] or gradBot
@@ -1117,11 +1115,13 @@ local function syncModern()
 		lastModern = modern
 	end
 
-	local cornerRadius = modern and (Library.ModernCornerRadius or 8) or 6
+	local cornerRadius = modern and (Library.ModernCornerRadius or 8) or 0
 	frameCorner.CornerRadius = UDim.new(0, cornerRadius)
 
 	local glow = frame:FindFirstChild("ModernGlow")
-	if modern then
+	local useGlow = getgenv().ESPPreviewUseGlow
+	if useGlow == nil then useGlow = true end
+	if modern and useGlow then
 		if not glow then
 			glow = Instance.new("UIStroke")
 			glow.Name = "ModernGlow"

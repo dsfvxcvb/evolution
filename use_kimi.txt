@@ -4779,6 +4779,12 @@ Callback = function(Value)
 getgenv().TargetUIAmmoEnd = Value
 end
 })
+pcall(function()
+if CombatTargetUITab and CombatTargetUITab.Frame then
+CombatTargetUITab.Frame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+CombatTargetUITab.Frame.CanvasSize = UDim2.new(0, 0, 0, 0)
+end
+end)
 local function RefreshHighlight()
 if Targeting.Target or SilentAim.Target then
 UpdateHighlight(Targeting.Target or SilentAim.Target)
