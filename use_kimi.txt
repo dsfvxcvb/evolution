@@ -6858,21 +6858,27 @@ ForceHitTracersSection:AddSlider('ForceHitTracersLifetime',{Text = "Lifetime",
     end})
 
 ForceHitTracersSection:AddDropdown('ForceHitTracersTexture',{Text = "Tracer Texture",
-    Values = {"Default", "Hoodcustoms", "laser", "light", "flow"},
+    Values = {"Default", "Hoodcustoms", "laser", "light", "flow", "Drawing"},
     Default = "Hoodcustoms",
     Callback = function(Value)
         if getgenv().FH_TracerConfig then
             local cfg = getgenv().FH_TracerConfig
             local selected = (Options.ForceHitTracersTexture and Options.ForceHitTracersTexture.Value) or "Hoodcustoms"
             cfg.TextureName = selected
-            local textureMap = {
-                ["Default"] = "rbxassetid://130791043",
-                ["Hoodcustoms"] = "rbxassetid://130791043",
-                ["laser"] = "rbxassetid://12781800668",
-                ["light"] = "rbxassetid://2382169232",
-                ["flow"] = "rbxassetid://12788927812"
-            }
-            cfg.Texture = textureMap[selected] or textureMap["Default"]
+
+            if selected == "Drawing" then
+                cfg.Mode = "Drawing"
+            else
+                cfg.Mode = "Beam"
+                local textureMap = {
+                    ["Default"] = "rbxassetid://130791043",
+                    ["Hoodcustoms"] = "rbxassetid://130791043",
+                    ["laser"] = "rbxassetid://12781800668",
+                    ["light"] = "rbxassetid://2382169232",
+                    ["flow"] = "rbxassetid://12788927812"
+                }
+                cfg.Texture = textureMap[selected] or textureMap["Default"]
+            end
         end
     end})
 
@@ -6889,6 +6895,7 @@ do
             Lifetime = 0.8,
             TextureName = "Hoodcustoms",
             Texture = "rbxassetid://130791043",
+            Mode = "Beam",
         }
     end
 
@@ -6973,12 +6980,50 @@ do
 
 
 
+    local function DrawLineTracer(startPos, endPos, cfg)
+        local line = Drawing.new("Line")
+        line.Color = cfg.Color or Color3.fromRGB(255, 50, 50)
+        line.Thickness = 1
+        line.Transparency = 1
+        line.Visible = true
+
+        local cam = Camera
+        local elapsed = 0
+        local conn
+        conn = RunService.RenderStepped:Connect(function(dt)
+            elapsed = elapsed + dt
+            local s, onS = cam:WorldToViewportPoint(startPos)
+            local e, onE = cam:WorldToViewportPoint(endPos)
+
+            if onS or onE then
+                line.Visible = true
+                line.From = Vector2.new(s.X, s.Y)
+                line.To = Vector2.new(e.X, e.Y)
+
+                if elapsed > (cfg.Lifetime or 0.8) then
+                    local fade = math.clamp((elapsed - (cfg.Lifetime or 0.8)) / 0.3, 0, 1)
+                    line.Transparency = 1 - fade
+                    if fade >= 1 then
+                        conn:Disconnect()
+                        line:Destroy()
+                    end
+                end
+            else
+                line.Visible = false
+            end
+        end)
+    end
+
     local function DrawTracer(startPos, endPos)
         local cfg = getgenv().FH_TracerConfig
         if not cfg or not cfg.Enabled then return end
         if (startPos - endPos).Magnitude < 0.1 then return end
 
-        DrawBeamTracer(startPos, endPos, cfg)
+        if cfg.Mode == "Drawing" then
+            DrawLineTracer(startPos, endPos, cfg)
+        else
+            DrawBeamTracer(startPos, endPos, cfg)
+        end
     end
 
     local function ResolveShooterPlayer(arg)
