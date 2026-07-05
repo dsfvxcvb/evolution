@@ -289,6 +289,8 @@ function Library:MakeDraggable(Instance, Cutoff)
     local dragConn = nil;
     local endConn = nil;
     local dragging = false;
+    local dragOffset = nil;
+    local anchorOffset = nil;
 
     Instance.InputBegan:Connect(function(Input)
         if Input.UserInputType ~= Enum.UserInputType.MouseButton1 then
@@ -305,21 +307,24 @@ function Library:MakeDraggable(Instance, Cutoff)
         end;
 
         dragging = true;
+        dragOffset = ObjPos;
+        anchorOffset = Vector2.new(
+            Instance.Size.X.Offset * Instance.AnchorPoint.X,
+            Instance.Size.Y.Offset * Instance.AnchorPoint.Y
+        );
 
         if dragConn then dragConn:Disconnect(); dragConn = nil; end;
         if endConn then endConn:Disconnect(); endConn = nil; end;
 
-        dragConn = InputService.InputChanged:Connect(function(MoveInput)
+        dragConn = RunService.RenderStepped:Connect(function()
             if not dragging then return end;
-            if MoveInput.UserInputType == Enum.UserInputType.MouseMovement then
-                local Pos = MoveInput.Position;
-                Instance.Position = UDim2.new(
-                    0,
-                    Pos.X - ObjPos.X + (Instance.Size.X.Offset * Instance.AnchorPoint.X),
-                    0,
-                    Pos.Y - ObjPos.Y + (Instance.Size.Y.Offset * Instance.AnchorPoint.Y)
-                );
-            end;
+            local Pos = InputService:GetMouseLocation();
+            Instance.Position = UDim2.new(
+                0,
+                Pos.X - dragOffset.X + anchorOffset.X,
+                0,
+                Pos.Y - dragOffset.Y + anchorOffset.Y
+            );
         end);
 
         endConn = InputService.InputEnded:Connect(function(UpInput)
