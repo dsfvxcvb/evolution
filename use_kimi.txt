@@ -10305,15 +10305,26 @@ do
         if not character then return end
         local list = {}
         for _, child in ipairs(character:GetChildren()) do
-            if child:IsA("Accessory") then
+            if child:IsA("Accessory") and child.Name ~= "Accessory" then
                 table.insert(list, child.Name)
             end
         end
+
+        if #list == 0 then
+            list = {" "}
+        end
+
         if Options.AvatarMorphAccessories then
             Options.AvatarMorphAccessories:SetValues(list)
-            pcall(function()
-                Options.AvatarMorphAccessories:SetValue(nil)
-            end)
+            if list[1] == " " then
+                pcall(function()
+                    Options.AvatarMorphAccessories:SetValue(" ")
+                end)
+            else
+                pcall(function()
+                    Options.AvatarMorphAccessories:SetValue(nil)
+                end)
+            end
         end
     end
 
@@ -10365,7 +10376,7 @@ do
     })
 
     VisualsClient:AddInput('AvatarMorphAccessoryId', {
-        Text = "ID",
+        Text = "Accessory ID",
         Default = "",
         Numeric = true,
         Callback = function(Value)
@@ -10385,9 +10396,11 @@ do
 
     VisualsClient:AddDropdown('AvatarMorphAccessories', {
         Text = "Current Accessories",
-        Values = {},
+        Values = {" "},
+        Default = " ",
         AllowNull = true,
         Callback = function(Value)
+            if Value == " " then return end
             local character = LocalPlayer.Character
             if not character then return end
             local accessory = character:FindFirstChild(Value)
@@ -10646,7 +10659,11 @@ MenuGroup:AddToggle('ModernUI', {
         if Library.SetModern then
             Library:SetModern(Value)
         end
-        task.delay(0.05, UpdateMenuGlow)
+        task.delay(0.05, function()
+            if UpdateMenuGlow then
+                UpdateMenuGlow()
+            end
+        end)
     end
 })
 
