@@ -6953,11 +6953,13 @@ do
         beam.Color = ColorSequence.new(startColor, endColor)
 
         beam.Texture = cfg.Texture or "rbxassetid://130791043"
-        beam.TextureMode = Enum.TextureMode.Stretch
-        beam.TextureLength = 1
-        beam.Width0 = 1
-        beam.Width1 = 1
+        beam.TextureMode = Enum.TextureMode.Wrap
+        beam.TextureLength = 5
+        beam.Width0 = 0.5
+        beam.Width1 = 0.5
         beam.FaceCamera = true
+        beam.LightEmission = 1
+        beam.LightInfluence = 0
 
         local t0 = cfg.UseGradient and 0 or 0
         local t1 = cfg.UseGradient and 1 or 0
@@ -7041,53 +7043,29 @@ do
         end
     end
 
-    local function ResolveShooterPlayer(arg)
-        if typeof(arg) == "Instance" and arg:IsA("Player") then
-            return arg
-        elseif typeof(arg) == "string" then
-            return Players:FindFirstChild(arg)
-        elseif typeof(arg) == "table" then
-            for _, v in pairs(arg) do
-                local p = ResolveShooterPlayer(v)
-                if p then return p end
-            end
-        end
-        return nil
-    end
+    local BulletRayConnection = nil
+    local function ProcessBulletRay(beam)
+        if beam.Name ~= "BULLET_RAYS" or not beam:IsA("Beam") then return end
+        if beam:GetAttribute("OwnerCharacter") ~= LocalPlayer.Name then return end
 
-    local function OnBulletRayReplicated(...)
-        local args = {...}
-        if args[1] ~= "ReplicateBulletRay" then return end
+        local cfg = getgenv().FH_TracerConfig
+        if not cfg or not cfg.Enabled then return end
 
-        local positions = args[2]
-        local shooter = ResolveShooterPlayer(args[3])
-        if typeof(positions) ~= "table" or shooter ~= LocalPlayer then return end
+        local att0 = beam.Attachment0
+        local att1 = beam.Attachment1
+        if not att0 or not att1 then return end
 
-        local startPos = positions[1]
-        local endPos = positions[2]
-        if typeof(startPos) ~= "Vector3" or typeof(endPos) ~= "Vector3" then return end
+        local startPos = att0.WorldPosition
+        local endPos = att1.WorldPosition
+        if (startPos - endPos).Magnitude < 0.1 then return end
+
+        task.defer(function()
+            beam:Destroy()
+        end)
 
         DrawTracer(startPos, endPos)
     end
 
-    local lastRayTick = 0
-    local function OnBulletRayDebounced(...)
-        local now = tick()
-        if now - lastRayTick < 0.03 then return end
-        lastRayTick = now
-        OnBulletRayReplicated(...)
-    end
-
-    if UnreliableMainEvent and UnreliableMainEvent:IsA("RemoteEvent") then
-        UnreliableMainEvent.OnClientEvent:Connect(OnBulletRayDebounced)
-    else
-        local mainEvent = ReplicatedStorage:FindFirstChild("MainEvent")
-        if mainEvent and mainEvent:IsA("RemoteEvent") then
-            mainEvent.OnClientEvent:Connect(OnBulletRayDebounced)
-        end
-    end
-
-    local BulletRayConnection = nil
     local function DestroyDefaultBulletRays()
         local cfg = getgenv().FH_TracerConfig
         if not cfg or not cfg.Enabled then return end
@@ -7105,14 +7083,9 @@ do
         end
 
         BulletRayConnection = workspace.DescendantAdded:Connect(function(child)
-            if child.Name ~= "BULLET_RAYS" then return end
-
-            local cfg = getgenv().FH_TracerConfig
-            if not cfg or not cfg.Enabled then return end
-
-            task.defer(function()
-                child:Destroy()
-            end)
+            if child.Name == "BULLET_RAYS" and child:IsA("Beam") then
+                ProcessBulletRay(child)
+            end
         end)
     end
 
