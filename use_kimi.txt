@@ -12262,7 +12262,7 @@ end
 end
 getgenv().VisualsTab = Tabs.Visuals
 InitializeESP()
-loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/evolution/main/ESPPreview.lua'))()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/evolution/main/ESPPreview.lua?nocache=' .. tostring(tick())))()
 SaveManager:LoadAutoloadConfig()
 -- Force the knife hitbox expander on by default so aura modes don't whiff.
 if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then

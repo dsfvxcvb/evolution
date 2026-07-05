@@ -1,6 +1,14 @@
+warn("[ESPPreview] module loaded")
+
 local EspLibrary = getgenv().EspLibrary
 local VisualsTab = getgenv().VisualsTab
 local Library = getgenv().Library
+
+warn("[ESPPreview] getgenv vars", tostring(EspLibrary), tostring(VisualsTab), tostring(Library))
+if Library then
+	warn("[ESPPreview] Library.Modern", tostring(Library.Modern))
+end
+
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
@@ -21,12 +29,23 @@ local AccentColor = getColor("AccentColor", Color3.fromRGB(0, 85, 255))
 local OutlineColor = getColor("OutlineColor", Color3.fromRGB(50, 50, 50))
 local FontColor = getColor("FontColor", Color3.new(1, 1, 1))
 
+warn("[ESPPreview] colors", tostring(MainColor), tostring(AccentColor), tostring(OutlineColor))
+
 local previewGui = Instance.new("ScreenGui")
 previewGui.Name = "ESPPreview"
 previewGui.ResetOnSpawn = false
 previewGui.IgnoreGuiInset = true
 previewGui.Enabled = false
-previewGui.Parent = typeof(gethui) == "function" and gethui() or CoreGui
+
+local parent = CoreGui
+if typeof(gethui) == "function" then
+	local ok, hui = pcall(gethui)
+	if ok and hui then
+		parent = hui
+	end
+end
+previewGui.Parent = parent
+warn("[ESPPreview] parent", parent.Name)
 
 local frame = Instance.new("Frame")
 frame.Name = "PreviewFrame"
@@ -101,6 +120,7 @@ viewport.LightDirection = Vector3.new(1, 1, -1)
 local cam = Instance.new("Camera")
 cam.FieldOfView = 70
 viewport.CurrentCamera = cam
+warn("[ESPPreview] viewport created", viewport.Name)
 
 local previewModel = nil
 local previewParts = {}
@@ -128,15 +148,19 @@ local function flattenModel(model)
 end
 
 local function setupModel(char)
+	warn("[ESPPreview] setupModel called", char and char.Name or "nil")
 	clearModel()
 	if not char then return end
 
 	local ok, archivable = pcall(function() return char.Archivable end)
+	warn("[ESPPreview] char.Archivable", ok, archivable)
 	if ok and not archivable then
-		pcall(function() char.Archivable = true end)
+		local setOk = pcall(function() char.Archivable = true end)
+		warn("[ESPPreview] set Archivable", setOk)
 	end
 
 	local ok2, clone = pcall(function() return char:Clone() end)
+	warn("[ESPPreview] clone ok", ok2, "clone", tostring(clone))
 	if not ok2 or not clone then return end
 
 	for _, desc in ipairs(clone:GetDescendants()) do
@@ -146,6 +170,7 @@ local function setupModel(char)
 	end
 
 	local parts = flattenModel(clone)
+	warn("[ESPPreview] part count", #parts)
 	if #parts == 0 then
 		clone:Destroy()
 		return
@@ -166,11 +191,13 @@ local function setupModel(char)
 		or clone:FindFirstChild("UpperTorso")
 		or clone:FindFirstChildOfClass("BasePart")
 	clone.PrimaryPart = primary
+	warn("[ESPPreview] primary", primary and primary.Name or "nil")
 
 	clone:PivotTo(CFrame.new(0, 0, 0))
 	clone.Parent = viewport
 	previewModel = clone
 	previewParts = parts
+	warn("[ESPPreview] model parented to viewport")
 
 	local minPos, maxPos = Vector3.zero, Vector3.zero
 	local first = true
@@ -203,6 +230,7 @@ local function setupModel(char)
 	local maxDim = math.max(size.X, size.Y)
 	local distance = (maxDim / (2 * math.tan(math.rad(cam.FieldOfView) * 0.5))) * 1.25 + size.Z * 0.5
 	cam.CFrame = CFrame.new(center + Vector3.new(0, 0, distance), center)
+	warn("[ESPPreview] camera set", tostring(cam.CFrame))
 end
 
 RunService.RenderStepped:Connect(function()
@@ -241,11 +269,16 @@ local function getTable()
 	return EspLibrary and EspLibrary["Table"]
 end
 
+local updateCount = 0
 local function updatePreview()
 	local Table = getTable()
 	if not Table then
 		box.Visible = false
 		nameLabel.Visible = false
+		if updateCount % 120 == 0 then
+			warn("[ESPPreview] no Table")
+		end
+		updateCount = updateCount + 1
 		return
 	end
 
@@ -255,6 +288,10 @@ local function updatePreview()
 	if not (espEnabled and boxesEnabled and previewModel and #previewParts > 0 and viewport.CurrentCamera) then
 		box.Visible = false
 		nameLabel.Visible = false
+		if updateCount % 120 == 0 then
+			warn("[ESPPreview] skip", espEnabled, boxesEnabled, previewModel and true or false, #previewParts)
+		end
+		updateCount = updateCount + 1
 		return
 	end
 
@@ -312,7 +349,20 @@ RunService.RenderStepped:Connect(updatePreview)
 LocalPlayer.CharacterAdded:Connect(setupModel)
 if LocalPlayer.Character then
 	setupModel(LocalPlayer.Character)
+else
+	warn("[ESPPreview] no character at load, waiting...")
 end
+
+task.spawn(function()
+	local waited = 0
+	while not LocalPlayer.Character and waited < 10 do
+		waited = waited + task.wait(0.5)
+	end
+	if LocalPlayer.Character then
+		warn("[ESPPreview] character arrived after wait")
+		setupModel(LocalPlayer.Character)
+	end
+end)
 
 if Library and typeof(Library.AddToRegistry) == "function" then
 	pcall(function()
@@ -330,11 +380,13 @@ end
 if VisualsTab and VisualsTab.Frame then
 	local function onTabVisibility()
 		previewGui.Enabled = VisualsTab.Frame.Visible
+		warn("[ESPPreview] visibility", previewGui.Enabled)
 	end
 	VisualsTab.Frame:GetPropertyChangedSignal("Visible"):Connect(onTabVisibility)
 	onTabVisibility()
 else
 	previewGui.Enabled = true
+	warn("[ESPPreview] VisualsTab missing, enabling anyway")
 end
 
 local dragging, dragStart, startPos = false, nil, nil
@@ -381,8 +433,10 @@ end)
 local lastModern = nil
 local function syncModern()
 	local modern = Library and Library.Modern
-	if modern == lastModern then return end
-	lastModern = modern
+	if modern ~= lastModern then
+		lastModern = modern
+		warn("[ESPPreview] modern changed", tostring(modern))
+	end
 
 	local cornerRadius = modern and (Library.ModernCornerRadius or 8) or 6
 	frameCorner.CornerRadius = UDim.new(0, cornerRadius)
@@ -396,10 +450,12 @@ local function syncModern()
 			glow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
 			glow.LineJoinMode = Enum.LineJoinMode.Round
 			glow.Parent = frame
+			warn("[ESPPreview] added glow")
 		end
 		glow.Color = getColor("AccentColor", AccentColor)
 	elseif glow then
 		glow:Destroy()
+		warn("[ESPPreview] removed glow")
 	end
 end
 RunService.RenderStepped:Connect(syncModern)
