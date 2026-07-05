@@ -38,7 +38,7 @@ previewGui.Parent = parent
 
 local frame = Instance.new("Frame")
 frame.Name = "PreviewFrame"
-frame.Size = UDim2.fromOffset(280, 340)
+frame.Size = UDim2.fromOffset(300, 360)
 frame.Position = UDim2.fromOffset(100, 100)
 frame.BackgroundColor3 = MainColor
 frame.BorderSizePixel = 0
@@ -219,41 +219,106 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
-local box = Instance.new("Frame")
-box.Name = "ESPBox"
-box.BorderSizePixel = 0
-box.BackgroundTransparency = 0.8
-box.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-box.Visible = false
-box.ZIndex = 10
-box.Parent = viewport
+local function createGradientFrame(name, parentFrame, z)
+	local f = Instance.new("Frame")
+	f.Name = name
+	f.BorderSizePixel = 0
+	f.BackgroundColor3 = Color3.new(1, 1, 1)
+	f.Visible = false
+	f.ZIndex = z or 1
+	f.Parent = parentFrame
 
+	local g = Instance.new("UIGradient")
+	g.Name = "Gradient"
+	g.Parent = f
+
+	local c = Instance.new("UICorner")
+	c.CornerRadius = UDim.new(0, 2)
+	c.Parent = f
+	return f, g
+end
+
+local glowFrame, glowGradient = createGradientFrame("Glow", viewport, 5)
+local boxFrame, boxGradient = createGradientFrame("BoxFill", viewport, 6)
 local boxStroke = Instance.new("UIStroke")
-boxStroke.Color = Color3.fromRGB(0, 255, 255)
 boxStroke.Thickness = 1
-boxStroke.Parent = box
+boxStroke.Parent = boxFrame
 
-local nameLabel = Instance.new("TextLabel")
-nameLabel.Name = "ESPName"
-nameLabel.Text = LocalPlayer.DisplayName or LocalPlayer.Name
-nameLabel.Font = Enum.Font.Code
-nameLabel.TextSize = 12
-nameLabel.BackgroundTransparency = 1
-nameLabel.Size = UDim2.fromOffset(120, 14)
-nameLabel.Visible = false
-nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-nameLabel.ZIndex = 10
-nameLabel.Parent = viewport
+local healthHolder = Instance.new("Frame")
+healthHolder.Name = "HealthHolder"
+healthHolder.BorderSizePixel = 0
+healthHolder.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+healthHolder.Visible = false
+healthHolder.ZIndex = 6
+healthHolder.Parent = viewport
+
+local healthFill = Instance.new("Frame")
+healthFill.Name = "HealthFill"
+healthFill.BorderSizePixel = 0
+healthFill.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+healthFill.Size = UDim2.new(1, 0, 1, 0)
+healthFill.Position = UDim2.new(0, 0, 0, 0)
+healthFill.ZIndex = 7
+healthFill.Parent = healthHolder
+
+local function createText(name)
+	local lbl = Instance.new("TextLabel")
+	lbl.Name = name
+	lbl.Font = Enum.Font.Code
+	lbl.TextSize = 12
+	lbl.BackgroundTransparency = 1
+	lbl.Size = UDim2.fromOffset(120, 14)
+	lbl.Visible = false
+	lbl.TextXAlignment = Enum.TextXAlignment.Left
+	lbl.ZIndex = 8
+	lbl.Parent = viewport
+	return lbl
+end
+
+local nameLabel = createText("ESPName")
+local distLabel = createText("ESPDistance")
+local weaponLabel = createText("ESPWeapon")
 
 local function getTable()
 	return EspLibrary and EspLibrary["Table"]
 end
 
+local function lerpColor(a, b, t)
+	return Color3.new(
+		a.R + (b.R - a.R) * t,
+		a.G + (b.G - a.G) * t,
+		a.B + (b.B - a.B) * t
+	)
+end
+
+local function getHealthPercent()
+	local char = LocalPlayer.Character
+	if not char then return 1 end
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not hum then return 1 end
+	return math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+end
+
+local function getWeaponName()
+	local char = LocalPlayer.Character
+	if not char then return "" end
+	for _, c in ipairs(char:GetChildren()) do
+		if c:IsA("Tool") then
+			return c.Name
+		end
+	end
+	return "None"
+end
+
 local function updatePreview()
 	local Table = getTable()
 	if not Table then
-		box.Visible = false
+		glowFrame.Visible = false
+		boxFrame.Visible = false
+		healthHolder.Visible = false
 		nameLabel.Visible = false
+		distLabel.Visible = false
+		weaponLabel.Visible = false
 		return
 	end
 
@@ -261,15 +326,14 @@ local function updatePreview()
 	local boxes = Table["Boxes"]
 	local boxesEnabled = boxes and boxes["Enabled"]
 	if not (espEnabled and boxesEnabled and previewModel and #previewParts > 0 and viewport.CurrentCamera) then
-		box.Visible = false
+		glowFrame.Visible = false
+		boxFrame.Visible = false
+		healthHolder.Visible = false
 		nameLabel.Visible = false
+		distLabel.Visible = false
+		weaponLabel.Visible = false
 		return
 	end
-
-	local topColor = boxes["Gradients"] and boxes["Gradients"]["Top"] or Color3.fromRGB(0, 255, 255)
-	box.BackgroundColor3 = topColor
-	boxStroke.Color = topColor
-	nameLabel.TextColor3 = topColor
 
 	local camObj = viewport.CurrentCamera
 	local vpSize = viewport.AbsoluteSize
@@ -299,21 +363,135 @@ local function updatePreview()
 	end
 
 	if not anyVisible then
-		box.Visible = false
+		glowFrame.Visible = false
+		boxFrame.Visible = false
+		healthHolder.Visible = false
 		nameLabel.Visible = false
+		distLabel.Visible = false
+		weaponLabel.Visible = false
 		return
 	end
 
-	local width = math.max(maxX - minX, 2)
-	local height = math.max(maxY - minY, 2)
-	box.Position = UDim2.fromOffset(minX, minY)
-	box.Size = UDim2.fromOffset(width, height)
-	box.Visible = true
+	local pad = 2
+	local boxX = minX
+	local boxY = minY
+	local boxW = math.max(maxX - minX, 2)
+	local boxH = math.max(maxY - minY, 2)
 
-	local nameWidth = TextService:GetTextSize(nameLabel.Text, nameLabel.TextSize, nameLabel.Font, Vector2.new(999, 999)).X
-	nameLabel.Size = UDim2.fromOffset(nameWidth + 2, 14)
-	nameLabel.Position = UDim2.fromOffset(minX, minY - 16)
-	nameLabel.Visible = true
+	local gradTop = boxes["Gradients"] and boxes["Gradients"]["Top"] or Color3.fromRGB(0, 255, 255)
+	local gradBot = boxes["Gradients"] and boxes["Gradients"]["Bot"] or Color3.fromRGB(0, 85, 255)
+
+	local boxCfg = boxes
+	local glowCfg = boxCfg["Box Glow"]
+	if glowCfg and glowCfg["Enabled"] then
+		local glowTop = glowCfg["Top"] or gradTop
+		local glowBot = glowCfg["Bot"] or gradBot
+		local t1 = glowCfg["Transparency"] and glowCfg["Transparency"][1] or 0.75
+		local t2 = glowCfg["Transparency"] and glowCfg["Transparency"][2] or 0.75
+		glowGradient.Color = ColorSequence.new(glowTop, glowBot)
+		glowGradient.Transparency = NumberSequence.new(t1, t2)
+		glowFrame.Position = UDim2.fromOffset(boxX - pad - 4, boxY - pad - 4)
+		glowFrame.Size = UDim2.fromOffset(boxW + (pad + 4) * 2, boxH + (pad + 4) * 2)
+		glowFrame.Visible = true
+	else
+		glowFrame.Visible = false
+	end
+
+	local filledCfg = boxCfg["Filled"]
+	if filledCfg and filledCfg["Enabled"] then
+		local fillTop = filledCfg["Top"] or gradTop
+		local fillBot = filledCfg["Bot"] or gradBot
+		local t1 = filledCfg["Transparency"] and filledCfg["Transparency"][1] or 1
+		local t2 = filledCfg["Transparency"] and filledCfg["Transparency"][2] or 0.65
+		boxGradient.Color = ColorSequence.new(fillTop, fillBot)
+		boxGradient.Transparency = NumberSequence.new(t1, t2)
+		boxFrame.BackgroundTransparency = 0
+	else
+		boxGradient.Color = ColorSequence.new(gradTop, gradBot)
+		boxGradient.Transparency = NumberSequence.new(1, 1)
+		boxFrame.BackgroundTransparency = 1
+	end
+
+	local outlineCfg = boxCfg["Outline"]
+	if outlineCfg and outlineCfg["Enabled"] then
+		boxStroke.Color = outlineCfg["Color"] or Color3.fromRGB(0, 0, 0)
+		boxStroke.Thickness = math.clamp(math.floor(math.min(boxW, boxH) * 0.08 + 0.5), 1, 3)
+		boxStroke.Enabled = true
+	else
+		boxStroke.Enabled = false
+	end
+
+	boxFrame.Position = UDim2.fromOffset(boxX, boxY)
+	boxFrame.Size = UDim2.fromOffset(boxW, boxH)
+	boxFrame.Visible = true
+
+	local textsCfg = Table["Texts"]
+	local barX = boxX - 10
+	local barW = 4
+	local barH = boxH
+	local hpCfg = Table["Bars"] and Table["Bars"]["Health Bar"]
+	if hpCfg and hpCfg["Enabled"] then
+		healthHolder.Position = UDim2.fromOffset(barX, boxY)
+		healthHolder.Size = UDim2.fromOffset(barW, barH)
+		healthHolder.Visible = true
+		local hp = getHealthPercent()
+		healthFill.Size = UDim2.new(1, 0, hp, 0)
+		healthFill.Position = UDim2.new(0, 0, 1 - hp, 0)
+		local top = hpCfg["Top"] or Color3.fromRGB(0, 255, 0)
+		local mid = hpCfg["Mid"] or Color3.fromRGB(255, 170, 0)
+		local bot = hpCfg["Bot"] or Color3.fromRGB(255, 0, 0)
+		local col
+		if hp > 0.5 then
+			col = lerpColor(mid, top, (hp - 0.5) * 2)
+		else
+			col = lerpColor(bot, mid, hp * 2)
+		end
+		healthFill.BackgroundColor3 = col
+	else
+		healthHolder.Visible = false
+	end
+
+	if textsCfg then
+		local nameCfg = textsCfg["Name"]
+		if nameCfg and nameCfg["Enabled"] then
+			nameLabel.Text = LocalPlayer.DisplayName or LocalPlayer.Name
+			nameLabel.TextColor3 = nameCfg["Color"] or gradTop
+			local tw = TextService:GetTextSize(nameLabel.Text, nameLabel.TextSize, nameLabel.Font, Vector2.new(999, 999)).X
+			nameLabel.Size = UDim2.fromOffset(tw + 2, 14)
+			nameLabel.Position = UDim2.fromOffset(boxX, boxY - 16)
+			nameLabel.Visible = true
+		else
+			nameLabel.Visible = false
+		end
+
+		local distCfg = textsCfg["Distance"]
+		if distCfg and distCfg["Enabled"] then
+			distLabel.Text = "0st"
+			distLabel.TextColor3 = distCfg["Color"] or Color3.fromRGB(255, 255, 255)
+			local tw = TextService:GetTextSize(distLabel.Text, distLabel.TextSize, distLabel.Font, Vector2.new(999, 999)).X
+			distLabel.Size = UDim2.fromOffset(tw + 2, 14)
+			distLabel.Position = UDim2.fromOffset(boxX, boxY - 30)
+			distLabel.Visible = true
+		else
+			distLabel.Visible = false
+		end
+
+		local wepCfg = textsCfg["Weapon"]
+		if wepCfg and wepCfg["Enabled"] then
+			weaponLabel.Text = getWeaponName()
+			weaponLabel.TextColor3 = wepCfg["Color"] or Color3.fromRGB(255, 255, 255)
+			local tw = TextService:GetTextSize(weaponLabel.Text, weaponLabel.TextSize, weaponLabel.Font, Vector2.new(999, 999)).X
+			weaponLabel.Size = UDim2.fromOffset(tw + 2, 14)
+			weaponLabel.Position = UDim2.fromOffset(boxX, boxY + boxH + 2)
+			weaponLabel.Visible = true
+		else
+			weaponLabel.Visible = false
+		end
+	else
+		nameLabel.Visible = false
+		distLabel.Visible = false
+		weaponLabel.Visible = false
+	end
 end
 
 RunService.RenderStepped:Connect(updatePreview)
