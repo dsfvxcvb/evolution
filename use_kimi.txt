@@ -11960,6 +11960,8 @@ local HitLogsScript2 = {
         Color3.fromRGB(77, 255, 124),
         Color3.fromRGB(255, 241, 77),
         Color3.fromRGB(255, 119, 242),
+        Color3.fromRGB(157, 77, 255),
+        Color3.fromRGB(77, 242, 255),
     }
 }
 
@@ -11987,8 +11989,6 @@ VisualsHitLogs:AddInput('HitLogsCustomText', {
         HitLogsScript2.CustomText = Value
     end
 })
-
-VisualsHitLogs:AddLabel('Words are colored 1, 2, 3...')
 
 VisualsHitLogs:AddToggle('HitLogsWordColorsToggle', {
     Text = "",
@@ -12024,7 +12024,21 @@ VisualsHitLogs:AddToggle('HitLogsWordColorsToggle', {
     Callback = function(Value)
         HitLogsScript2.WordColors[5] = Value or HitLogsScript2.WordColors[5]
     end
+}):AddColorPicker('HitLogsWord6Color', {
+    Title = "Word 6",
+    Default = HitLogsScript2.WordColors[6],
+    Callback = function(Value)
+        HitLogsScript2.WordColors[6] = Value or HitLogsScript2.WordColors[6]
+    end
+}):AddColorPicker('HitLogsWord7Color', {
+    Title = "Word 7",
+    Default = HitLogsScript2.WordColors[7],
+    Callback = function(Value)
+        HitLogsScript2.WordColors[7] = Value or HitLogsScript2.WordColors[7]
+    end
 })
+
+VisualsHitLogs:AddLabel('Word 1 | Word 2 | Word 3 | Word 4 | Word 5 | Word 6 | Word 7')
 
 local notifications = {}
 local BASE_Y = -120
