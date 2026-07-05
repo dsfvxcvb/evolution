@@ -11990,11 +11990,7 @@ VisualsHitLogs:AddInput('HitLogsCustomText', {
     end
 })
 
-VisualsHitLogs:AddToggle('HitLogsWordColorsToggle', {
-    Text = "",
-    Default = false,
-    Callback = function(Value) end
-}):AddColorPicker('HitLogsWord1Color', {
+VisualsHitLogs:AddColorPicker('HitLogsWord1Color', {
     Title = "Word 1",
     Default = HitLogsScript2.WordColors[1],
     Callback = function(Value)

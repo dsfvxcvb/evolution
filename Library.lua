@@ -1554,6 +1554,14 @@ do
         return Label;
     end;
 
+    function Funcs:AddColorPicker(Idx, Info)
+        assert(Info.Default, 'AddColorPicker: Missing default value.')
+
+        local Label = self:AddLabel(Info.Text or '')
+        Label:AddColorPicker(Idx, Info)
+        return Label
+    end;
+
     function Funcs:AddButton(...)
         -- TODO: Eventually redo this
         local Button = {};
