@@ -10268,16 +10268,31 @@ do
         end
     })
 
+    local function resolveUserId(input)
+        local num = tonumber(input)
+        if num then
+            return num
+        end
+        local ok, userId = pcall(function()
+            return Players:GetUserIdFromNameAsync(input)
+        end)
+        if ok and userId then
+            return userId
+        end
+        warn("[AvatarMorph] Invalid user ID or username:", input)
+        return nil
+    end
+
     VisualsClient:AddInput('AvatarMorphUserId', {
-        Text = "Morph User ID",
+        Text = "Morph User ID / Username",
         Default = "5042596195",
-        Numeric = true,
+        Numeric = false,
         Callback = function(Value)
-            local num = tonumber(Value)
-            if num then
-                AvatarMorph.UserId = num
+            local userId = resolveUserId(Value)
+            if userId then
+                AvatarMorph.UserId = userId
                 if AvatarMorph.Enabled then
-                    applyAvatarMorph(num)
+                    applyAvatarMorph(userId)
                 end
             end
         end
