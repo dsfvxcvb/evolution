@@ -1,5 +1,6 @@
 -- ============================================
 -- MAIN SCRIPT
+print("evolution")
 -- ============================================
 local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
 print("aids")
