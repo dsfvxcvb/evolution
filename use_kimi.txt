@@ -11954,9 +11954,13 @@ local HitLogsScript2 = {
     Enabled = false,
     CustomTextEnabled = false,
     CustomText = '[evolution] Hit "{target}" for {damage} damage.',
-    TargetColor = Color3.fromRGB(255, 74, 74),
-    DamageColor = Color3.fromRGB(77, 163, 255),
-    ColorPlaceholders = false
+    WordColors = {
+        Color3.fromRGB(255, 74, 74),
+        Color3.fromRGB(77, 163, 255),
+        Color3.fromRGB(77, 255, 124),
+        Color3.fromRGB(255, 241, 77),
+        Color3.fromRGB(255, 119, 242),
+    }
 }
 
 VisualsHitLogs:AddToggle('HitLogsScript2Enabled', {
@@ -11984,28 +11988,18 @@ VisualsHitLogs:AddInput('HitLogsCustomText', {
     end
 })
 
-VisualsHitLogs:AddToggle('HitLogsColorPlaceholders', {
-    Text = "Color Placeholders",
-    Default = false,
-    Callback = function(Value)
-        HitLogsScript2.ColorPlaceholders = Value
-    end
-}):AddColorPicker('HitLogsTargetColor', {
-    Title = "Target Color",
-    Default = Color3.fromRGB(255, 74, 74),
-    Callback = function(Value)
-        HitLogsScript2.TargetColor = Value or Color3.fromRGB(255, 74, 74)
-    end
-}):AddColorPicker('HitLogsDamageColor', {
-    Title = "Damage Color",
-    Default = Color3.fromRGB(77, 163, 255),
-    Callback = function(Value)
-        HitLogsScript2.DamageColor = Value or Color3.fromRGB(77, 163, 255)
-    end
-})
-
 VisualsHitLogs:AddLabel('Placeholders: {target} | {damage}')
-VisualsHitLogs:AddLabel('Color tags: [red]word[/red], [blue]word[/blue], [green], [yellow], [white], [pink], [cyan], [purple]')
+VisualsHitLogs:AddLabel('Use [1]word[/1], [2]word[/2], etc.')
+
+for i = 1, 5 do
+    VisualsHitLogs:AddLabel('Word ' .. i):AddColorPicker('HitLogsWord' .. i .. 'Color', {
+        Title = "Word " .. i,
+        Default = HitLogsScript2.WordColors[i],
+        Callback = function(Value)
+            HitLogsScript2.WordColors[i] = Value or HitLogsScript2.WordColors[i]
+        end
+    })
+end
 
 local notifications = {}
 local BASE_Y = -120
@@ -12057,14 +12051,10 @@ local function CreateScript2HitMessage(targetName, damage)
         return string.format("#%02X%02X%02X", math.floor(c.R * 255), math.floor(c.G * 255), math.floor(c.B * 255))
     end
 
-    local function applyColorTags(text)
-        local tags = {
-            red = "#FF4A4A", blue = "#4DA3FF", green = "#4DFF4D",
-            yellow = "#FFFF4D", white = "#EAEAEA", black = "#000000",
-            pink = "#FF4DFF", cyan = "#4DFFFF", purple = "#9D4DFF"
-        }
-        for name, hex in pairs(tags) do
-            text = text:gsub("%[" .. name .. "%](.-)%[/%" .. name .. "%]", string.format('<font color="%s">%%1</font>', hex))
+    local function applyWordColors(text)
+        for i, color in ipairs(HitLogsScript2.WordColors) do
+            local hex = colorToHex(color)
+            text = text:gsub("%[" .. i .. "%](.-)%[/%" .. i .. "%]", string.format('<font color="%s">%%1</font>', hex))
         end
         return text
     end
@@ -12072,15 +12062,8 @@ local function CreateScript2HitMessage(targetName, damage)
     local messageText
     if HitLogsScript2.CustomTextEnabled then
         local template = HitLogsScript2.CustomText or '[evolution] Hit "{target}" for {damage} damage.'
-        if HitLogsScript2.ColorPlaceholders then
-            local targetColor = colorToHex(HitLogsScript2.TargetColor or Color3.fromRGB(255, 74, 74))
-            local damageColor = colorToHex(HitLogsScript2.DamageColor or Color3.fromRGB(77, 163, 255))
-            template = template:gsub("{target}", string.format('<font color="%s">%s</font>', targetColor, targetName))
-            template = template:gsub("{damage}", string.format('<font color="%s">%s</font>', damageColor, tostring(math.floor(damage or 0))))
-            messageText = applyColorTags(template)
-        else
-            messageText = applyColorTags(template:gsub("{target}", targetName):gsub("{damage}", tostring(math.floor(damage or 0))))
-        end
+        template = template:gsub("{target}", targetName):gsub("{damage}", tostring(math.floor(damage or 0)))
+        messageText = applyWordColors(template)
     else
         messageText = string.format(
             '<font color="#EAEAEA">[evolution] Hit </font><font color="#FF4A4A">"%s"</font><font color="#4DA3FF"> for %d </font><font color="#EAEAEA">damage.</font>',
