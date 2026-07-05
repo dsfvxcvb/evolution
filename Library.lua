@@ -1558,6 +1558,10 @@ do
         assert(Info.Default, 'AddColorPicker: Missing default value.')
 
         local Label = self:AddLabel(Info.Text or '')
+        local layout = Label.TextLabel:FindFirstChildOfClass('UIListLayout')
+        if layout then
+            layout.HorizontalFlex = Enum.UIFlexAlignment.SpaceEvenly
+        end
         Label:AddColorPicker(Idx, Info)
         return Label
     end;
