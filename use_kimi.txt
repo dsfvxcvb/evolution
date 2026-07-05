@@ -10431,32 +10431,6 @@ MenuGroup:AddSlider('MenuGlowTransparency', {
     end
 })
 
-getgenv().MenuToggleGlowEnabled = getgenv().MenuToggleGlowEnabled or false
-getgenv().MenuToggleGlowColor = getgenv().MenuToggleGlowColor or Color3.fromRGB(0, 170, 255)
-
-local function UpdateMenuToggleGlows()
-    if Library.UpdateToggleGlows then
-        Library:UpdateToggleGlows()
-    end
-end
-
-MenuGroup:AddToggle('MenuToggleGlowEnabled', {
-    Text = "Toggle Glow",
-    Default = getgenv().MenuToggleGlowEnabled,
-    Callback = function(Value)
-        getgenv().MenuToggleGlowEnabled = Value
-        UpdateMenuToggleGlows()
-    end
-}):AddColorPicker('MenuToggleGlowColor', {
-    Title = "Toggle Glow Color",
-    Default = getgenv().MenuToggleGlowColor,
-    Callback = function(Value)
-        getgenv().MenuToggleGlowColor = Value
-        UpdateMenuToggleGlows()
-    end
-})
-
-
 -- Hood Customs Addons integration for existing Linoria UI
 -- Uses Library, Tabs, Options, Toggles, Window from the host script
 

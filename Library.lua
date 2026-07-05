@@ -98,6 +98,7 @@ end;
 function Library:ApplyCorner(Inst)
     if not self:ShouldRound(Inst) then return end;
     if Inst:FindFirstChild('ModernUICorner') then return end;
+    if Inst.Name == 'WindowOuter' or Inst.Name == 'WindowInner' then return end;
 
     local Corner = Instance.new('UICorner');
     Corner.Name = 'ModernUICorner';
@@ -161,14 +162,6 @@ function Library:SetModern(Enabled)
         end;
     else
         self:RemoveCorners();
-    end;
-end;
-
-function Library:UpdateToggleGlows()
-    for _, Toggle in next, Toggles do
-        if Toggle.Display then
-            Toggle:Display();
-        end;
     end;
 end;
 
@@ -2000,47 +1993,6 @@ do
             BorderColor3 = 'Black';
         });
 
-        local ToggleGlow = Instance.new('Frame');
-        ToggleGlow.Name = 'ToggleGlow';
-        ToggleGlow.BackgroundTransparency = 1;
-        ToggleGlow.BorderSizePixel = 0;
-        ToggleGlow.Position = UDim2.new(0, 0, 0, 0);
-        ToggleGlow.Size = UDim2.new(1, 0, 1, 0);
-        ToggleGlow.ZIndex = 4;
-        ToggleGlow.Visible = false;
-        ToggleGlow.Parent = ToggleOuter;
-
-        do
-            local glowLayers = 8;
-            local glowMaxInset = 10;
-            local targetCombinedTransparency = 0.35;
-            local perLayerTransparency = targetCombinedTransparency ^ (1 / glowLayers);
-            local baseRadius = 2;
-            local corner = ToggleOuter:FindFirstChild('ModernUICorner');
-            if corner and corner:IsA('UICorner') then
-                baseRadius = corner.CornerRadius.Offset;
-            end;
-
-            for i = 1, glowLayers do
-                local t = i / glowLayers;
-                local inset = glowMaxInset * t;
-
-                local layer = Instance.new('Frame');
-                layer.Name = 'GlowLayer' .. i;
-                layer.BackgroundColor3 = getgenv().MenuToggleGlowColor or Color3.fromRGB(0, 170, 255);
-                layer.BackgroundTransparency = perLayerTransparency;
-                layer.BorderSizePixel = 0;
-                layer.Position = UDim2.new(0, -inset, 0, -inset);
-                layer.Size = UDim2.new(1, inset * 2, 1, inset * 2);
-                layer.ZIndex = ToggleGlow.ZIndex - (glowLayers - i);
-                layer.Parent = ToggleGlow;
-
-                local layerCorner = Instance.new('UICorner');
-                layerCorner.CornerRadius = UDim.new(0, baseRadius + inset);
-                layerCorner.Parent = layer;
-            end;
-        end;
-
         local ToggleInner = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
             BorderColor3 = Library.OutlineColor;
@@ -2099,16 +2051,6 @@ do
 
             Library.RegistryMap[ToggleInner].Properties.BackgroundColor3 = Toggle.Value and 'AccentColor' or 'MainColor';
             Library.RegistryMap[ToggleInner].Properties.BorderColor3 = Toggle.Value and 'AccentColorDark' or 'OutlineColor';
-
-            if ToggleGlow then
-                ToggleGlow.Visible = Toggle.Value and (getgenv().MenuToggleGlowEnabled == true);
-                local glowColor = getgenv().MenuToggleGlowColor or Color3.fromRGB(0, 170, 255);
-                for _, child in ipairs(ToggleGlow:GetChildren()) do
-                    if child:IsA('Frame') and child.Name:sub(1, 9) == 'GlowLayer' then
-                        child.BackgroundColor3 = glowColor;
-                    end;
-                end;
-            end;
         end;
 
         function Toggle:OnChanged(Func)
@@ -3170,6 +3112,7 @@ function Library:CreateWindow(...)
     };
 
     local Outer = Library:Create('Frame', {
+        Name = 'WindowOuter';
         AnchorPoint = Config.AnchorPoint,
         BackgroundColor3 = Color3.new(0, 0, 0);
         BorderSizePixel = 0;
@@ -3183,6 +3126,7 @@ function Library:CreateWindow(...)
     Library:MakeDraggable(Outer, 25);
 
     local Inner = Library:Create('Frame', {
+        Name = 'WindowInner';
         BackgroundColor3 = Library.MainColor;
         BorderColor3 = Library.AccentColor;
         BorderMode = Enum.BorderMode.Inset;
