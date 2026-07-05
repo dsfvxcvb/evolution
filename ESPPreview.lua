@@ -37,11 +37,15 @@ frame.BorderSizePixel = 0
 frame.Parent = previewGui
 
 local frameStroke = Instance.new("UIStroke")
+frameStroke.Name = "FrameStroke"
 frameStroke.Color = OutlineColor
 frameStroke.Thickness = 1
 frameStroke.Parent = frame
 
-Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 6)
+local frameCorner = Instance.new("UICorner")
+frameCorner.Name = "ModernUICorner"
+frameCorner.CornerRadius = UDim.new(0, 6)
+frameCorner.Parent = frame
 
 local topBar = Instance.new("Frame")
 topBar.Name = "TopBar"
@@ -51,6 +55,7 @@ topBar.BorderSizePixel = 0
 topBar.Parent = frame
 
 local topBarStroke = Instance.new("UIStroke")
+topBarStroke.Name = "TopBarStroke"
 topBarStroke.Color = OutlineColor
 topBarStroke.Thickness = 1
 topBarStroke.Parent = topBar
@@ -84,6 +89,7 @@ viewport.BorderSizePixel = 0
 viewport.Parent = frame
 
 local viewportStroke = Instance.new("UIStroke")
+viewportStroke.Name = "ViewportStroke"
 viewportStroke.Color = OutlineColor
 viewportStroke.Thickness = 1
 viewportStroke.Parent = viewport
@@ -98,13 +104,17 @@ viewport.CurrentCamera = cam
 
 local previewModel = nil
 local previewParts = {}
+local modelYaw = 0
+local modelPitch = 0
 
 local function clearModel()
 	if previewModel then
 		previewModel:Destroy()
 		previewModel = nil
 	end
-	table.clear(previewParts)
+	for i = #previewParts, 1, -1 do
+		previewParts[i] = nil
+	end
 end
 
 local function flattenModel(model)
@@ -197,8 +207,7 @@ end
 
 RunService.RenderStepped:Connect(function()
 	if previewModel and previewModel.PrimaryPart then
-		local angle = tick() * 0.6
-		previewModel:PivotTo(CFrame.Angles(0, angle, 0))
+		previewModel:PivotTo(CFrame.Angles(modelPitch, modelYaw, 0))
 	end
 end)
 
@@ -208,6 +217,7 @@ box.BorderSizePixel = 0
 box.BackgroundTransparency = 0.8
 box.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
 box.Visible = false
+box.ZIndex = 10
 box.Parent = viewport
 
 local boxStroke = Instance.new("UIStroke")
@@ -224,6 +234,7 @@ nameLabel.BackgroundTransparency = 1
 nameLabel.Size = UDim2.fromOffset(120, 14)
 nameLabel.Visible = false
 nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+nameLabel.ZIndex = 10
 nameLabel.Parent = viewport
 
 local function getTable()
@@ -345,3 +356,50 @@ UserInputService.InputEnded:Connect(function(input)
 		dragging = false
 	end
 end)
+
+local rotating, rotateStart = false, nil
+viewport.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		rotating = true
+		rotateStart = input.Position
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if rotating and input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - rotateStart
+		rotateStart = input.Position
+		modelYaw = modelYaw - delta.X * 0.01
+		modelPitch = math.clamp(modelPitch - delta.Y * 0.01, -math.rad(80), math.rad(80))
+	end
+end)
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.MouseButton1 then
+		rotating = false
+	end
+end)
+
+local lastModern = nil
+local function syncModern()
+	local modern = Library and Library.Modern
+	if modern == lastModern then return end
+	lastModern = modern
+
+	local cornerRadius = modern and (Library.ModernCornerRadius or 8) or 6
+	frameCorner.CornerRadius = UDim.new(0, cornerRadius)
+
+	local glow = frame:FindFirstChild("ModernGlow")
+	if modern then
+		if not glow then
+			glow = Instance.new("UIStroke")
+			glow.Name = "ModernGlow"
+			glow.Thickness = 1.5
+			glow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+			glow.LineJoinMode = Enum.LineJoinMode.Round
+			glow.Parent = frame
+		end
+		glow.Color = getColor("AccentColor", AccentColor)
+	elseif glow then
+		glow:Destroy()
+	end
+end
+RunService.RenderStepped:Connect(syncModern)
