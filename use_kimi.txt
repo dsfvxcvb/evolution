@@ -4,6 +4,7 @@
 local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
 
 print("drawing")
+print("drawing2")
 
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
     pcall(function() Library:Unload() end)
