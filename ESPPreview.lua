@@ -1109,30 +1109,62 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 local lastModern = nil
+local function updateWindowGlow()
+	local modern = Library and Library.Modern
+	local useGlow = getgenv().ESPPreviewUseGlow
+	if useGlow == nil then useGlow = true end
+	local glow = frame:FindFirstChild("WindowGlow")
+	if not (modern and useGlow) then
+		if glow then glow:Destroy() end
+		return
+	end
+	local glowColor = getColor("AccentColor", AccentColor)
+	local radius = frameCorner.CornerRadius.Offset
+	local glowLayers = 8
+	local glowMaxInset = 12
+	local targetCombinedTransparency = 0.85
+	local perLayerTransparency = targetCombinedTransparency ^ (1 / glowLayers)
+	if not glow then
+		glow = Instance.new("Frame")
+		glow.Name = "WindowGlow"
+		glow.BackgroundTransparency = 1
+		glow.BorderSizePixel = 0
+		glow.ZIndex = 0
+		glow.Parent = frame
+	end
+	glow.Position = UDim2.new(0, -glowMaxInset, 0, -glowMaxInset)
+	glow.Size = UDim2.new(1, glowMaxInset * 2, 1, glowMaxInset * 2)
+	for i = 1, glowLayers do
+		local layer = glow:FindFirstChild("GlowLayer" .. i)
+		if not layer then
+			layer = Instance.new("Frame")
+			layer.Name = "GlowLayer" .. i
+			layer.BorderSizePixel = 0
+			layer.Parent = glow
+			local corner = Instance.new("UICorner")
+			corner.Name = "LayerCorner"
+			corner.Parent = layer
+		end
+		local t = i / glowLayers
+		local inset = glowMaxInset * t
+		layer.BackgroundColor3 = glowColor
+		layer.BackgroundTransparency = perLayerTransparency
+		layer.Position = UDim2.new(0, glowMaxInset - inset, 0, glowMaxInset - inset)
+		layer.Size = UDim2.new(1, inset * 2, 1, inset * 2)
+		layer.ZIndex = - (glowLayers - i)
+		local corner = layer:FindFirstChild("LayerCorner")
+		if corner then
+			corner.CornerRadius = UDim.new(0, radius + inset)
+		end
+	end
+end
 local function syncModern()
 	local modern = Library and Library.Modern
 	if modern ~= lastModern then
 		lastModern = modern
 	end
-
 	local cornerRadius = modern and (Library.ModernCornerRadius or 8) or 0
 	frameCorner.CornerRadius = UDim.new(0, cornerRadius)
-
-	local glow = frame:FindFirstChild("ModernGlow")
-	local useGlow = getgenv().ESPPreviewUseGlow
-	if useGlow == nil then useGlow = true end
-	if modern and useGlow then
-		if not glow then
-			glow = Instance.new("UIStroke")
-			glow.Name = "ModernGlow"
-			glow.Thickness = 1.5
-			glow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-			glow.LineJoinMode = Enum.LineJoinMode.Round
-			glow.Parent = frame
-		end
-		glow.Color = getColor("AccentColor", AccentColor)
-	elseif glow then
-		glow:Destroy()
-	end
+	updateWindowGlow()
 end
 RunService.RenderStepped:Connect(syncModern)
