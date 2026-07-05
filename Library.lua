@@ -2011,9 +2011,9 @@ do
         ToggleGlow.Parent = ToggleOuter;
 
         do
-            local glowLayers = 4;
-            local glowMaxInset = 6;
-            local targetCombinedTransparency = 0.5;
+            local glowLayers = 8;
+            local glowMaxInset = 10;
+            local targetCombinedTransparency = 0.35;
             local perLayerTransparency = targetCombinedTransparency ^ (1 / glowLayers);
             local baseRadius = 2;
             local corner = ToggleOuter:FindFirstChild('ModernUICorner');
