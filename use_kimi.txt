@@ -11991,15 +11991,41 @@ VisualsHitLogs:AddInput('HitLogsCustomText', {
 VisualsHitLogs:AddLabel('Placeholders: {target} | {damage}')
 VisualsHitLogs:AddLabel('Use [1]word[/1], [2]word[/2], etc.')
 
-for i = 1, 5 do
-    VisualsHitLogs:AddLabel('Word ' .. i):AddColorPicker('HitLogsWord' .. i .. 'Color', {
-        Title = "Word " .. i,
-        Default = HitLogsScript2.WordColors[i],
-        Callback = function(Value)
-            HitLogsScript2.WordColors[i] = Value or HitLogsScript2.WordColors[i]
-        end
-    })
-end
+VisualsHitLogs:AddToggle('HitLogsWordColorsToggle', {
+    Text = "",
+    Default = false,
+    Callback = function(Value) end
+}):AddColorPicker('HitLogsWord1Color', {
+    Title = "Word 1",
+    Default = HitLogsScript2.WordColors[1],
+    Callback = function(Value)
+        HitLogsScript2.WordColors[1] = Value or HitLogsScript2.WordColors[1]
+    end
+}):AddColorPicker('HitLogsWord2Color', {
+    Title = "Word 2",
+    Default = HitLogsScript2.WordColors[2],
+    Callback = function(Value)
+        HitLogsScript2.WordColors[2] = Value or HitLogsScript2.WordColors[2]
+    end
+}):AddColorPicker('HitLogsWord3Color', {
+    Title = "Word 3",
+    Default = HitLogsScript2.WordColors[3],
+    Callback = function(Value)
+        HitLogsScript2.WordColors[3] = Value or HitLogsScript2.WordColors[3]
+    end
+}):AddColorPicker('HitLogsWord4Color', {
+    Title = "Word 4",
+    Default = HitLogsScript2.WordColors[4],
+    Callback = function(Value)
+        HitLogsScript2.WordColors[4] = Value or HitLogsScript2.WordColors[4]
+    end
+}):AddColorPicker('HitLogsWord5Color', {
+    Title = "Word 5",
+    Default = HitLogsScript2.WordColors[5],
+    Callback = function(Value)
+        HitLogsScript2.WordColors[5] = Value or HitLogsScript2.WordColors[5]
+    end
+})
 
 local notifications = {}
 local BASE_Y = -120
@@ -12054,7 +12080,7 @@ local function CreateScript2HitMessage(targetName, damage)
     local function applyWordColors(text)
         for i, color in ipairs(HitLogsScript2.WordColors) do
             local hex = colorToHex(color)
-            text = text:gsub("%[" .. i .. "%](.-)%[/%" .. i .. "%]", string.format('<font color="%s">%%1</font>', hex))
+            text = text:gsub("%[" .. i .. "%](.-)%[/" .. i .. "%]", string.format('<font color="%s">%%1</font>', hex))
         end
         return text
     end
