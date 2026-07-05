@@ -8528,7 +8528,7 @@ if rightFoot and KorbloxVisual.Originals[rightFoot] then
 rightFoot.Transparency = KorbloxVisual.Originals[rightFoot]
 end
 if rightLowerLeg and KorbloxVisual.Originals[rightLowerLeg] then
-rightLowerLeg.Transparency = KorbloxVisual.Originals[rightLowerLeg]
+rightLowerLeg.Transparency = KorbloxVisual.Originals[rightLowerLeg].Transparency
 rightLowerLeg.MeshId = KorbloxVisual.Originals[rightLowerLeg].MeshId
 rightLowerLeg.TextureID = KorbloxVisual.Originals[rightLowerLeg].TextureID
 end
