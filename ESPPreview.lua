@@ -931,21 +931,21 @@ local function updatePreview()
 
 		local layouts = {
 			Left = {
-				HolderPos = UDim2.new(0, -6, 0, 0),
+				HolderPos = UDim2.new(0, -8, 0, 0),
 				HolderSize = UDim2.new(0, 2, 1, 0),
 				BarAnchor = Vector2.new(0, 1),
 				BarPos = UDim2.new(0, 0, 1, 0),
 				Rotation = 90,
 			},
 			Right = {
-				HolderPos = UDim2.new(1, 4, 0, 0),
+				HolderPos = UDim2.new(1, 6, 0, 0),
 				HolderSize = UDim2.new(0, 2, 1, 0),
 				BarAnchor = Vector2.new(0, 1),
 				BarPos = UDim2.new(0, 0, 1, 0),
 				Rotation = 90,
 			},
 			Bottom = {
-				HolderPos = UDim2.new(0, 0, 1, 4),
+				HolderPos = UDim2.new(0, 0, 1, 6),
 				HolderSize = UDim2.new(1, 0, 0, 2),
 				BarAnchor = Vector2.new(0, 0),
 				BarPos = UDim2.new(0, 0, 0, 0),
