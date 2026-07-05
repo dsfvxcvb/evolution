@@ -10079,6 +10079,155 @@ do
         applyParticleAura(LocalPlayer.Character)
     end
 
+    -- Avatar Morph
+    local AvatarMorph = {
+        Enabled = false,
+        UserId = 5042596195,
+    }
+
+    local function clearLocalAccessories(character)
+        for _, item in ipairs(character:GetChildren()) do
+            if item:IsA("Accessory") or item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("ShirtGraphic") then
+                item:Destroy()
+            end
+        end
+    end
+
+    local function getAllAccessories(model)
+        local list = {}
+        for _, desc in ipairs(model:GetDescendants()) do
+            if desc:IsA("Accessory") then
+                table.insert(list, desc)
+            end
+        end
+        return list
+    end
+
+    local function cleanAccessory(accessory)
+        for _, desc in ipairs(accessory:GetDescendants()) do
+            if desc:IsA("Weld") or desc:IsA("ManualWeld") or desc:IsA("Motor6D") then
+                desc:Destroy()
+            end
+        end
+    end
+
+    local function attachAccessory(character, accessory)
+        local handle = accessory:FindFirstChild("Handle")
+        if not handle or not handle:IsA("BasePart") then
+            warn("[AvatarMorph] No Handle for", accessory.Name)
+            return
+        end
+
+        handle.Anchored = false
+        handle.CanCollide = false
+        handle.Massless = true
+
+        cleanAccessory(accessory)
+
+        local attachment = handle:FindFirstChildOfClass("Attachment")
+        if not attachment then
+            accessory.Parent = character
+            return
+        end
+
+        local targetAttachment = character:FindFirstChild(attachment.Name, true)
+        if not targetAttachment or not targetAttachment:IsA("Attachment") then
+            accessory.Parent = character
+            return
+        end
+
+        local targetPart = targetAttachment.Parent
+        if not targetPart or not targetPart:IsA("BasePart") then
+            accessory.Parent = character
+            return
+        end
+
+        local weld = Instance.new("Weld")
+        weld.Name = "AccessoryWeld"
+        weld.Part0 = handle
+        weld.Part1 = targetPart
+        weld.C0 = attachment.CFrame
+        weld.C1 = targetAttachment.CFrame
+        weld.Parent = handle
+
+        handle.CFrame = targetPart.CFrame * targetAttachment.CFrame * attachment.CFrame:Inverse()
+        accessory.Parent = character
+    end
+
+    local function applyAvatarMorph(userId)
+        local character = LocalPlayer.Character
+        if not character then return end
+
+        local success, model = pcall(function()
+            return Players:CreateHumanoidModelFromUserId(userId)
+        end)
+
+        if not success or not model then
+            warn("[AvatarMorph] Failed to load avatar.")
+            return
+        end
+
+        clearLocalAccessories(character)
+
+        for _, accessory in ipairs(getAllAccessories(model)) do
+            local clone = accessory:Clone()
+            if clone then
+                attachAccessory(character, clone)
+            end
+        end
+
+        local humanoid = character:FindFirstChildOfClass("Humanoid")
+        if humanoid then
+            pcall(function()
+                humanoid:BuildRigFromAttachments()
+            end)
+        end
+
+        for _, item in ipairs(model:GetChildren()) do
+            if item:IsA("Shirt") or item:IsA("Pants") or item:IsA("BodyColors") or item:IsA("ShirtGraphic") then
+                local clone = item:Clone()
+                clone.Parent = character
+            elseif item:IsA("MeshPart") and character:FindFirstChild(item.Name) then
+                character[item.Name].Size = item.Size
+            end
+        end
+
+        model:Destroy()
+    end
+
+    VisualsClient:AddToggle('AvatarMorphEnabled', {
+        Text = "Avatar Morph",
+        Default = false,
+        Callback = function(Value)
+            AvatarMorph.Enabled = Value
+            if Value then
+                applyAvatarMorph(AvatarMorph.UserId)
+            end
+        end
+    })
+
+    VisualsClient:AddInput('AvatarMorphUserId', {
+        Text = "Morph User ID",
+        Default = "5042596195",
+        Numeric = true,
+        Callback = function(Value)
+            local num = tonumber(Value)
+            if num then
+                AvatarMorph.UserId = num
+                if AvatarMorph.Enabled then
+                    applyAvatarMorph(num)
+                end
+            end
+        end
+    })
+
+    LocalPlayer.CharacterAdded:Connect(function(char)
+        if AvatarMorph.Enabled then
+            task.wait(0.5)
+            applyAvatarMorph(AvatarMorph.UserId)
+        end
+    end)
+
     local oldUnload = Library.Unload
     Library.Unload = function()
         restoreParticleAura(LocalPlayer.Character)
