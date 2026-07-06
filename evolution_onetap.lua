@@ -748,13 +748,18 @@ local autoKillAiming = false
 local autoKillHiddenParts = {}
 
 local function unhideAutoKillTarget()
-    for part, orig in pairs(autoKillHiddenParts) do
-        if part.Parent then
-            if part:IsA("BasePart") then
-                part.LocalTransparencyModifier = orig.ltm
-                part.Transparency = orig.trans
-            elseif part:IsA("Decal") or part:IsA("Texture") then
-                part.Transparency = orig.trans
+    for obj, orig in pairs(autoKillHiddenParts) do
+        if obj.Parent then
+            if obj:IsA("BasePart") then
+                obj.LocalTransparencyModifier = orig.ltm
+            elseif obj:IsA("Decal") or obj:IsA("Texture") then
+                obj.Transparency = orig.trans
+            elseif obj:IsA("Highlight") then
+                obj.Enabled = orig.enabled
+                obj.FillTransparency = orig.fill
+                obj.OutlineTransparency = orig.outline
+            elseif obj:IsA("BillboardGui") or obj:IsA("SurfaceGui") then
+                obj.Enabled = orig.enabled
             end
         end
     end
@@ -763,19 +768,30 @@ end
 
 local function hideAutoKillTarget(model)
     if not model then return end
-    for _, part in ipairs(model:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if autoKillHiddenParts[part] == nil then
-                autoKillHiddenParts[part] = { ltm = part.LocalTransparencyModifier, trans = part.Transparency }
+    for _, obj in ipairs(model:GetDescendants()) do
+        if obj:IsA("BasePart") then
+            if autoKillHiddenParts[obj] == nil then
+                autoKillHiddenParts[obj] = { ltm = obj.LocalTransparencyModifier }
             end
-            part.LocalTransparencyModifier = 1
-            part.Transparency = 1
-            part.CastShadow = false
-        elseif part:IsA("Decal") or part:IsA("Texture") then
-            if autoKillHiddenParts[part] == nil then
-                autoKillHiddenParts[part] = { trans = part.Transparency }
+            obj.LocalTransparencyModifier = 1
+            obj.CastShadow = false
+        elseif obj:IsA("Decal") or obj:IsA("Texture") then
+            if autoKillHiddenParts[obj] == nil then
+                autoKillHiddenParts[obj] = { trans = obj.Transparency }
             end
-            part.Transparency = 1
+            obj.Transparency = 1
+        elseif obj:IsA("Highlight") then
+            if autoKillHiddenParts[obj] == nil then
+                autoKillHiddenParts[obj] = { enabled = obj.Enabled, fill = obj.FillTransparency, outline = obj.OutlineTransparency }
+            end
+            obj.Enabled = false
+            obj.FillTransparency = 1
+            obj.OutlineTransparency = 1
+        elseif obj:IsA("BillboardGui") or obj:IsA("SurfaceGui") then
+            if autoKillHiddenParts[obj] == nil then
+                autoKillHiddenParts[obj] = { enabled = obj.Enabled }
+            end
+            obj.Enabled = false
         end
     end
 end
@@ -837,6 +853,8 @@ RunService.RenderStepped:Connect(function()
         return
     end
 
+    hideAutoKillTarget(target)
+
     targetRoot.CFrame = myHRP.CFrame * CFrame.new(0, 0, -6.5)
 
     setAutoKillWeapon()
@@ -867,8 +885,6 @@ RunService.RenderStepped:Connect(function()
             autoKillAiming = false
         end)
     end
-
-    hideAutoKillTarget(target)
 end)
 -- ESP LOGIC (static 2D boxes)
 -- ============================================================
