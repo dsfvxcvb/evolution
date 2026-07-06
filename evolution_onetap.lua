@@ -742,16 +742,45 @@ local function equipTool(tool)
 end
 
 local currentAutoKillTarget = nil
+local lastAutoKillTarget = nil
 local lastAutoKillAttack = 0
+local autoKillHiddenParts = {}
+
+local function unhideAutoKillTarget()
+    for part, orig in pairs(autoKillHiddenParts) do
+        if part.Parent then
+            part.LocalTransparencyModifier = orig
+        end
+    end
+    autoKillHiddenParts = {}
+end
+
+local function hideAutoKillTarget(model)
+    if not model then return end
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            if autoKillHiddenParts[part] == nil then
+                autoKillHiddenParts[part] = part.LocalTransparencyModifier
+            end
+            part.LocalTransparencyModifier = 1
+        end
+    end
+end
+
 RunService.RenderStepped:Connect(function()
     if not cfg.AutoKillEnabled then
         currentAutoKillTarget = nil
+        lastAutoKillTarget = nil
+        unhideAutoKillTarget()
         return
     end
 
     local myChar = LocalPlayer.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return end
+    if not myHRP then
+        unhideAutoKillTarget()
+        return
+    end
 
     if currentAutoKillTarget then
         if not currentAutoKillTarget.Parent or not isAlive(currentAutoKillTarget) or hasShield(currentAutoKillTarget) then
@@ -761,10 +790,19 @@ RunService.RenderStepped:Connect(function()
 
     if not currentAutoKillTarget then
         currentAutoKillTarget = getAutoKillTarget()
+        lastAutoKillTarget = currentAutoKillTarget
     end
 
     local target = currentAutoKillTarget
-    if not target then return end
+    if not target then
+        unhideAutoKillTarget()
+        return
+    end
+
+    if target ~= lastAutoKillTarget then
+        unhideAutoKillTarget()
+        lastAutoKillTarget = target
+    end
 
     local targetRoot = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Head") or target.PrimaryPart
     if not targetRoot then
@@ -792,6 +830,8 @@ RunService.RenderStepped:Connect(function()
             end
         end)
     end
+
+    hideAutoKillTarget(target)
 end)
 
 -- ============================================================
@@ -859,6 +899,10 @@ RunService.RenderStepped:Connect(function()
     for _, model in ipairs(tagged) do
         seen[model] = true
         if model == myChar then continue end
+        if model == currentAutoKillTarget then
+            removeEsp(model)
+            continue
+        end
         if not isAlive(model) then
             removeEsp(model)
             continue
