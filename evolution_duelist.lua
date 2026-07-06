@@ -625,20 +625,65 @@ getgenv().EvolutionDuelistHooks = {
 }
 
 -- Auto Fire
-local lastTrigger = 0
+local lastSemiTrigger = 0
+local autoFireHeld = false
+
+local function getEquippedGun()
+    local char = LocalPlayer.Character
+    if not char then return nil end
+    for _, t in ipairs(char:GetChildren()) do
+        if t:IsA("Tool") and t:HasTag("Gun") then
+            return t
+        end
+    end
+    return nil
+end
+
+local function isAutomaticGun(tool)
+    if not tool then return false end
+    local name = tool.Name:lower()
+    if name:find("carabine") or name:find("carbine") or name:find("rifle") then
+        return true
+    end
+    local attr = tool:GetAttribute("Automatic")
+    return attr == true or attr == "true" or attr == 1
+end
+
+local function setShootBind(down)
+    if not (GameG and typeof(GameG.FireBind) == "function") then return end
+    pcall(function() GameG:FireBind("Shoot", down, false) end)
+end
+
 RunService.RenderStepped:Connect(function()
-    if not cfg.SilentAimEnabled or not cfg.AutoFire then return end
-    if tick() - lastTrigger < 0.15 then return end
+    local shouldFire = cfg.SilentAimEnabled and cfg.AutoFire
+    local target = shouldFire and getTarget() or nil
 
-    local target = getTarget()
-    if not target then return end
+    if not target then
+        if autoFireHeld then
+            setShootBind(false)
+            autoFireHeld = false
+        end
+        return
+    end
 
-    lastTrigger = tick()
-    if GameG and typeof(GameG.FireBind) == "function" then
-        pcall(function() GameG:FireBind("Shoot", true, false) end)
-        task.delay(0.05, function()
-            pcall(function() GameG:FireBind("Shoot", false, false) end)
-        end)
+    local gun = getEquippedGun()
+    if isAutomaticGun(gun) then
+        -- Hold the bind so automatic weapons spray.
+        if not autoFireHeld then
+            setShootBind(true)
+            autoFireHeld = true
+        end
+    else
+        -- Tap for semi-auto (pistol).
+        if tick() - lastSemiTrigger >= 0.15 then
+            setShootBind(true)
+            autoFireHeld = true
+            lastSemiTrigger = tick()
+            task.delay(0.05, function()
+                setShootBind(false)
+                autoFireHeld = false
+            end)
+        end
     end
 end)
 
