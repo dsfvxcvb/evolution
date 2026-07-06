@@ -1,6 +1,6 @@
 -- ============================================================
 -- evolution | DUELIST: PvP
--- Silent aim + bullet manipulation via Weapons remote hook.
+-- Silent aim + bullet manipulation via workspace.Raycast hook.
 -- ============================================================
 
 local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
@@ -382,7 +382,10 @@ local function getPriorityPart(model)
     end
 end
 
-local function getTarget()
+-- Prevents recursive raycast redirection while getTarget runs.
+local computingTarget = false
+
+local function rawGetTarget()
     if not cfg.SilentAimEnabled then return nil end
     if not CharactersFolder then return nil end
 
@@ -426,6 +429,62 @@ local function getTarget()
     return bestPart
 end
 
+local function getTarget()
+    if computingTarget then return nil end
+    computingTarget = true
+    local ok, result = pcall(rawGetTarget)
+    computingTarget = false
+    if ok then return result end
+    return nil
+end
+
+-- The game's bind system stores its functions in the real Roblox _G, not the executor _G.
+local GameG = (typeof(getrenv) == "function" and getrenv()._G) or _G
+
+-- Hook workspace.Raycast via the game metatable so WeaponsClient's castBullet hits our target.
+local mt = (typeof(getrawmetatable) == "function" and getrawmetatable(game)) or (debug and debug.getmetatable(game))
+local oldNamecall
+if mt then
+    local setro = setreadonly or function(t, writable)
+        if typeof(make_writable) == "function" then
+            if writable then make_writable(t) else make_readonly(t) end
+        end
+    end
+
+    oldNamecall = mt.__namecall
+    setro(mt, false)
+
+    local function namecallHook(...)
+        local self, a1 = ...
+        local method = getnamecallmethod()
+
+        if method == "Raycast" and self == Workspace and cfg.SilentAimEnabled and not computingTarget then
+            local stack = debug.traceback("", 2)
+            if string.find(stack, "castBullet", 1, true) or string.find(stack, "firePellet", 1, true) then
+                local target = getTarget()
+                if target then
+                    local origin = a1
+                    local pos = target.Position
+                    local normal = (origin - pos).Unit
+                    return {
+                        Instance = target,
+                        Position = pos,
+                        Normal = normal,
+                        Material = Enum.Material.Plastic,
+                        Distance = (origin - pos).Magnitude,
+                    }
+                end
+            end
+        end
+
+        return oldNamecall(...)
+    end
+
+    mt.__namecall = (typeof(newcclosure) == "function" and newcclosure(namecallHook)) or namecallHook
+    setro(mt, true)
+end
+
+-- Hook outgoing remotes for nicer visuals / fallback alignment.
 local oldFireServer = nil
 local function hookedFireServer(self, cmd, ...)
     if self ~= WeaponsRemote then
@@ -436,15 +495,7 @@ local function hookedFireServer(self, cmd, ...)
         return oldFireServer(self, cmd, ...)
     end
 
-    if cmd == "DamageRequest" then
-        local target = getTarget()
-        if target then
-            local hum = target.Parent and target.Parent:FindFirstChildOfClass("Humanoid")
-            if hum then
-                return oldFireServer(self, "DamageRequest", hum, nil, nil, target, target.Position)
-            end
-        end
-    elseif cmd == "ReplicateTracer" then
+    if cmd == "ReplicateTracer" then
         local style, startPos, _, hitInfo = ...
         local target = getTarget()
         if target then
@@ -477,10 +528,10 @@ RunService.RenderStepped:Connect(function()
     if not target then return end
 
     lastTrigger = tick()
-    if _G and typeof(_G.FireBind) == "function" then
-        pcall(function() _G.FireBind("Shoot", true, false) end)
+    if GameG and typeof(GameG.FireBind) == "function" then
+        pcall(function() GameG:FireBind("Shoot", true, false) end)
         task.delay(0.05, function()
-            pcall(function() _G.FireBind("Shoot", false, false) end)
+            pcall(function() GameG:FireBind("Shoot", false, false) end)
         end)
     end
 end)
