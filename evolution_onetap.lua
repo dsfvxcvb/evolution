@@ -459,336 +459,6 @@ end
 createFov()
 
 RunService.RenderStepped:Connect(function()
-    local shouldShow = cfg.SilentAimEnabled and cfg.ShowFOV
-    if not shouldShow then
-        if fovFrame then fovFrame.Visible = false end
-        return
-    end
-
-    if not fovFrame or fovFrame.Parent == nil then
-        createFov()
-    end
-
-    local center = Camera.ViewportSize / 2
-    fovFrame.Visible = true
-    fovFrame.Position = UDim2.new(0, center.X, 0, center.Y)
-    fovFrame.Size = UDim2.new(0, cfg.FOVRadius * 2, 0, cfg.FOVRadius * 2)
-    fovFrame.BackgroundColor3 = cfg.FOVColor
-    fovFrame.BackgroundTransparency = cfg.FOVFillTransparency
-
-    if fovOutline then
-        fovOutline.Enabled = cfg.FOVOutline
-        fovOutline.Color = cfg.FOVOutlineColor
-        fovOutline.Thickness = cfg.FOVOutlineThickness
-    end
-
-    if fovGradient then
-        if cfg.FOVGradient then
-            fovGradient.Color = gradientColor(cfg.FOVGradientTop, cfg.FOVGradientBottom)
-            if cfg.FOVGradientSpin then
-                fovGradient.Rotation = (tick() * cfg.FOVGradientSpeed) % 360
-            end
-        else
-            fovGradient.Color = gradientColor(cfg.FOVColor, cfg.FOVColor)
-        end
-    end
-end)
-
--- ============================================================
--- SILENT AIM LOGIC
--- ============================================================
-local WeaponClient
-local WeaponManager
-
-repeat
-    local ok1 = pcall(function()
-        WeaponClient = require(LocalPlayer.PlayerScripts.Start.Game.WeaponClient)
-    end)
-    local ok2 = pcall(function()
-        WeaponManager = require(ReplicatedStorage.Common.Managers.WeaponManager)
-    end)
-    if not (ok1 and ok2) then task.wait(0.2) end
-until WeaponClient and WeaponManager
-
--- ============================================================
--- AUTOKILL BULLET MANIP (rapid fire / infinite ammo / headshot)
--- ============================================================
-local origGetWeaponData = WeaponManager.getWeaponData
-WeaponManager.getWeaponData = function(name)
-    local data = origGetWeaponData(name)
-    if data and cfg.AutoKillEnabled then
-        local copy = {}
-        for k, v in pairs(data) do
-            copy[k] = v
-        end
-        copy.firerate = 9999
-        return copy
-    end
-    return data
-end
-
-local origGetBullets = WeaponClient.getBullets
-WeaponClient.getBullets = function(...)
-    if cfg.AutoKillEnabled then
-        return 999
-    end
-    return origGetBullets(...)
-end
-
-local origCast = WeaponManager.cast
-WeaponManager.cast = function(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10)
-    if cfg.AutoKillEnabled and p6 and p6.onHitCharacter then
-        local origOnHit = p6.onHitCharacter
-        p6.onHitCharacter = function(char, part, rayResult, activeCast)
-            local head = char:FindFirstChild("Hitbox_Head") or char:FindFirstChild("Head")
-            if head then
-                origOnHit(char, head, rayResult, activeCast)
-            else
-                origOnHit(char, part, rayResult, activeCast)
-            end
-        end
-    end
-    return origCast(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10)
-end
-
-local origRcast = WeaponManager.rcast
-WeaponManager.rcast = function(p1, p2, p3, p4, p5, p6, p7)
-    if cfg.AutoKillEnabled and p6 and p6.onHitCharacter then
-        local origOnHit = p6.onHitCharacter
-        p6.onHitCharacter = function(char, part, rayResult)
-            local head = char:FindFirstChild("Hitbox_Head") or char:FindFirstChild("Head")
-            if head then
-                origOnHit(char, head, rayResult)
-            else
-                origOnHit(char, part, rayResult)
-            end
-        end
-    end
-    return origRcast(p1, p2, p3, p4, p5, p6, p7)
-end
-
-local function isAlive(char)
-    if not char then return false end
-    local hum = char:FindFirstChildOfClass("Humanoid")
-    return hum and hum.Health > 0
-end
-
-local function getPriorityPart(char)
-    local roll = math.random(1, 100)
-    if roll <= cfg.Hitchance then
-        return char:FindFirstChild("Head") or char:FindFirstChild("Hitbox_Head")
-    else
-        return char:FindFirstChild("Torso") or char:FindFirstChild("Hitbox_Torso")
-            or char:FindFirstChild("UpperTorso") or char:FindFirstChild("LowerTorso")
-    end
-end
-
-local function getTarget()
-    if not cfg.SilentAimEnabled then return nil end
-
-    local myChar = LocalPlayer.Character
-    if not myChar then return nil end
-    local myHead = myChar:FindFirstChild("Head")
-    if not myHead then return nil end
-
-    local origin = myHead.Position
-    local bestDist = math.huge
-    local bestPart = nil
-
-    for _, model in ipairs(CollectionService:GetTagged("Character")) do
-        if model == myChar then continue end
-        if not isAlive(model) then continue end
-        if model:FindFirstChild("ForceField") then continue end
-
-        local part = getPriorityPart(model)
-        if not part then continue end
-
-        local dist = (part.Position - origin).Magnitude
-        if dist > cfg.MaxDistance then continue end
-
-        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
-        if not onScreen then continue end
-
-        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-        if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude > cfg.FOVRadius then continue end
-
-        local rp = RaycastParams.new()
-        rp.FilterType = Enum.RaycastFilterType.Blacklist
-        rp.FilterDescendantsInstances = {myChar, Camera, model}
-        if Workspace:Raycast(origin, (part.Position - origin).Unit * dist, rp) then continue end
-
-        if dist < bestDist then
-            bestDist = dist
-            bestPart = part
-        end
-    end
-
-    return bestPart
-end
-
-local oldFire = nil
-local function hookedFire(...)
-    local target = getTarget()
-    if not target then
-        return oldFire(...)
-    end
-
-    local realCFrame = Camera.CFrame
-    local myChar = LocalPlayer.Character
-    local myHead = myChar and myChar:FindFirstChild("Head")
-
-    if myHead then
-        local dir = (target.Position - myHead.Position).Unit
-        Camera.CFrame = CFrame.new(realCFrame.Position, realCFrame.Position + dir)
-    else
-        Camera.CFrame = CFrame.new(realCFrame.Position, target.Position)
-    end
-
-    task.defer(function()
-        Camera.CFrame = realCFrame
-    end)
-
-    local success, err = pcall(oldFire, ...)
-    if not success then
-        Camera.CFrame = realCFrame
-        error(err)
-    end
-end
-
-if typeof(hookfunction) == "function" then
-    oldFire = hookfunction(WeaponClient.fire, hookedFire)
-else
-    oldFire = WeaponClient.fire
-    WeaponClient.fire = hookedFire
-end
-
--- Auto Fire
-local lastTrigger = 0
-RunService.RenderStepped:Connect(function()
-    if not cfg.SilentAimEnabled or not cfg.AutoFire then return end
-    if tick() - lastTrigger < 0.35 then return end
-
-    local target = getTarget()
-    if not target then return end
-
-    lastTrigger = tick()
-    pcall(WeaponClient.fire)
-end)
-
--- ============================================================
--- AUTOKILL LOGIC
--- ============================================================
-local function hasShield(model)
-    if model:FindFirstChildOfClass("ForceField") then return true end
-    if model:GetAttribute("Shielded") == true then return true end
-    if model:GetAttribute("Invincible") == true then return true end
-
-    for _, child in ipairs(model:GetChildren()) do
-        if child:IsA("Highlight") and child.FillTransparency < 1 and child.FillColor.B > 0.5 and child.FillColor.R < 0.5 then
-            return true
-        end
-    end
-    return false
-end
-
-local function getAutoKillTarget()
-    local myChar = LocalPlayer.Character
-    local myRoot = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Head"))
-    if not myRoot then return nil end
-
-    local myPos = myRoot.Position
-    local bestModel = nil
-    local bestDist = math.huge
-
-    for _, model in ipairs(CollectionService:GetTagged("Character")) do
-        if model == myChar then continue end
-        if not model:IsDescendantOf(Workspace) then continue end
-        if not isAlive(model) then continue end
-        if hasShield(model) then continue end
-
-        local root = model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
-        if not root then continue end
-
-        local dist = (root.Position - myPos).Magnitude
-        if dist < bestDist then
-            bestDist = dist
-            bestModel = model
-        end
-    end
-
-    return bestModel
-end
-
-local function getWeaponSlot()
-    if cfg.AutoKillMethod == 'Sniper' then
-        return 'Primary', 1
-    elseif cfg.AutoKillMethod == 'Pistol' then
-        return 'Secondary', 2
-    end
-    return 'Primary', 1
-end
-
-local function setAutoKillWeapon()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local slotName, slotIndex = getWeaponSlot()
-    local current = char:GetAttribute("currentWeapon")
-    if current == slotName then return end
-    pcall(function()
-        if WeaponClient.setWeapon then
-            WeaponClient.setWeapon(slotIndex)
-        end
-    end)
-end
-
-local currentAutoKillTarget = nil
-local lastAutoKillTarget = nil
-local hasFiredAtCurrent = false
-local autoKillHiddenParts = {}
-
-local function unhideAutoKillTarget()
-    for part, orig in pairs(autoKillHiddenParts) do
-        if part.Parent then
-            if part:IsA("BasePart") then
-                part.LocalTransparencyModifier = orig.ltm
-                part.Transparency = orig.trans
-            elseif part:IsA("Decal") or part:IsA("Texture") then
-                part.Transparency = orig.trans
-            end
-        end
-    end
-    autoKillHiddenParts = {}
-end
-
-local function hideAutoKillTarget(model)
-    if not model then return end
-    for _, part in ipairs(model:GetDescendants()) do
-        if part:IsA("BasePart") then
-            if autoKillHiddenParts[part] == nil then
-                autoKillHiddenParts[part] = { ltm = part.LocalTransparencyModifier, trans = part.Transparency }
-            end
-            part.LocalTransparencyModifier = 1
-            part.Transparency = 1
-            part.CastShadow = false
-        elseif part:IsA("Decal") or part:IsA("Texture") then
-            if autoKillHiddenParts[part] == nil then
-                autoKillHiddenParts[part] = { trans = part.Transparency }
-            end
-            part.Transparency = 1
-        end
-    end
-end
-
-task.spawn(function()
-    while true do
-        task.wait()
-        if cfg.AutoKillEnabled and currentAutoKillTarget then
-            hideAutoKillTarget(currentAutoKillTarget)
-        end
-    end
-end)
-
-RunService.RenderStepped:Connect(function()
     if not cfg.AutoKillEnabled then
         currentAutoKillTarget = nil
         lastAutoKillTarget = nil
@@ -799,7 +469,8 @@ RunService.RenderStepped:Connect(function()
 
     local myChar = LocalPlayer.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then
+    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+    if not myHRP or not myHum or myHum.Health <= 0 or not myChar:GetAttribute("deployed") then
         unhideAutoKillTarget()
         return
     end
@@ -826,6 +497,7 @@ RunService.RenderStepped:Connect(function()
     if target ~= lastAutoKillTarget then
         unhideAutoKillTarget()
         lastAutoKillTarget = target
+        hasFiredAtCurrent = false
     end
 
     local targetRoot = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Head") or target.PrimaryPart
@@ -838,14 +510,20 @@ RunService.RenderStepped:Connect(function()
 
     setAutoKillWeapon()
 
-    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetRoot.Position)
-
     if not hasFiredAtCurrent then
         hasFiredAtCurrent = true
-        pcall(function()
-            if WeaponClient.fire then
-                WeaponClient.fire()
+        local firedTarget = target
+        task.delay(0.12, function()
+            if not cfg.AutoKillEnabled or currentAutoKillTarget ~= firedTarget then return end
+            local tRoot = firedTarget:FindFirstChild("HumanoidRootPart") or firedTarget:FindFirstChild("Head") or firedTarget.PrimaryPart
+            if tRoot then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, tRoot.Position)
             end
+            pcall(function()
+                if WeaponClient.fire then
+                    WeaponClient.fire()
+                end
+            end)
         end)
     end
 
