@@ -528,6 +528,11 @@ if mt then
             end
         end
 
+        -- Bypass the old __namecall closure to avoid the "expects string" calling-convention error.
+        local realMethod = self[method]
+        if typeof(realMethod) == "function" then
+            return realMethod(self, select(2, ...))
+        end
         return oldNamecall(...)
     end
 
