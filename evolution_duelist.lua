@@ -469,6 +469,9 @@ end
 -- The game's bind system stores its functions in the real Roblox _G, not the executor _G.
 local GameG = (typeof(getrenv) == "function" and getrenv()._G) or _G
 
+-- Active while WeaponsClient is processing a shot (Process -> castBullet).
+local shotActiveUntil = 0
+
 -- Hook workspace.Raycast via the game metatable so WeaponsClient's castBullet hits our target.
 local mt = (typeof(getrawmetatable) == "function" and getrawmetatable(game)) or (debug and debug.getmetatable(game))
 local oldNamecall
@@ -487,20 +490,40 @@ if mt then
         local method = getnamecallmethod()
 
         if method == "Raycast" and self == Workspace and cfg.SilentAimEnabled and not computingTarget then
-            local stack = debug.traceback("", 2)
-            if string.find(stack, "castBullet", 1, true) or string.find(stack, "firePellet", 1, true) then
-                local target = getTarget()
-                if target then
+            if tick() <= shotActiveUntil then
+                local fromWeaponsClient = false
+
+                if typeof(getcallingscript) == "function" then
+                    local calling = getcallingscript()
+                    fromWeaponsClient = calling and calling:IsA("ModuleScript") and calling.Name == "WeaponsClient"
+                end
+
+                if not fromWeaponsClient then
+                    local stack = debug.traceback("", 2)
+                    fromWeaponsClient = string.find(stack, "WeaponsClient", 1, true)
+                        or string.find(stack, "castBullet", 1, true)
+                        or string.find(stack, "firePellet", 1, true)
+                end
+
+                if fromWeaponsClient then
+                    -- Don't redirect the per-frame CameraUpdate head-origin raycast.
+                    local myChar = LocalPlayer.Character
+                    local myHead = myChar and myChar:FindFirstChild("Head")
                     local origin = a1
-                    local pos = target.Position
-                    local normal = (origin - pos).Unit
-                    return {
-                        Instance = target,
-                        Position = pos,
-                        Normal = normal,
-                        Material = Enum.Material.Plastic,
-                        Distance = (origin - pos).Magnitude,
-                    }
+                    if not (myHead and (origin - myHead.Position).Magnitude < 1.5) then
+                        local target = getTarget()
+                        if target then
+                            local pos = target.Position
+                            local normal = (origin - pos).Unit
+                            return {
+                                Instance = target,
+                                Position = pos,
+                                Normal = normal,
+                                Material = Enum.Material.Plastic,
+                                Distance = (origin - pos).Magnitude,
+                            }
+                        end
+                    end
                 end
             end
         end
@@ -512,7 +535,7 @@ if mt then
     setro(mt, true)
 end
 
--- Hook outgoing remotes for nicer visuals / fallback alignment.
+-- Hook outgoing remotes so the tracer looks right and we know when a shot is fired.
 local oldFireServer = nil
 local function hookedFireServer(self, cmd, ...)
     if self ~= WeaponsRemote then
@@ -523,7 +546,12 @@ local function hookedFireServer(self, cmd, ...)
         return oldFireServer(self, cmd, ...)
     end
 
-    if cmd == "ReplicateTracer" then
+    if cmd == "Process" then
+        local target = getTarget()
+        if target then
+            shotActiveUntil = tick() + 0.25
+        end
+    elseif cmd == "ReplicateTracer" then
         local style, startPos, _, hitInfo = ...
         local target = getTarget()
         if target then
