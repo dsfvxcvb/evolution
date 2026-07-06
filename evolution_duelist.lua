@@ -988,11 +988,25 @@ function applySelectedSkin()
     if not skinObj then return end
     local tool = getEquippedGun()
     if not tool then return end
-    local old = tool:FindFirstChild("Skin")
-    if old then old:Destroy() end
-    local clone = skinObj:Clone()
-    clone.Name = "Skin"
-    clone.Parent = tool
+
+    -- Wait for the server-applied skin model to exist, then replace its contents.
+    -- This keeps the Skin wrapper that WeaponsClient expects and avoids the gun going invisible.
+    task.delay(0.25, function()
+        local currentTool = getEquippedGun()
+        if currentTool ~= tool then return end
+
+        local existingSkin = currentTool:FindFirstChild("Skin")
+        if existingSkin then
+            existingSkin:ClearAllChildren()
+            for _, c in ipairs(skinObj:GetChildren()) do
+                c:Clone().Parent = existingSkin
+            end
+        else
+            local clone = skinObj:Clone()
+            clone.Name = "Skin"
+            clone.Parent = currentTool
+        end
+    end)
 end
 
 function applySelectedCard()
@@ -1000,40 +1014,80 @@ function applySelectedCard()
     local cardObj = cfg.SelectedCardKey and cardRegistry[cfg.SelectedCardKey]
     if not cardObj then return end
 
-    local texture = nil
-    if cardObj:IsA("Decal") or cardObj:IsA("Texture") then
-        texture = cardObj.Texture
-    elseif cardObj:IsA("ImageLabel") or cardObj:IsA("ImageButton") then
-        texture = cardObj.Image
-    elseif cardObj:IsA("StringValue") then
-        texture = cardObj.Value
-    end
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
 
-    local value = texture or cardObj.Name
+    local desc = nil
 
-    local playerData = LocalPlayer:FindFirstChild("PlayerData")
-    if playerData then
-        local settings = playerData:FindFirstChild("Settings")
-        if settings then
-            for _, v in ipairs(settings:GetDescendants()) do
-                if v.Name == "PlayerCard" and v:IsA("StringValue") then
-                    v.Value = value
-                elseif v.Name == "PlayerCard" and (v:IsA("ImageLabel") or v:IsA("ImageButton")) and texture then
-                    v.Image = texture
-                end
-            end
+    if cardObj:IsA("HumanoidDescription") then
+        desc = cardObj
+    else
+        -- Card might be a character model; build a description from it.
+        pcall(function()
+            desc = Players:GetHumanoidDescriptionFromCharacter(cardObj)
+        end)
+        if not desc then
+            local hd = cardObj:FindFirstChildOfClass("HumanoidDescription")
+            if hd then desc = hd end
         end
     end
 
-    for _, gui in ipairs(LocalPlayer.PlayerGui:GetDescendants()) do
-        if (gui:IsA("ImageLabel") or gui:IsA("ImageButton")) and gui.Name:lower():find("card") and texture then
-            gui.Image = texture
+    if desc then
+        pcall(function()
+            hum:ApplyDescription(desc)
+        end)
+        return
+    end
+
+    -- Fallback: copy basic appearance objects manually.
+    local function copyOrUpdate(className)
+        local from = cardObj:FindFirstChildOfClass(className)
+        if not from then return end
+        local to = char:FindFirstChildOfClass(className)
+        if to then
+            to:Destroy()
+        end
+        local clone = from:Clone()
+        clone.Parent = char
+    end
+
+    copyOrUpdate("BodyColors")
+    copyOrUpdate("Shirt")
+    copyOrUpdate("Pants")
+    copyOrUpdate("ShirtGraphic")
+
+    -- Remove old accessories and clone new ones.
+    for _, acc in ipairs(char:GetDescendants()) do
+        if acc:IsA("Accessory") then
+            acc:Destroy()
+        end
+    end
+    for _, acc in ipairs(cardObj:GetDescendants()) do
+        if acc:IsA("Accessory") then
+            local clone = acc:Clone()
+            clone.Parent = char
+        end
+    end
+
+    -- Copy face decal from card's head to local head.
+    local cardHead = cardObj:FindFirstChild("Head")
+    local myHead = char:FindFirstChild("Head")
+    if cardHead and myHead then
+        local cardFace = cardHead:FindFirstChildOfClass("Decal")
+        if cardFace then
+            for _, d in ipairs(myHead:GetChildren()) do
+                if d:IsA("Decal") then d:Destroy() end
+            end
+            local clone = cardFace:Clone()
+            clone.Parent = myHead
         end
     end
 end
 
 -- Auto-apply cosmetics.
 local lastSkinTool = nil
+local lastAppliedCardKey = nil
 RunService.RenderStepped:Connect(function()
     if cfg.SkinChangerEnabled and cfg.AutoApplySkin then
         local tool = getEquippedGun()
@@ -1043,7 +1097,10 @@ RunService.RenderStepped:Connect(function()
         end
     end
     if cfg.CardChangerEnabled and cfg.AutoApplyCard then
-        applySelectedCard()
+        if cfg.SelectedCardKey and cfg.SelectedCardKey ~= lastAppliedCardKey then
+            lastAppliedCardKey = cfg.SelectedCardKey
+            applySelectedCard()
+        end
     end
 end)
 
