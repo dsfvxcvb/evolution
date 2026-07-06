@@ -58,8 +58,7 @@ getgenv().EvolutionOneTap = {
     ShowFOV = true,
     FOVRadius = 150,
     FOVColor = Color3.fromRGB(255, 255, 255),
-    FOVType = 'Circle',
-    FOVTransparency = 0.65,
+    FOVFillTransparency = 0.65,
     FOVOutline = true,
     FOVOutlineColor = Color3.fromRGB(0, 0, 0),
     FOVOutlineThickness = 1,
@@ -68,11 +67,6 @@ getgenv().EvolutionOneTap = {
     FOVGradientBottom = Color3.fromRGB(0, 0, 0),
     FOVGradientSpin = true,
     FOVGradientSpeed = 120,
-    FOVOutlineGradient = true,
-    FOVOutlineGradientTop = Color3.fromRGB(211, 211, 211),
-    FOVOutlineGradientBottom = Color3.fromRGB(0, 0, 0),
-    FOVOutlineGradientSpin = true,
-    FOVOutlineGradientSpeed = 120,
 
     Fly = false,
     FlySpeed = 50,
@@ -84,6 +78,9 @@ getgenv().EvolutionOneTap = {
     EspDistance = true,
     EspMaxDistance = 3000,
     EspBoxColor = Color3.fromRGB(255, 255, 255),
+    EspNameColor = Color3.fromRGB(255, 255, 255),
+    EspHealthColor = Color3.fromRGB(0, 255, 0),
+    EspDistanceColor = Color3.fromRGB(255, 255, 255),
 
     WorldEnabled = false,
     WorldAmbient = Color3.fromRGB(127, 127, 127),
@@ -92,7 +89,9 @@ getgenv().EvolutionOneTap = {
     WorldFogEnd = 100000,
     WorldFogColor = Color3.fromRGB(192, 192, 192),
     WorldOverrideTime = false,
-    WorldTimeOfDay = "14:00:00",
+    WorldTime = 14,
+
+    MenuGlow = true,
 }
 local cfg = getgenv().EvolutionOneTap
 
@@ -133,17 +132,16 @@ SilentAimBox:AddSlider('OT_MaxDistance', {
 -- ============================================================
 -- FOV CIRCLE UI
 -- ============================================================
-FovBox:AddToggle('OT_ShowFOV', {
+local ShowFOVToggle = FovBox:AddToggle('OT_ShowFOV', {
     Text = 'Visible',
     Default = cfg.ShowFOV,
     Callback = function(v) cfg.ShowFOV = v end
 })
 
-FovBox:AddDropdown('OT_FOVType', {
-    Text = 'Type',
-    Default = cfg.FOVType,
-    Values = {'Circle', 'Square', 'Dotted', 'Lined'},
-    Callback = function(v) cfg.FOVType = v end
+ShowFOVToggle:AddColorPicker('OT_FOVColor', {
+    Title = 'Fill Color',
+    Default = cfg.FOVColor,
+    Callback = function(v) cfg.FOVColor = v end
 })
 
 FovBox:AddSlider('OT_FOVRadius', {
@@ -155,25 +153,25 @@ FovBox:AddSlider('OT_FOVRadius', {
     Callback = function(v) cfg.FOVRadius = v end
 })
 
-FovBox:AddSlider('OT_FOVTransparency', {
-    Text = 'Transparency',
-    Default = cfg.FOVTransparency * 100,
+FovBox:AddSlider('OT_FOVFillTransparency', {
+    Text = 'Fill Transparency',
+    Default = cfg.FOVFillTransparency * 100,
     Min = 0,
     Max = 100,
     Rounding = 0,
-    Callback = function(v) cfg.FOVTransparency = v / 100 end
+    Callback = function(v) cfg.FOVFillTransparency = v / 100 end
 })
 
-FovBox:AddLabel('Fill Color'):AddColorPicker('OT_FOVColor', {
-    Title = 'Fill Color',
-    Default = cfg.FOVColor,
-    Callback = function(v) cfg.FOVColor = v end
-})
-
-FovBox:AddToggle('OT_FOVOutline', {
+local OutlineToggle = FovBox:AddToggle('OT_FOVOutline', {
     Text = 'Outline',
     Default = cfg.FOVOutline,
     Callback = function(v) cfg.FOVOutline = v end
+})
+
+OutlineToggle:AddColorPicker('OT_FOVOutlineColor', {
+    Title = 'Outline Color',
+    Default = cfg.FOVOutlineColor,
+    Callback = function(v) cfg.FOVOutlineColor = v end
 })
 
 FovBox:AddSlider('OT_FOVOutlineThickness', {
@@ -185,25 +183,19 @@ FovBox:AddSlider('OT_FOVOutlineThickness', {
     Callback = function(v) cfg.FOVOutlineThickness = v end
 })
 
-FovBox:AddLabel('Outline Color'):AddColorPicker('OT_FOVOutlineColor', {
-    Title = 'Outline Color',
-    Default = cfg.FOVOutlineColor,
-    Callback = function(v) cfg.FOVOutlineColor = v end
-})
-
-FovBox:AddToggle('OT_FOVGradient', {
+local GradientToggle = FovBox:AddToggle('OT_FOVGradient', {
     Text = 'Gradient',
     Default = cfg.FOVGradient,
     Callback = function(v) cfg.FOVGradient = v end
 })
 
-FovBox:AddLabel('Gradient Top'):AddColorPicker('OT_FOVGradientTop', {
+GradientToggle:AddColorPicker('OT_FOVGradientTop', {
     Title = 'Gradient Top',
     Default = cfg.FOVGradientTop,
     Callback = function(v) cfg.FOVGradientTop = v end
 })
 
-FovBox:AddLabel('Gradient Bottom'):AddColorPicker('OT_FOVGradientBottom', {
+GradientToggle:AddColorPicker('OT_FOVGradientBottom', {
     Title = 'Gradient Bottom',
     Default = cfg.FOVGradientBottom,
     Callback = function(v) cfg.FOVGradientBottom = v end
@@ -222,39 +214,6 @@ FovBox:AddSlider('OT_FOVGradientSpeed', {
     Max = 500,
     Rounding = 0,
     Callback = function(v) cfg.FOVGradientSpeed = v end
-})
-
-FovBox:AddToggle('OT_FOVOutlineGradient', {
-    Text = 'Outline Gradient',
-    Default = cfg.FOVOutlineGradient,
-    Callback = function(v) cfg.FOVOutlineGradient = v end
-})
-
-FovBox:AddLabel('Outline Gradient Top'):AddColorPicker('OT_FOVOutlineGradientTop', {
-    Title = 'Outline Gradient Top',
-    Default = cfg.FOVOutlineGradientTop,
-    Callback = function(v) cfg.FOVOutlineGradientTop = v end
-})
-
-FovBox:AddLabel('Outline Gradient Bottom'):AddColorPicker('OT_FOVOutlineGradientBottom', {
-    Title = 'Outline Gradient Bottom',
-    Default = cfg.FOVOutlineGradientBottom,
-    Callback = function(v) cfg.FOVOutlineGradientBottom = v end
-})
-
-FovBox:AddToggle('OT_FOVOutlineGradientSpin', {
-    Text = 'Outline Gradient Spin',
-    Default = cfg.FOVOutlineGradientSpin,
-    Callback = function(v) cfg.FOVOutlineGradientSpin = v end
-})
-
-FovBox:AddSlider('OT_FOVOutlineGradientSpeed', {
-    Text = 'Outline Spin Speed',
-    Default = cfg.FOVOutlineGradientSpeed,
-    Min = 0,
-    Max = 500,
-    Rounding = 0,
-    Callback = function(v) cfg.FOVOutlineGradientSpeed = v end
 })
 
 -- ============================================================
@@ -284,28 +243,52 @@ EspBox:AddToggle('OT_EspEnabled', {
     Callback = function(v) cfg.EspEnabled = v end
 })
 
-EspBox:AddToggle('OT_EspBoxes', {
+local EspBoxesToggle = EspBox:AddToggle('OT_EspBoxes', {
     Text = 'Boxes',
     Default = cfg.EspBoxes,
     Callback = function(v) cfg.EspBoxes = v end
 })
 
-EspBox:AddToggle('OT_EspNames', {
+EspBoxesToggle:AddColorPicker('OT_EspBoxColor', {
+    Title = 'Box Color',
+    Default = cfg.EspBoxColor,
+    Callback = function(v) cfg.EspBoxColor = v end
+})
+
+local EspNamesToggle = EspBox:AddToggle('OT_EspNames', {
     Text = 'Names',
     Default = cfg.EspNames,
     Callback = function(v) cfg.EspNames = v end
 })
 
-EspBox:AddToggle('OT_EspHealth', {
+EspNamesToggle:AddColorPicker('OT_EspNameColor', {
+    Title = 'Name Color',
+    Default = cfg.EspNameColor,
+    Callback = function(v) cfg.EspNameColor = v end
+})
+
+local EspHealthToggle = EspBox:AddToggle('OT_EspHealth', {
     Text = 'Health',
     Default = cfg.EspHealth,
     Callback = function(v) cfg.EspHealth = v end
 })
 
-EspBox:AddToggle('OT_EspDistance', {
+EspHealthToggle:AddColorPicker('OT_EspHealthColor', {
+    Title = 'Health Color',
+    Default = cfg.EspHealthColor,
+    Callback = function(v) cfg.EspHealthColor = v end
+})
+
+local EspDistanceToggle = EspBox:AddToggle('OT_EspDistance', {
     Text = 'Distance',
     Default = cfg.EspDistance,
     Callback = function(v) cfg.EspDistance = v end
+})
+
+EspDistanceToggle:AddColorPicker('OT_EspDistanceColor', {
+    Title = 'Distance Color',
+    Default = cfg.EspDistanceColor,
+    Callback = function(v) cfg.EspDistanceColor = v end
 })
 
 EspBox:AddSlider('OT_EspMaxDist', {
@@ -315,12 +298,6 @@ EspBox:AddSlider('OT_EspMaxDist', {
     Max = 10000,
     Rounding = 0,
     Callback = function(v) cfg.EspMaxDistance = v end
-})
-
-EspBox:AddLabel('Box Color'):AddColorPicker('OT_EspBoxColor', {
-    Title = 'Box Color',
-    Default = cfg.EspBoxColor,
-    Callback = function(v) cfg.EspBoxColor = v end
 })
 
 -- ============================================================
@@ -394,11 +371,13 @@ WorldBox:AddToggle('OT_OverrideTime', {
     Callback = function(v) cfg.WorldOverrideTime = v end
 })
 
-WorldBox:AddInput('OT_TimeOfDay', {
+WorldBox:AddSlider('OT_WorldTime', {
     Text = 'Time of Day',
-    Default = cfg.WorldTimeOfDay,
-    Finished = true,
-    Callback = function(v) cfg.WorldTimeOfDay = v end
+    Default = cfg.WorldTime * 100,
+    Min = 0,
+    Max = 2400,
+    Rounding = 0,
+    Callback = function(v) cfg.WorldTime = v / 100 end
 })
 
 -- ============================================================
@@ -409,9 +388,12 @@ fovParent.Name = "EvolutionFOV"
 fovParent.Parent = cloneref(game:GetService("CoreGui"))
 fovParent.ResetOnSpawn = false
 fovParent.DisplayOrder = 9999
+fovParent.IgnoreGuiInset = true
 
 local fovFrame = nil
-local rotatingGradients = {}
+local fovOutline = nil
+local fovGradient = nil
+local fovCorner = nil
 
 local function gradientColor(top, bottom)
     return ColorSequence.new{
@@ -420,151 +402,73 @@ local function gradientColor(top, bottom)
     }
 end
 
-local function addRotatingGradient(gradient, speed)
-    if gradient then
-        table.insert(rotatingGradients, {gradient = gradient, speed = speed})
-    end
-end
-
-local function clearRotatingGradients()
-    rotatingGradients = {}
-end
-
-local function destroyFov()
-    clearRotatingGradients()
-    if fovFrame then
-        pcall(function() fovFrame:Destroy() end)
-        fovFrame = nil
-    end
-end
-
-local function buildFov()
-    destroyFov()
-    if not cfg.ShowFOV then return end
-
-    local radius = cfg.FOVRadius
-    local fovType = cfg.FOVType
+local function createFov()
+    if fovFrame then return end
 
     fovFrame = Instance.new("Frame")
     fovFrame.Name = "FOV"
     fovFrame.AnchorPoint = Vector2.new(0.5, 0.5)
-    fovFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
-    fovFrame.BackgroundTransparency = 1
-    fovFrame.Visible = true
+    fovFrame.BorderSizePixel = 0
+    fovFrame.ZIndex = 1
     fovFrame.Parent = fovParent
 
-    if fovType == "Dotted" or fovType == "Lined" then
-        for i = 1, 36 do
-            local segment = Instance.new("Frame")
-            segment.Size = UDim2.new(0, 5, 0, 5)
-            segment.BackgroundColor3 = cfg.FOVColor
-            segment.BackgroundTransparency = cfg.FOVTransparency
-            segment.AnchorPoint = Vector2.new(0.5, 0.5)
+    fovCorner = Instance.new("UICorner")
+    fovCorner.CornerRadius = UDim.new(0.5, 0)
+    fovCorner.Parent = fovFrame
 
-            local angle = math.rad((i - 1) * (360 / 36))
-            local x = math.cos(angle) * radius
-            local y = math.sin(angle) * radius
-            segment.Position = UDim2.new(0.5, x, 0.5, y)
-            segment.Parent = fovFrame
+    fovOutline = Instance.new("UIStroke")
+    fovOutline.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    fovOutline.LineJoinMode = Enum.LineJoinMode.Round
+    fovOutline.Parent = fovFrame
 
-            if fovType == "Dotted" then
-                local corner = Instance.new("UICorner")
-                corner.CornerRadius = UDim.new(1, 0)
-                corner.Parent = segment
-            elseif fovType == "Lined" then
-                segment.Size = UDim2.new(0, 10, 0, 2)
-                segment.Rotation = math.deg(angle)
-            end
+    fovGradient = Instance.new("UIGradient")
+    fovGradient.Parent = fovFrame
+end
 
-            local segOutline = nil
-            if cfg.FOVOutline then
-                segOutline = Instance.new("UIStroke")
-                segOutline.Color = cfg.FOVOutlineColor
-                segOutline.Transparency = 0
-                segOutline.Thickness = cfg.FOVOutlineThickness
-                segOutline.Parent = segment
-            end
-
-            if cfg.FOVOutlineGradient and segOutline then
-                local grad = Instance.new("UIGradient")
-                grad.Color = gradientColor(cfg.FOVOutlineGradientTop, cfg.FOVOutlineGradientBottom)
-                grad.Rotation = 0
-                grad.Parent = segOutline
-                if cfg.FOVOutlineGradientSpin then
-                    addRotatingGradient(grad, cfg.FOVOutlineGradientSpeed)
-                end
-            end
-
-            if cfg.FOVGradient then
-                local grad = Instance.new("UIGradient")
-                grad.Color = gradientColor(cfg.FOVGradientTop, cfg.FOVGradientBottom)
-                grad.Rotation = 0
-                grad.Parent = segment
-                if cfg.FOVGradientSpin then
-                    addRotatingGradient(grad, cfg.FOVGradientSpeed)
-                end
-            end
-        end
-    else
-        fovFrame.Size = UDim2.new(0, radius * 2, 0, radius * 2)
-        fovFrame.BackgroundColor3 = cfg.FOVColor
-        fovFrame.BackgroundTransparency = cfg.FOVTransparency
-
-        if fovType == "Circle" then
-            local corner = Instance.new("UICorner")
-            corner.CornerRadius = UDim.new(0.5, 0)
-            corner.Parent = fovFrame
-        end
-
-        local outline = nil
-        if cfg.FOVOutline then
-            outline = Instance.new("UIStroke")
-            outline.Color = cfg.FOVOutlineColor
-            outline.Transparency = 0
-            outline.Thickness = cfg.FOVOutlineThickness
-            outline.Parent = fovFrame
-        end
-
-        if cfg.FOVOutlineGradient and outline then
-            local grad = Instance.new("UIGradient")
-            grad.Color = gradientColor(cfg.FOVOutlineGradientTop, cfg.FOVOutlineGradientBottom)
-            grad.Rotation = 0
-            grad.Parent = outline
-            if cfg.FOVOutlineGradientSpin then
-                addRotatingGradient(grad, cfg.FOVOutlineGradientSpeed)
-            end
-        end
-
-        if cfg.FOVGradient then
-            local grad = Instance.new("UIGradient")
-            grad.Color = gradientColor(cfg.FOVGradientTop, cfg.FOVGradientBottom)
-            grad.Rotation = 0
-            grad.Parent = fovFrame
-            if cfg.FOVGradientSpin then
-                addRotatingGradient(grad, cfg.FOVGradientSpeed)
-            end
-        end
+local function destroyFov()
+    if fovFrame then
+        pcall(function() fovFrame:Destroy() end)
+        fovFrame = nil
+        fovOutline = nil
+        fovGradient = nil
+        fovCorner = nil
     end
 end
 
-buildFov()
+createFov()
 
-local lastFovRebuild = tick()
 RunService.RenderStepped:Connect(function()
-    for _, data in ipairs(rotatingGradients) do
-        local grad = data.gradient
-        if grad then
-            grad.Rotation = (tick() * data.speed) % 360
-        end
+    local shouldShow = cfg.SilentAimEnabled and cfg.ShowFOV
+    if not shouldShow then
+        if fovFrame then fovFrame.Visible = false end
+        return
     end
 
-    -- rebuild on radius/type change (debounced a bit)
-    if tick() - lastFovRebuild > 0.1 then
-        lastFovRebuild = tick()
-        if cfg.ShowFOV and (not fovFrame or fovFrame.Parent == nil) then
-            buildFov()
-        elseif not cfg.ShowFOV and fovFrame then
-            destroyFov()
+    if not fovFrame or fovFrame.Parent == nil then
+        createFov()
+    end
+
+    local center = Camera.ViewportSize / 2
+    fovFrame.Visible = true
+    fovFrame.Position = UDim2.new(0, center.X, 0, center.Y)
+    fovFrame.Size = UDim2.new(0, cfg.FOVRadius * 2, 0, cfg.FOVRadius * 2)
+    fovFrame.BackgroundColor3 = cfg.FOVColor
+    fovFrame.BackgroundTransparency = cfg.FOVFillTransparency
+
+    if fovOutline then
+        fovOutline.Enabled = cfg.FOVOutline
+        fovOutline.Color = cfg.FOVOutlineColor
+        fovOutline.Thickness = cfg.FOVOutlineThickness
+    end
+
+    if fovGradient then
+        if cfg.FOVGradient then
+            fovGradient.Color = gradientColor(cfg.FOVGradientTop, cfg.FOVGradientBottom)
+            if cfg.FOVGradientSpin then
+                fovGradient.Rotation = (tick() * cfg.FOVGradientSpeed) % 360
+            end
+        else
+            fovGradient.Color = gradientColor(cfg.FOVColor, cfg.FOVColor)
         end
     end
 end)
@@ -798,7 +702,7 @@ RunService.RenderStepped:Connect(function()
             t.Name.Visible = true
             t.Name.Position = topLeft - Vector2.new(0, 14)
             t.Name.Text = plr and plr.DisplayName or model.Name
-            t.Name.Color = cfg.EspBoxColor
+            t.Name.Color = cfg.EspNameColor
         else
             t.Name.Visible = false
         end
@@ -808,7 +712,7 @@ RunService.RenderStepped:Connect(function()
             t.Health.Visible = true
             t.Health.Position = topLeft - Vector2.new(0, 28)
             t.Health.Text = math.floor(hum.Health) .. "/" .. math.floor(hum.MaxHealth)
-            t.Health.Color = Color3.fromRGB(0, 255, 0)
+            t.Health.Color = cfg.EspHealthColor
         else
             t.Health.Visible = false
         end
@@ -817,7 +721,7 @@ RunService.RenderStepped:Connect(function()
             t.Distance.Visible = true
             t.Distance.Position = Vector2.new(center.X, topLeft.Y + boxSize.Y + 2)
             t.Distance.Text = math.floor(dist) .. "m"
-            t.Distance.Color = Color3.fromRGB(255, 255, 255)
+            t.Distance.Color = cfg.EspDistanceColor
         else
             t.Distance.Visible = false
         end
@@ -866,7 +770,10 @@ RunService.RenderStepped:Connect(function()
         Lighting.FogEnd = cfg.WorldFogEnd
         Lighting.FogColor = cfg.WorldFogColor
         if cfg.WorldOverrideTime then
-            Lighting.TimeOfDay = cfg.WorldTimeOfDay
+            local totalMinutes = math.floor(cfg.WorldTime * 60)
+            local hours = math.floor(totalMinutes / 60) % 24
+            local minutes = totalMinutes % 60
+            Lighting.TimeOfDay = string.format("%02d:%02d:00", hours, minutes)
         end
     end
 end)
@@ -874,6 +781,25 @@ end)
 -- ============================================================
 -- UI SETTINGS
 -- ============================================================
+local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
+
+MenuGroup:AddToggle('OT_MenuGlow', {
+    Text = 'Menu Glow',
+    Default = cfg.MenuGlow,
+    Callback = function(v) cfg.MenuGlow = v end
+})
+
+MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', {
+    Default = 'RightShift',
+    NoUI = true,
+    Text = 'Menu keybind'
+})
+Library.ToggleKeybind = Options.MenuKeybind
+
+MenuGroup:AddButton('Unload', function()
+    Library:Unload()
+end)
+
 ThemeManager:SetLibrary(Library)
 SaveManager:SetLibrary(Library)
 SaveManager:IgnoreThemeSettings()
@@ -881,5 +807,40 @@ SaveManager:SetIgnoreIndexes({ 'MenuKeybind', 'BackgroundColor', 'MainColor', 'A
 ThemeManager:ApplyToTab(Tabs['UI Settings'])
 SaveManager:BuildConfigSection(Tabs['UI Settings'])
 SaveManager:LoadAutoloadConfig()
+
+-- ============================================================
+-- MENU GLOW
+-- ============================================================
+local glowFrame = nil
+RunService.RenderStepped:Connect(function()
+    if not cfg.MenuGlow then
+        if glowFrame then glowFrame.Visible = false end
+        return
+    end
+
+    local outer = Library.ScreenGui:FindFirstChild("Outer")
+    if not outer then
+        if glowFrame then glowFrame.Visible = false end
+        return
+    end
+
+    if not glowFrame then
+        glowFrame = Instance.new("Frame")
+        glowFrame.Name = "MenuGlow"
+        glowFrame.BorderSizePixel = 0
+        glowFrame.BackgroundColor3 = Library.AccentColor
+        glowFrame.BackgroundTransparency = 0.85
+        glowFrame.ZIndex = 0
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius = UDim.new(0, 12)
+        corner.Parent = glowFrame
+        glowFrame.Parent = Library.ScreenGui
+    end
+
+    glowFrame.Visible = true
+    local pad = 8
+    glowFrame.Position = UDim2.new(0, outer.AbsolutePosition.X - pad, 0, outer.AbsolutePosition.Y - pad)
+    glowFrame.Size = UDim2.new(0, outer.AbsoluteSize.X + pad * 2, 0, outer.AbsoluteSize.Y + pad * 2)
+end)
 
 print('[evolution] One Tap module loaded')
