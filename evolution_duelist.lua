@@ -489,7 +489,7 @@ if mt then
         local self, a1 = ...
         local method = getnamecallmethod()
 
-        if method == "Raycast" and self == Workspace and cfg.SilentAimEnabled and not computingTarget then
+        if method == "Raycast" and self:IsA("Workspace") and cfg.SilentAimEnabled and not computingTarget then
             if tick() <= shotActiveUntil then
                 local fromWeaponsClient = false
 
