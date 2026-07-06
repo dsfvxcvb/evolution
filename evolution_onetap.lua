@@ -744,7 +744,6 @@ end
 local currentAutoKillTarget = nil
 local lastAutoKillTarget = nil
 local hasFiredAtCurrent = false
-local autoKillAiming = false
 local autoKillHiddenParts = {}
 
 local function unhideAutoKillTarget()
@@ -864,32 +863,23 @@ RunService.RenderStepped:Connect(function()
 
     targetRoot.CFrame = myHRP.CFrame * CFrame.new(0, 0, -6.5)
 
-    setAutoKillWeapon()
+    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetRoot.Position)
+
+    local slotName, slotIndex = getWeaponSlot()
+    if myChar:GetAttribute("currentWeapon") ~= slotName then
+        pcall(function()
+            if WeaponClient.setWeapon then
+                WeaponClient.setWeapon(slotIndex)
+            end
+        end)
+    end
 
     if not hasFiredAtCurrent then
         hasFiredAtCurrent = true
-        local firedTarget = target
-        task.delay(0.22, function()
-            if not cfg.AutoKillEnabled or currentAutoKillTarget ~= firedTarget then return end
-
-            local slotName = getWeaponSlot()
-            if not isAlive(firedTarget) or hasShield(firedTarget) or LocalPlayer.Character:GetAttribute("currentWeapon") ~= slotName then
-                hasFiredAtCurrent = false
-                return
+        pcall(function()
+            if WeaponClient.fire then
+                WeaponClient.fire()
             end
-
-            local tRoot = firedTarget:FindFirstChild("HumanoidRootPart") or firedTarget:FindFirstChild("Head") or firedTarget.PrimaryPart
-            autoKillAiming = true
-            if tRoot then
-                Camera.CFrame = CFrame.new(Camera.CFrame.Position, tRoot.Position)
-            end
-            pcall(function()
-                if WeaponClient.fire then
-                    WeaponClient.fire()
-                end
-            end)
-            task.wait(0.05)
-            autoKillAiming = false
         end)
     end
 end)
@@ -1087,7 +1077,7 @@ end)
 -- ============================================================
 local noRecoilBaseLook = Camera.CFrame.LookVector
 RunService.RenderStepped:Connect(function()
-    if autoKillAiming then return end
+    if currentAutoKillTarget and not hasFiredAtCurrent then return end
     local delta = UserInputService:GetMouseDelta()
     if delta.Magnitude > 0 then
         local yaw = -delta.X * 0.0025
