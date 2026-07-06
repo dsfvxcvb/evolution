@@ -744,6 +744,7 @@ end
 local currentAutoKillTarget = nil
 local lastAutoKillTarget = nil
 local hasFiredAtCurrent = false
+local autoKillAiming = false
 local autoKillHiddenParts = {}
 
 local function unhideAutoKillTarget()
@@ -843,9 +844,17 @@ RunService.RenderStepped:Connect(function()
     if not hasFiredAtCurrent then
         hasFiredAtCurrent = true
         local firedTarget = target
-        task.delay(0.12, function()
+        task.delay(0.22, function()
             if not cfg.AutoKillEnabled or currentAutoKillTarget ~= firedTarget then return end
+
+            local slotName = getWeaponSlot()
+            if firedTarget ~= currentAutoKillTarget or LocalPlayer.Character:GetAttribute("currentWeapon") ~= slotName then
+                hasFiredAtCurrent = false
+                return
+            end
+
             local tRoot = firedTarget:FindFirstChild("HumanoidRootPart") or firedTarget:FindFirstChild("Head") or firedTarget.PrimaryPart
+            autoKillAiming = true
             if tRoot then
                 Camera.CFrame = CFrame.new(Camera.CFrame.Position, tRoot.Position)
             end
@@ -854,6 +863,8 @@ RunService.RenderStepped:Connect(function()
                     WeaponClient.fire()
                 end
             end)
+            task.wait(0.05)
+            autoKillAiming = false
         end)
     end
 
@@ -1046,6 +1057,25 @@ RunService.RenderStepped:Connect(function()
             Lighting.TimeOfDay = string.format("%02d:%02d:00", hours, minutes)
         end
     end
+end)
+
+-- ============================================================
+-- NO RECOIL (always on)
+-- ============================================================
+local noRecoilBaseLook = Camera.CFrame.LookVector
+RunService.RenderStepped:Connect(function()
+    if autoKillAiming then return end
+    local delta = UserInputService:GetMouseDelta()
+    if delta.Magnitude > 0 then
+        local yaw = -delta.X * 0.0025
+        local pitch = -delta.Y * 0.0025
+        local cf = CFrame.new(Vector3.zero, noRecoilBaseLook)
+        cf = CFrame.fromAxisAngle(Vector3.yAxis, yaw) * cf
+        local right = cf.RightVector
+        cf = CFrame.fromAxisAngle(right, pitch) * cf
+        noRecoilBaseLook = cf.LookVector
+    end
+    Camera.CFrame = CFrame.new(Camera.CFrame.Position, Camera.CFrame.Position + noRecoilBaseLook)
 end)
 
 -- ============================================================
