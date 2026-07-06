@@ -682,6 +682,12 @@ local function hasShield(model)
     if model:FindFirstChildOfClass("ForceField") then return true end
     if model:GetAttribute("Shielded") == true then return true end
     if model:GetAttribute("Invincible") == true then return true end
+
+    for _, child in ipairs(model:GetChildren()) do
+        if child:IsA("Highlight") and child.FillTransparency < 1 and child.FillColor.B > 0.5 and child.FillColor.R < 0.5 then
+            return true
+        end
+    end
     return false
 end
 
@@ -713,32 +719,26 @@ local function getAutoKillTarget()
     return bestModel
 end
 
-local function findTool(method)
-    local char = LocalPlayer.Character
-    local backpack = LocalPlayer:FindFirstChild("Backpack")
-    local function matches(tool)
-        return tool:IsA("Tool") and string.find(tool.Name:lower(), method:lower(), 1, true)
+local function getWeaponSlot()
+    if cfg.AutoKillMethod == 'Sniper' then
+        return 'Primary', 1
+    elseif cfg.AutoKillMethod == 'Pistol' then
+        return 'Secondary', 2
     end
-
-    if char then
-        for _, t in ipairs(char:GetChildren()) do
-            if matches(t) then return t end
-        end
-    end
-    if backpack then
-        for _, t in ipairs(backpack:GetChildren()) do
-            if matches(t) then return t end
-        end
-    end
-    return nil
+    return 'Primary', 1
 end
 
-local function equipTool(tool)
+local function setAutoKillWeapon()
     local char = LocalPlayer.Character
-    local hum = char and char:FindFirstChildOfClass("Humanoid")
-    if hum and tool then
-        pcall(function() hum:EquipTool(tool) end)
-    end
+    if not char then return end
+    local slotName, slotIndex = getWeaponSlot()
+    local current = char:GetAttribute("currentWeapon")
+    if current == slotName then return end
+    pcall(function()
+        if WeaponClient.setWeapon then
+            WeaponClient.setWeapon(slotIndex)
+        end
+    end)
 end
 
 local currentAutoKillTarget = nil
@@ -833,13 +833,7 @@ RunService.RenderStepped:Connect(function()
 
     targetRoot.CFrame = myHRP.CFrame * CFrame.new(0, 0, -6.5)
 
-    local tool = findTool(cfg.AutoKillMethod)
-    if not tool then return end
-
-    local currentTool = myChar:FindFirstChildOfClass("Tool")
-    if currentTool ~= tool then
-        equipTool(tool)
-    end
+    setAutoKillWeapon()
 
     Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetRoot.Position)
 
