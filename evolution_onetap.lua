@@ -749,7 +749,12 @@ local autoKillHiddenParts = {}
 local function unhideAutoKillTarget()
     for part, orig in pairs(autoKillHiddenParts) do
         if part.Parent then
-            part.LocalTransparencyModifier = orig
+            if part:IsA("BasePart") then
+                part.LocalTransparencyModifier = orig.ltm
+                part.Transparency = orig.trans
+            elseif part:IsA("Decal") or part:IsA("Texture") then
+                part.Transparency = orig.trans
+            end
         end
     end
     autoKillHiddenParts = {}
@@ -760,12 +765,28 @@ local function hideAutoKillTarget(model)
     for _, part in ipairs(model:GetDescendants()) do
         if part:IsA("BasePart") then
             if autoKillHiddenParts[part] == nil then
-                autoKillHiddenParts[part] = part.LocalTransparencyModifier
+                autoKillHiddenParts[part] = { ltm = part.LocalTransparencyModifier, trans = part.Transparency }
             end
             part.LocalTransparencyModifier = 1
+            part.Transparency = 1
+            part.CastShadow = false
+        elseif part:IsA("Decal") or part:IsA("Texture") then
+            if autoKillHiddenParts[part] == nil then
+                autoKillHiddenParts[part] = { trans = part.Transparency }
+            end
+            part.Transparency = 1
         end
     end
 end
+
+task.spawn(function()
+    while true do
+        task.wait()
+        if cfg.AutoKillEnabled and currentAutoKillTarget then
+            hideAutoKillTarget(currentAutoKillTarget)
+        end
+    end
+end)
 
 RunService.RenderStepped:Connect(function()
     if not cfg.AutoKillEnabled then
