@@ -357,6 +357,34 @@ end)
 -- ============================================================
 -- SILENT AIM / BULLET MANIPULATION LOGIC
 -- ============================================================
+
+-- Clean up any hooks from a previous load so we don't double-hook.
+local previousHooks = getgenv().EvolutionDuelistHooks
+if previousHooks then
+    if previousHooks.mt and previousHooks.oldNamecall then
+        pcall(function()
+            local setro = setreadonly or function(t, writable)
+                if typeof(make_writable) == "function" then
+                    if writable then make_writable(t) else make_readonly(t) end
+                end
+            end
+            setro(previousHooks.mt, false)
+            previousHooks.mt.__namecall = previousHooks.oldNamecall
+            setro(previousHooks.mt, true)
+        end)
+    end
+    if previousHooks.weaponsRemote and previousHooks.oldFireServer then
+        pcall(function()
+            if typeof(hookfunction) == "function" then
+                hookfunction(previousHooks.weaponsRemote.FireServer, previousHooks.oldFireServer)
+            else
+                previousHooks.weaponsRemote.FireServer = previousHooks.oldFireServer
+            end
+        end)
+    end
+    getgenv().EvolutionDuelistHooks = nil
+end
+
 local CharactersFolder = Workspace:WaitForChild("Characters", 10) or Workspace:FindFirstChild("Characters")
 local WeaponsRemote = ReplicatedStorage:WaitForChild("Events", 10):WaitForChild("Weapons", 10)
 
@@ -517,6 +545,14 @@ else
     oldFireServer = WeaponsRemote.FireServer
     WeaponsRemote.FireServer = hookedFireServer
 end
+
+-- Remember hooks so a reload can restore them instead of stacking hooks.
+getgenv().EvolutionDuelistHooks = {
+    mt = mt,
+    oldNamecall = oldNamecall,
+    weaponsRemote = WeaponsRemote,
+    oldFireServer = oldFireServer,
+}
 
 -- Auto Fire
 local lastTrigger = 0
