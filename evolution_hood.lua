@@ -354,6 +354,94 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = Workspace.CurrentCamera
+
+-- ============================================================
+-- EXTERNAL DEPENDENCIES STUBS (ForceHit / AnimGodmode)
+-- ============================================================
+if not getgenv().ForceHit then
+    getgenv().ForceHit = {
+        Enabled = false,
+        MaxDistance = 250,
+        WallCheck = true,
+        ForceFieldCheck = true,
+        DeathCheck = true,
+        PrefireForceField = false,
+        HitPart = "UpperTorso",
+        LastShotTime = 0,
+        _InternalOverride = false,
+    }
+end
+
+if not getgenv().FH_Fire then
+    getgenv().FH_Fire = function(target)
+        if not target or not target.Character then return end
+        local hitPartName = getgenv().ForceHit.HitPart or "Head"
+        local part = target.Character:FindFirstChild(hitPartName) or target.Character:FindFirstChild("Head")
+        if not part then return end
+        local myChar = LocalPlayer.Character
+        local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myHRP then return end
+
+        local pellets = {}
+        local offsets = {}
+        for i = 1, 5 do
+            pellets[i] = { Normal = part.Position, Instance = part, Position = part.Position }
+            offsets[i] = { thePart = part, theOffset = Vector3.new(0, 0, 0) }
+        end
+
+        local args = {
+            "Shoot",
+            {
+                pellets,
+                offsets,
+                myHRP.Position,
+                myHRP.Position,
+                workspace:GetServerTimeNow()
+            }
+        }
+        pcall(function()
+            ReplicatedStorage:WaitForChild("MainEvent"):FireServer(unpack(args))
+        end)
+        getgenv().ForceHit.LastShotTime = tick()
+    end
+end
+
+if not getgenv().AnimGodmode then
+    local animGodEnabled = false
+    local animGodConn = nil
+    getgenv().AnimGodmode = {
+        IsEnabled = function() return animGodEnabled end,
+        Set = function(value)
+            animGodEnabled = value
+            if animGodConn then
+                animGodConn:Disconnect()
+                animGodConn = nil
+            end
+            if value then
+                local char = LocalPlayer.Character
+                if char then
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum.BreakJointsOnDeath = false
+                    end
+                end
+                animGodConn = LocalPlayer.CharacterAdded:Connect(function(character)
+                    task.wait(0.5)
+                    local hum = character:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum.BreakJointsOnDeath = false
+                        hum.HealthChanged:Connect(function(health)
+                            if health < hum.MaxHealth then
+                                hum.Health = hum.MaxHealth
+                            end
+                        end)
+                    end
+                end)
+            end
+        end
+    }
+end
+
 local SelectedShootSounds = {
 DoubleBarrel = "Mp40",
 Revolver = "Mp40",
@@ -9223,7 +9311,7 @@ Values = {" "},
 Default = " ",
 AllowNull = true,
 Callback = function(Value)
-if Value == " " then return end
+if not Value or Value == " " then return end
 local character = LocalPlayer.Character
 if not character then return end
 local accessory = character:FindFirstChild(Value)
