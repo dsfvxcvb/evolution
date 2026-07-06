@@ -306,6 +306,7 @@ local SkinDropdown = SkinBox:AddDropdown('DT_SelectedSkin', {
     Text = 'Skin',
     Default = cfg.SelectedSkinKey,
     Values = {},
+    AllowNull = true,
     Callback = function(v) cfg.SelectedSkinKey = v end
 })
 
@@ -334,6 +335,7 @@ local CardDropdown = CardBox:AddDropdown('DT_SelectedCard', {
     Text = 'Player Card',
     Default = cfg.SelectedCardKey,
     Values = {},
+    AllowNull = true,
     Callback = function(v) cfg.SelectedCardKey = v end
 })
 
