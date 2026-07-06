@@ -4,6 +4,12 @@
 -- ============================================================
 
 local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
+
+-- unload old UI before loading the new library, so the fresh ScreenGui isn't destroyed
+if typeof(getgenv().Library) == "table" and typeof(getgenv().Library.Unload) == "function" then
+    pcall(function() getgenv().Library:Unload() end)
+end
+
 local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
 getgenv().Library = Library
 local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
@@ -21,11 +27,6 @@ local TweenService = cloneref(game:GetService("TweenService"))
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
-
--- unload old
-if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
-    pcall(function() Library:Unload() end)
-end
 
 local Window = Library:CreateWindow({
     Title = 'evolution',
