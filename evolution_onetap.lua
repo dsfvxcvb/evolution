@@ -18,6 +18,7 @@ local Players = cloneref(game:GetService("Players"))
 local RunService = cloneref(game:GetService("RunService"))
 local CollectionService = cloneref(game:GetService("CollectionService"))
 local Workspace = cloneref(game:GetService("Workspace"))
+local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
 local UserInputService = cloneref(game:GetService("UserInputService"))
 local Lighting = cloneref(game:GetService("Lighting"))
 
@@ -145,7 +146,7 @@ AutoKillBox:AddToggle('OT_AutoKillUse', {
 AutoKillBox:AddDropdown('OT_AutoKillMethod', {
     Text = 'Method',
     Default = cfg.AutoKillMethod,
-    Values = {'Sniper', 'Pistol', 'Knife'},
+    Values = {'Sniper', 'Pistol'},
     Callback = function(v) cfg.AutoKillMethod = v end
 })
 
@@ -497,12 +498,74 @@ end)
 -- SILENT AIM LOGIC
 -- ============================================================
 local WeaponClient
+local WeaponManager
+
 repeat
-    local ok = pcall(function()
+    local ok1 = pcall(function()
         WeaponClient = require(LocalPlayer.PlayerScripts.Start.Game.WeaponClient)
     end)
-    if not ok then task.wait(0.2) end
-until WeaponClient
+    local ok2 = pcall(function()
+        WeaponManager = require(ReplicatedStorage.Common.Managers.WeaponManager)
+    end)
+    if not (ok1 and ok2) then task.wait(0.2) end
+until WeaponClient and WeaponManager
+
+-- ============================================================
+-- AUTOKILL BULLET MANIP (rapid fire / infinite ammo / headshot)
+-- ============================================================
+local origGetWeaponData = WeaponManager.getWeaponData
+WeaponManager.getWeaponData = function(name)
+    local data = origGetWeaponData(name)
+    if data and cfg.AutoKillEnabled then
+        local copy = {}
+        for k, v in pairs(data) do
+            copy[k] = v
+        end
+        copy.firerate = 9999
+        return copy
+    end
+    return data
+end
+
+local origGetBullets = WeaponClient.getBullets
+WeaponClient.getBullets = function(...)
+    if cfg.AutoKillEnabled then
+        return 999
+    end
+    return origGetBullets(...)
+end
+
+local origCast = WeaponManager.cast
+WeaponManager.cast = function(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10)
+    if cfg.AutoKillEnabled and p6 and p6.onHitCharacter then
+        local origOnHit = p6.onHitCharacter
+        p6.onHitCharacter = function(char, part, rayResult, activeCast)
+            local head = char:FindFirstChild("Hitbox_Head") or char:FindFirstChild("Head")
+            if head then
+                origOnHit(char, head, rayResult, activeCast)
+            else
+                origOnHit(char, part, rayResult, activeCast)
+            end
+        end
+    end
+    return origCast(p1, p2, p3, p4, p5, p6, p7, p8, p9, p10)
+end
+
+local origRcast = WeaponManager.rcast
+WeaponManager.rcast = function(p1, p2, p3, p4, p5, p6, p7)
+    if cfg.AutoKillEnabled and p6 and p6.onHitCharacter then
+        local origOnHit = p6.onHitCharacter
+        p6.onHitCharacter = function(char, part, rayResult)
+            local head = char:FindFirstChild("Hitbox_Head") or char:FindFirstChild("Head")
+            if head then
+                origOnHit(char, head, rayResult)
+            else
+                origOnHit(char, part, rayResult)
+            end
+        end
+    end
+    return origRcast(p1, p2, p3, p4, p5, p6, p7)
+end
 
 local function isAlive(char)
     if not char then return false end
@@ -633,10 +696,11 @@ local function getAutoKillTarget()
 
     for _, model in ipairs(CollectionService:GetTagged("Character")) do
         if model == myChar then continue end
+        if not model:IsDescendantOf(Workspace) then continue end
         if not isAlive(model) then continue end
         if hasShield(model) then continue end
 
-        local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head") or model.PrimaryPart
+        local root = model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart") or model.PrimaryPart
         if not root then continue end
 
         local dist = (root.Position - myPos).Magnitude
@@ -708,8 +772,7 @@ RunService.RenderStepped:Connect(function()
         return
     end
 
-    local distance = cfg.AutoKillMethod == 'Knife' and 2.5 or 6.5
-    targetRoot.CFrame = myHRP.CFrame * CFrame.new(0, 0, -distance)
+    targetRoot.CFrame = myHRP.CFrame * CFrame.new(0, 0, -6.5)
 
     local tool = findTool(cfg.AutoKillMethod)
     if not tool then return end
@@ -721,14 +784,10 @@ RunService.RenderStepped:Connect(function()
 
     Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetRoot.Position)
 
-    local cooldown = cfg.AutoKillMethod == 'Knife' and 0.4 or 0.15
-    if tick() - lastAutoKillAttack >= cooldown then
+    if tick() - lastAutoKillAttack >= 0.05 then
         lastAutoKillAttack = tick()
         pcall(function()
-            if tool:IsA("Tool") then
-                tool:Activate()
-            end
-            if cfg.AutoKillMethod ~= 'Knife' and WeaponClient.fire then
+            if WeaponClient.fire then
                 WeaponClient.fire()
             end
         end)
