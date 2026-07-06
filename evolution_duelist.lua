@@ -989,35 +989,23 @@ function applySelectedSkin()
     local tool = getEquippedGun()
     if not tool then return end
 
-    -- Wait for the server skin to load, then overlay the selected skin and hide the original.
+    -- Wait for the server skin to load, then replace the entire Skin model with the selected one.
     task.delay(0.25, function()
         local currentTool = getEquippedGun()
         if currentTool ~= tool then return end
 
-        -- Remove any previous overlay.
-        local prev = currentTool:FindFirstChild("AppliedSkinOverlay")
-        if prev then prev:Destroy() end
-
         local toolHandle = currentTool:FindFirstChild("Handle") or currentTool:FindFirstChildWhichIsA("BasePart")
         if not toolHandle then return end
 
-        -- Hide the server-applied skin model so it doesn't overlap.
-        local serverSkin = currentTool:FindFirstChild("Skin")
-        if serverSkin then
-            for _, d in ipairs(serverSkin:GetDescendants()) do
-                if d:IsA("BasePart") then
-                    d.Transparency = 1
-                elseif d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") then
-                    d.Enabled = false
-                end
-            end
-        end
+        -- Destroy the server-applied skin so the old skin is completely gone.
+        local oldSkin = currentTool:FindFirstChild("Skin")
+        if oldSkin then oldSkin:Destroy() end
 
-        local overlay = skinObj:Clone()
-        overlay.Name = "AppliedSkinOverlay"
+        local newSkin = skinObj:Clone()
+        newSkin.Name = "Skin"
 
-        -- Clean up the overlay so it doesn't anchor the player or fight the tool's physics.
-        for _, d in ipairs(overlay:GetDescendants()) do
+        -- Clean up the new skin so it doesn't anchor or fight the tool.
+        for _, d in ipairs(newSkin:GetDescendants()) do
             if d:IsA("BasePart") then
                 d.Anchored = false
                 d.CanCollide = false
@@ -1029,19 +1017,20 @@ function applySelectedSkin()
             end
         end
 
-        overlay.Parent = currentTool
+        newSkin.Parent = currentTool
 
-        local skinHandle = overlay:FindFirstChild("Handle") or overlay:FindFirstChildWhichIsA("BasePart")
+        -- The skin's main part is usually named Handle1; fall back to any BasePart.
+        local skinHandle = newSkin:FindFirstChild("Handle1") or newSkin:FindFirstChildWhichIsA("BasePart")
         if not skinHandle then
-            overlay:Destroy()
+            newSkin:Destroy()
             return
         end
 
-        overlay.PrimaryPart = skinHandle
+        newSkin.PrimaryPart = skinHandle
         skinHandle.CFrame = toolHandle.CFrame
 
-        -- Weld overlay parts to its handle.
-        for _, part in ipairs(overlay:GetDescendants()) do
+        -- Weld all other skin parts to the skin handle.
+        for _, part in ipairs(newSkin:GetDescendants()) do
             if part:IsA("BasePart") and part ~= skinHandle then
                 local weld = Instance.new("Weld")
                 weld.Part0 = skinHandle
@@ -1051,7 +1040,7 @@ function applySelectedSkin()
             end
         end
 
-        -- Weld overlay handle to the tool handle.
+        -- Weld the skin handle to the tool's invisible handle.
         local mainWeld = Instance.new("Weld")
         mainWeld.Part0 = toolHandle
         mainWeld.Part1 = skinHandle
@@ -1096,14 +1085,9 @@ function applySelectedCard()
         end
     end
 
-    if desc then
-        pcall(function()
-            hum:ApplyDescription(desc)
-        end)
-        return
-    end
+    -- ApplyDescription is blocked client-side, so we have to build the outfit manually.
 
-    -- Fallback: copy basic appearance objects and accessories manually.
+    -- 1) Copy body colors / clothing.
     local function copyOrUpdate(className)
         local from = cardObj:FindFirstChildOfClass(className)
         if not from then return end
@@ -1120,7 +1104,25 @@ function applySelectedCard()
     copyOrUpdate("Pants")
     copyOrUpdate("ShirtGraphic")
 
-    -- Remove old accessories.
+    -- 2) Copy body part meshes (so the body shape matches the card).
+    for _, fromPart in ipairs(cardObj:GetDescendants()) do
+        if fromPart:IsA("MeshPart") or fromPart:IsA("Part") then
+            local myPart = char:FindFirstChild(fromPart.Name)
+            if myPart and (myPart:IsA("MeshPart") or myPart:IsA("Part")) then
+                if fromPart:IsA("MeshPart") and myPart:IsA("MeshPart") then
+                    myPart.MeshId = fromPart.MeshId
+                    myPart.TextureID = fromPart.TextureID
+                end
+                myPart.Color = fromPart.Color
+                myPart.Size = fromPart.Size
+                myPart.Transparency = fromPart.Transparency
+                myPart.Reflectance = fromPart.Reflectance
+                myPart.Material = fromPart.Material
+            end
+        end
+    end
+
+    -- 3) Remove old accessories.
     for _, acc in ipairs(char:GetDescendants()) do
         if acc:IsA("Accessory") then
             pcall(function() hum:RemoveAccessory(acc) end)
@@ -1128,26 +1130,21 @@ function applySelectedCard()
         end
     end
 
-    -- Add new accessories (try humanoid first, then direct parent).
+    -- 4) Add new accessories.
     for _, acc in ipairs(cardObj:GetDescendants()) do
         if acc:IsA("Accessory") then
             local clone = acc:Clone()
-            pcall(function()
-                local handle = clone:FindFirstChildOfClass("BasePart") or clone:FindFirstChildWhichIsA("BasePart")
-                if handle then
-                    handle.Anchored = false
-                    handle.CanCollide = false
-                    handle.Massless = true
-                end
-                hum:AddAccessory(clone)
-            end)
-            if not clone.Parent then
-                clone.Parent = char
+            local handle = clone:FindFirstChildOfClass("BasePart") or clone:FindFirstChildWhichIsA("BasePart")
+            if handle then
+                handle.Anchored = false
+                handle.CanCollide = false
+                handle.Massless = true
             end
+            clone.Parent = char
         end
     end
 
-    -- Copy effects (particles, trails, beams, guis, sounds).
+    -- 5) Copy effects.
     for _, d in ipairs(cardObj:GetDescendants()) do
         local copy = nil
         if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") or d:IsA("BillboardGui") or d:IsA("SurfaceGui") or d:IsA("Sound") then
@@ -1167,7 +1164,7 @@ function applySelectedCard()
         end
     end
 
-    -- Copy face decal from card's head to local head.
+    -- 6) Copy face decal from card's head to local head.
     local cardHead = cardObj:FindFirstChild("Head")
     local myHead = char:FindFirstChild("Head")
     if cardHead and myHead then
