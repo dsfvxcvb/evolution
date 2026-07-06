@@ -18,7 +18,6 @@ local Players = cloneref(game:GetService("Players"))
 local RunService = cloneref(game:GetService("RunService"))
 local CollectionService = cloneref(game:GetService("CollectionService"))
 local Workspace = cloneref(game:GetService("Workspace"))
-local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
 local UserInputService = cloneref(game:GetService("UserInputService"))
 local Lighting = cloneref(game:GetService("Lighting"))
 
@@ -53,14 +52,27 @@ local WorldBox = Tabs.Main:AddRightGroupbox('World')
 getgenv().EvolutionOneTap = {
     SilentAimEnabled = false,
     AutoFire = false,
-    TeamCheck = false,
+    Hitchance = 100,
     MaxDistance = 1500,
-    HeadHitchance = 100,
-    BodyHitchance = 0,
 
     ShowFOV = true,
-    FOVRadius = 300,
-    FOVColor = Color3.new(1, 1, 1),
+    FOVRadius = 150,
+    FOVColor = Color3.fromRGB(255, 255, 255),
+    FOVType = 'Circle',
+    FOVTransparency = 0.65,
+    FOVOutline = true,
+    FOVOutlineColor = Color3.fromRGB(0, 0, 0),
+    FOVOutlineThickness = 1,
+    FOVGradient = true,
+    FOVGradientTop = Color3.fromRGB(211, 211, 211),
+    FOVGradientBottom = Color3.fromRGB(0, 0, 0),
+    FOVGradientSpin = true,
+    FOVGradientSpeed = 120,
+    FOVOutlineGradient = true,
+    FOVOutlineGradientTop = Color3.fromRGB(211, 211, 211),
+    FOVOutlineGradientBottom = Color3.fromRGB(0, 0, 0),
+    FOVOutlineGradientSpin = true,
+    FOVOutlineGradientSpeed = 120,
 
     Fly = false,
     FlySpeed = 50,
@@ -70,7 +82,6 @@ getgenv().EvolutionOneTap = {
     EspNames = true,
     EspHealth = true,
     EspDistance = true,
-    EspTeamCheck = false,
     EspMaxDistance = 3000,
     EspBoxColor = Color3.fromRGB(255, 255, 255),
 
@@ -100,10 +111,14 @@ SilentAimBox:AddToggle('OT_AutoFire', {
     Callback = function(v) cfg.AutoFire = v end
 })
 
-SilentAimBox:AddToggle('OT_TeamCheck', {
-    Text = 'Team Check',
-    Default = cfg.TeamCheck,
-    Callback = function(v) cfg.TeamCheck = v end
+SilentAimBox:AddSlider('OT_Hitchance', {
+    Text = 'Hitchance',
+    Default = cfg.Hitchance,
+    Min = 0,
+    Max = 100,
+    Rounding = 0,
+    Suffix = '%',
+    Callback = function(v) cfg.Hitchance = v end
 })
 
 SilentAimBox:AddSlider('OT_MaxDistance', {
@@ -115,26 +130,6 @@ SilentAimBox:AddSlider('OT_MaxDistance', {
     Callback = function(v) cfg.MaxDistance = v end
 })
 
-SilentAimBox:AddSlider('OT_HeadChance', {
-    Text = 'Head Hitchance',
-    Default = cfg.HeadHitchance,
-    Min = 0,
-    Max = 100,
-    Rounding = 0,
-    Suffix = '%',
-    Callback = function(v) cfg.HeadHitchance = v end
-})
-
-SilentAimBox:AddSlider('OT_BodyChance', {
-    Text = 'Body Hitchance',
-    Default = cfg.BodyHitchance,
-    Min = 0,
-    Max = 100,
-    Rounding = 0,
-    Suffix = '%',
-    Callback = function(v) cfg.BodyHitchance = v end
-})
-
 -- ============================================================
 -- FOV CIRCLE UI
 -- ============================================================
@@ -142,6 +137,13 @@ FovBox:AddToggle('OT_ShowFOV', {
     Text = 'Visible',
     Default = cfg.ShowFOV,
     Callback = function(v) cfg.ShowFOV = v end
+})
+
+FovBox:AddDropdown('OT_FOVType', {
+    Text = 'Type',
+    Default = cfg.FOVType,
+    Values = {'Circle', 'Square', 'Dotted', 'Lined'},
+    Callback = function(v) cfg.FOVType = v end
 })
 
 FovBox:AddSlider('OT_FOVRadius', {
@@ -153,10 +155,106 @@ FovBox:AddSlider('OT_FOVRadius', {
     Callback = function(v) cfg.FOVRadius = v end
 })
 
-FovBox:AddLabel('Color'):AddColorPicker('OT_FOVColor', {
-    Title = 'FOV Color',
+FovBox:AddSlider('OT_FOVTransparency', {
+    Text = 'Transparency',
+    Default = cfg.FOVTransparency * 100,
+    Min = 0,
+    Max = 100,
+    Rounding = 0,
+    Callback = function(v) cfg.FOVTransparency = v / 100 end
+})
+
+FovBox:AddLabel('Fill Color'):AddColorPicker('OT_FOVColor', {
+    Title = 'Fill Color',
     Default = cfg.FOVColor,
     Callback = function(v) cfg.FOVColor = v end
+})
+
+FovBox:AddToggle('OT_FOVOutline', {
+    Text = 'Outline',
+    Default = cfg.FOVOutline,
+    Callback = function(v) cfg.FOVOutline = v end
+})
+
+FovBox:AddSlider('OT_FOVOutlineThickness', {
+    Text = 'Outline Thickness',
+    Default = cfg.FOVOutlineThickness,
+    Min = 0,
+    Max = 10,
+    Rounding = 1,
+    Callback = function(v) cfg.FOVOutlineThickness = v end
+})
+
+FovBox:AddLabel('Outline Color'):AddColorPicker('OT_FOVOutlineColor', {
+    Title = 'Outline Color',
+    Default = cfg.FOVOutlineColor,
+    Callback = function(v) cfg.FOVOutlineColor = v end
+})
+
+FovBox:AddToggle('OT_FOVGradient', {
+    Text = 'Gradient',
+    Default = cfg.FOVGradient,
+    Callback = function(v) cfg.FOVGradient = v end
+})
+
+FovBox:AddLabel('Gradient Top'):AddColorPicker('OT_FOVGradientTop', {
+    Title = 'Gradient Top',
+    Default = cfg.FOVGradientTop,
+    Callback = function(v) cfg.FOVGradientTop = v end
+})
+
+FovBox:AddLabel('Gradient Bottom'):AddColorPicker('OT_FOVGradientBottom', {
+    Title = 'Gradient Bottom',
+    Default = cfg.FOVGradientBottom,
+    Callback = function(v) cfg.FOVGradientBottom = v end
+})
+
+FovBox:AddToggle('OT_FOVGradientSpin', {
+    Text = 'Gradient Spin',
+    Default = cfg.FOVGradientSpin,
+    Callback = function(v) cfg.FOVGradientSpin = v end
+})
+
+FovBox:AddSlider('OT_FOVGradientSpeed', {
+    Text = 'Gradient Spin Speed',
+    Default = cfg.FOVGradientSpeed,
+    Min = 0,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(v) cfg.FOVGradientSpeed = v end
+})
+
+FovBox:AddToggle('OT_FOVOutlineGradient', {
+    Text = 'Outline Gradient',
+    Default = cfg.FOVOutlineGradient,
+    Callback = function(v) cfg.FOVOutlineGradient = v end
+})
+
+FovBox:AddLabel('Outline Gradient Top'):AddColorPicker('OT_FOVOutlineGradientTop', {
+    Title = 'Outline Gradient Top',
+    Default = cfg.FOVOutlineGradientTop,
+    Callback = function(v) cfg.FOVOutlineGradientTop = v end
+})
+
+FovBox:AddLabel('Outline Gradient Bottom'):AddColorPicker('OT_FOVOutlineGradientBottom', {
+    Title = 'Outline Gradient Bottom',
+    Default = cfg.FOVOutlineGradientBottom,
+    Callback = function(v) cfg.FOVOutlineGradientBottom = v end
+})
+
+FovBox:AddToggle('OT_FOVOutlineGradientSpin', {
+    Text = 'Outline Gradient Spin',
+    Default = cfg.FOVOutlineGradientSpin,
+    Callback = function(v) cfg.FOVOutlineGradientSpin = v end
+})
+
+FovBox:AddSlider('OT_FOVOutlineGradientSpeed', {
+    Text = 'Outline Spin Speed',
+    Default = cfg.FOVOutlineGradientSpeed,
+    Min = 0,
+    Max = 500,
+    Rounding = 0,
+    Callback = function(v) cfg.FOVOutlineGradientSpeed = v end
 })
 
 -- ============================================================
@@ -208,12 +306,6 @@ EspBox:AddToggle('OT_EspDistance', {
     Text = 'Distance',
     Default = cfg.EspDistance,
     Callback = function(v) cfg.EspDistance = v end
-})
-
-EspBox:AddToggle('OT_EspTeamCheck', {
-    Text = 'Team Check',
-    Default = cfg.EspTeamCheck,
-    Callback = function(v) cfg.EspTeamCheck = v end
 })
 
 EspBox:AddSlider('OT_EspMaxDist', {
@@ -310,6 +402,174 @@ WorldBox:AddInput('OT_TimeOfDay', {
 })
 
 -- ============================================================
+-- FOV CIRCLE LOGIC (GUI based with gradient + spin)
+-- ============================================================
+local fovParent = Instance.new("ScreenGui")
+fovParent.Name = "EvolutionFOV"
+fovParent.Parent = cloneref(game:GetService("CoreGui"))
+fovParent.ResetOnSpawn = false
+fovParent.DisplayOrder = 9999
+
+local fovFrame = nil
+local rotatingGradients = {}
+
+local function gradientColor(top, bottom)
+    return ColorSequence.new{
+        ColorSequenceKeypoint.new(0, top),
+        ColorSequenceKeypoint.new(1, bottom)
+    }
+end
+
+local function addRotatingGradient(gradient, speed)
+    if gradient then
+        table.insert(rotatingGradients, {gradient = gradient, speed = speed})
+    end
+end
+
+local function clearRotatingGradients()
+    rotatingGradients = {}
+end
+
+local function destroyFov()
+    clearRotatingGradients()
+    if fovFrame then
+        pcall(function() fovFrame:Destroy() end)
+        fovFrame = nil
+    end
+end
+
+local function buildFov()
+    destroyFov()
+    if not cfg.ShowFOV then return end
+
+    local radius = cfg.FOVRadius
+    local fovType = cfg.FOVType
+
+    fovFrame = Instance.new("Frame")
+    fovFrame.Name = "FOV"
+    fovFrame.AnchorPoint = Vector2.new(0.5, 0.5)
+    fovFrame.Position = UDim2.new(0.5, 0, 0.5, 0)
+    fovFrame.BackgroundTransparency = 1
+    fovFrame.Visible = true
+    fovFrame.Parent = fovParent
+
+    if fovType == "Dotted" or fovType == "Lined" then
+        for i = 1, 36 do
+            local segment = Instance.new("Frame")
+            segment.Size = UDim2.new(0, 5, 0, 5)
+            segment.BackgroundColor3 = cfg.FOVColor
+            segment.BackgroundTransparency = cfg.FOVTransparency
+            segment.AnchorPoint = Vector2.new(0.5, 0.5)
+
+            local angle = math.rad((i - 1) * (360 / 36))
+            local x = math.cos(angle) * radius
+            local y = math.sin(angle) * radius
+            segment.Position = UDim2.new(0.5, x, 0.5, y)
+            segment.Parent = fovFrame
+
+            if fovType == "Dotted" then
+                local corner = Instance.new("UICorner")
+                corner.CornerRadius = UDim.new(1, 0)
+                corner.Parent = segment
+            elseif fovType == "Lined" then
+                segment.Size = UDim2.new(0, 10, 0, 2)
+                segment.Rotation = math.deg(angle)
+            end
+
+            local segOutline = nil
+            if cfg.FOVOutline then
+                segOutline = Instance.new("UIStroke")
+                segOutline.Color = cfg.FOVOutlineColor
+                segOutline.Transparency = 0
+                segOutline.Thickness = cfg.FOVOutlineThickness
+                segOutline.Parent = segment
+            end
+
+            if cfg.FOVOutlineGradient and segOutline then
+                local grad = Instance.new("UIGradient")
+                grad.Color = gradientColor(cfg.FOVOutlineGradientTop, cfg.FOVOutlineGradientBottom)
+                grad.Rotation = 0
+                grad.Parent = segOutline
+                if cfg.FOVOutlineGradientSpin then
+                    addRotatingGradient(grad, cfg.FOVOutlineGradientSpeed)
+                end
+            end
+
+            if cfg.FOVGradient then
+                local grad = Instance.new("UIGradient")
+                grad.Color = gradientColor(cfg.FOVGradientTop, cfg.FOVGradientBottom)
+                grad.Rotation = 0
+                grad.Parent = segment
+                if cfg.FOVGradientSpin then
+                    addRotatingGradient(grad, cfg.FOVGradientSpeed)
+                end
+            end
+        end
+    else
+        fovFrame.Size = UDim2.new(0, radius * 2, 0, radius * 2)
+        fovFrame.BackgroundColor3 = cfg.FOVColor
+        fovFrame.BackgroundTransparency = cfg.FOVTransparency
+
+        if fovType == "Circle" then
+            local corner = Instance.new("UICorner")
+            corner.CornerRadius = UDim.new(0.5, 0)
+            corner.Parent = fovFrame
+        end
+
+        local outline = nil
+        if cfg.FOVOutline then
+            outline = Instance.new("UIStroke")
+            outline.Color = cfg.FOVOutlineColor
+            outline.Transparency = 0
+            outline.Thickness = cfg.FOVOutlineThickness
+            outline.Parent = fovFrame
+        end
+
+        if cfg.FOVOutlineGradient and outline then
+            local grad = Instance.new("UIGradient")
+            grad.Color = gradientColor(cfg.FOVOutlineGradientTop, cfg.FOVOutlineGradientBottom)
+            grad.Rotation = 0
+            grad.Parent = outline
+            if cfg.FOVOutlineGradientSpin then
+                addRotatingGradient(grad, cfg.FOVOutlineGradientSpeed)
+            end
+        end
+
+        if cfg.FOVGradient then
+            local grad = Instance.new("UIGradient")
+            grad.Color = gradientColor(cfg.FOVGradientTop, cfg.FOVGradientBottom)
+            grad.Rotation = 0
+            grad.Parent = fovFrame
+            if cfg.FOVGradientSpin then
+                addRotatingGradient(grad, cfg.FOVGradientSpeed)
+            end
+        end
+    end
+end
+
+buildFov()
+
+local lastFovRebuild = tick()
+RunService.RenderStepped:Connect(function()
+    for _, data in ipairs(rotatingGradients) do
+        local grad = data.gradient
+        if grad then
+            grad.Rotation = (tick() * data.speed) % 360
+        end
+    end
+
+    -- rebuild on radius/type change (debounced a bit)
+    if tick() - lastFovRebuild > 0.1 then
+        lastFovRebuild = tick()
+        if cfg.ShowFOV and (not fovFrame or fovFrame.Parent == nil) then
+            buildFov()
+        elseif not cfg.ShowFOV and fovFrame then
+            destroyFov()
+        end
+    end
+end)
+
+-- ============================================================
 -- SILENT AIM LOGIC
 -- ============================================================
 local WeaponClient
@@ -320,45 +580,15 @@ repeat
     if not ok then task.wait(0.2) end
 until WeaponClient
 
-local fovCircle = Drawing.new("Circle")
-fovCircle.Thickness = 1.5
-fovCircle.NumSides = 64
-fovCircle.Filled = false
-fovCircle.Visible = false
-
-RunService.RenderStepped:Connect(function()
-    fovCircle.Position = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    fovCircle.Radius = cfg.FOVRadius
-    fovCircle.Visible = cfg.ShowFOV
-    fovCircle.Color = cfg.FOVColor
-end)
-
 local function isAlive(char)
     if not char then return false end
     local hum = char:FindFirstChildOfClass("Humanoid")
     return hum and hum.Health > 0
 end
 
-local function getTeam(model)
-    local plr = Players:GetPlayerFromCharacter(model)
-    if plr then return plr.Team end
-    return model:GetAttribute("Team")
-end
-
-local function isEnemy(model)
-    if not cfg.TeamCheck then return true end
-    local theirTeam = getTeam(model)
-    if theirTeam == nil then return true end
-    return theirTeam ~= LocalPlayer.Team
-end
-
 local function getPriorityPart(char)
-    local headChance = cfg.HeadHitchance
-    local bodyChance = cfg.BodyHitchance
-    if headChance == 0 and bodyChance == 0 then headChance = 100 end
-    local total = headChance + bodyChance
-    local roll = math.random(1, math.max(total, 1))
-    if roll <= headChance then
+    local roll = math.random(1, 100)
+    if roll <= cfg.Hitchance then
         return char:FindFirstChild("Head") or char:FindFirstChild("Hitbox_Head")
     else
         return char:FindFirstChild("Torso") or char:FindFirstChild("Hitbox_Torso")
@@ -382,7 +612,6 @@ local function getTarget()
         if model == myChar then continue end
         if not isAlive(model) then continue end
         if model:FindFirstChild("ForceField") then continue end
-        if not isEnemy(model) then continue end
 
         local part = getPriorityPart(model)
         if not part then continue end
@@ -525,10 +754,6 @@ RunService.RenderStepped:Connect(function()
         seen[model] = true
         if model == myChar then continue end
         if not isAlive(model) then
-            removeEsp(model)
-            continue
-        end
-        if cfg.EspTeamCheck and not isEnemy(model) then
             removeEsp(model)
             continue
         end
