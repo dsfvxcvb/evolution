@@ -33,12 +33,15 @@ local Window = Library:CreateWindow({
 
 local Tabs = {
     Main = Window:AddTab('Main'),
+    Cosmetics = Window:AddTab('Cosmetics'),
     ['UI Settings'] = Window:AddTab('UI Settings'),
 }
 
 local SilentAimBox = Tabs.Main:AddLeftGroupbox('Silent Aim')
 local FovBox = Tabs.Main:AddRightGroupbox('FOV Circle')
 local EspBox = Tabs.Main:AddRightGroupbox('ESP')
+local SkinBox = Tabs.Cosmetics:AddLeftGroupbox('Gun Skin')
+local CardBox = Tabs.Cosmetics:AddRightGroupbox('Player Card')
 
 -- ============================================================
 -- CONFIG
@@ -74,6 +77,13 @@ getgenv().EvolutionDuelist = {
     EspNameColor = Color3.fromRGB(255, 255, 255),
     EspHealthColor = Color3.fromRGB(0, 255, 0),
     EspDistanceColor = Color3.fromRGB(255, 255, 255),
+
+    SkinChangerEnabled = false,
+    AutoApplySkin = true,
+    SelectedSkinKey = nil,
+    CardChangerEnabled = false,
+    AutoApplyCard = true,
+    SelectedCardKey = nil,
 }
 local cfg = getgenv().EvolutionDuelist
 
@@ -276,6 +286,64 @@ EspBox:AddSlider('DT_EspMaxDist', {
     Rounding = 0,
     Callback = function(v) cfg.EspMaxDistance = v end
 })
+
+-- ============================================================
+-- COSMETICS UI
+-- ============================================================
+SkinBox:AddToggle('DT_SkinChanger', {
+    Text = 'Enabled',
+    Default = cfg.SkinChangerEnabled,
+    Callback = function(v) cfg.SkinChangerEnabled = v end
+})
+
+SkinBox:AddToggle('DT_AutoApplySkin', {
+    Text = 'Auto Apply On Equip',
+    Default = cfg.AutoApplySkin,
+    Callback = function(v) cfg.AutoApplySkin = v end
+})
+
+local SkinDropdown = SkinBox:AddDropdown('DT_SelectedSkin', {
+    Text = 'Skin',
+    Default = cfg.SelectedSkinKey,
+    Values = {},
+    Callback = function(v) cfg.SelectedSkinKey = v end
+})
+
+SkinBox:AddButton('Refresh Skins', function()
+    -- populated in logic section
+    if typeof(refreshSkinList) == "function" then refreshSkinList() end
+end)
+
+SkinBox:AddButton('Apply Skin Now', function()
+    if typeof(applySelectedSkin) == "function" then applySelectedSkin() end
+end)
+
+CardBox:AddToggle('DT_CardChanger', {
+    Text = 'Enabled',
+    Default = cfg.CardChangerEnabled,
+    Callback = function(v) cfg.CardChangerEnabled = v end
+})
+
+CardBox:AddToggle('DT_AutoApplyCard', {
+    Text = 'Auto Apply',
+    Default = cfg.AutoApplyCard,
+    Callback = function(v) cfg.AutoApplyCard = v end
+})
+
+local CardDropdown = CardBox:AddDropdown('DT_SelectedCard', {
+    Text = 'Player Card',
+    Default = cfg.SelectedCardKey,
+    Values = {},
+    Callback = function(v) cfg.SelectedCardKey = v end
+})
+
+CardBox:AddButton('Refresh Cards', function()
+    if typeof(refreshCardList) == "function" then refreshCardList() end
+end)
+
+CardBox:AddButton('Apply Card Now', function()
+    if typeof(applySelectedCard) == "function" then applySelectedCard() end
+end)
 
 -- ============================================================
 -- FOV CIRCLE LOGIC
@@ -807,6 +875,179 @@ RunService.RenderStepped:Connect(function()
     for model, _ in pairs(espDrawings) do
         if not seen[model] then removeEsp(model) end
     end
+end)
+
+-- ============================================================
+-- COSMETICS LOGIC
+-- ============================================================
+local skinRegistry = {}
+local cardRegistry = {}
+
+local function scanSkins()
+    local list = {}
+    local checked = {}
+
+    local function addFolder(folder, prefix)
+        for _, item in ipairs(folder:GetChildren()) do
+            if item:IsA("Model") or item:IsA("Folder") then
+                local key = (prefix and prefix .. " / " or "") .. item.Name
+                table.insert(list, {Key = key, Object = item, Gun = prefix})
+                if item:IsA("Folder") and #item:GetChildren() > 0 then
+                    addFolder(item, key)
+                end
+            end
+        end
+    end
+
+    local function check(folder)
+        if not folder or checked[folder] then return end
+        checked[folder] = true
+        addFolder(folder, folder.Name)
+    end
+
+    local rs = ReplicatedStorage
+    check(rs:FindFirstChild("Wraps"))
+    check(rs:FindFirstChild("Skins"))
+
+    local assets = rs:FindFirstChild("Assets")
+    if assets then
+        for _, c in ipairs(assets:GetChildren()) do
+            local n = c.Name:lower()
+            if n:find("wrap") or n:find("skin") or n:find("gun") then
+                check(c)
+            end
+        end
+    end
+
+    return list
+end
+
+local function scanCards()
+    local list = {}
+
+    local function addFolder(folder)
+        for _, item in ipairs(folder:GetChildren()) do
+            table.insert(list, {Key = item.Name, Object = item})
+        end
+    end
+
+    local rs = ReplicatedStorage
+    for _, c in ipairs(rs:GetChildren()) do
+        if c.Name:lower():find("card") then
+            addFolder(c)
+        end
+    end
+
+    local assets = rs:FindFirstChild("Assets")
+    if assets then
+        for _, c in ipairs(assets:GetChildren()) do
+            if c.Name:lower():find("card") then
+                addFolder(c)
+            end
+        end
+    end
+
+    return list
+end
+
+function refreshSkinList()
+    local skins = scanSkins()
+    skinRegistry = {}
+    local values = {}
+    for _, s in ipairs(skins) do
+        skinRegistry[s.Key] = s.Object
+        table.insert(values, s.Key)
+    end
+    SkinDropdown:SetValues(values)
+    if #values > 0 and not skinRegistry[cfg.SelectedSkinKey] then
+        cfg.SelectedSkinKey = values[1]
+        SkinDropdown:SetValue(values[1])
+    end
+end
+
+function refreshCardList()
+    local cards = scanCards()
+    cardRegistry = {}
+    local values = {}
+    for _, c in ipairs(cards) do
+        cardRegistry[c.Key] = c.Object
+        table.insert(values, c.Key)
+    end
+    CardDropdown:SetValues(values)
+    if #values > 0 and not cardRegistry[cfg.SelectedCardKey] then
+        cfg.SelectedCardKey = values[1]
+        CardDropdown:SetValue(values[1])
+    end
+end
+
+function applySelectedSkin()
+    if not cfg.SkinChangerEnabled then return end
+    local skinObj = cfg.SelectedSkinKey and skinRegistry[cfg.SelectedSkinKey]
+    if not skinObj then return end
+    local tool = getEquippedGun()
+    if not tool then return end
+    local old = tool:FindFirstChild("Skin")
+    if old then old:Destroy() end
+    local clone = skinObj:Clone()
+    clone.Name = "Skin"
+    clone.Parent = tool
+end
+
+function applySelectedCard()
+    if not cfg.CardChangerEnabled then return end
+    local cardObj = cfg.SelectedCardKey and cardRegistry[cfg.SelectedCardKey]
+    if not cardObj then return end
+
+    local texture = nil
+    if cardObj:IsA("Decal") or cardObj:IsA("Texture") then
+        texture = cardObj.Texture
+    elseif cardObj:IsA("ImageLabel") or cardObj:IsA("ImageButton") then
+        texture = cardObj.Image
+    elseif cardObj:IsA("StringValue") then
+        texture = cardObj.Value
+    end
+
+    local value = texture or cardObj.Name
+
+    local playerData = LocalPlayer:FindFirstChild("PlayerData")
+    if playerData then
+        local settings = playerData:FindFirstChild("Settings")
+        if settings then
+            for _, v in ipairs(settings:GetDescendants()) do
+                if v.Name == "PlayerCard" and v:IsA("StringValue") then
+                    v.Value = value
+                elseif v.Name == "PlayerCard" and (v:IsA("ImageLabel") or v:IsA("ImageButton")) and texture then
+                    v.Image = texture
+                end
+            end
+        end
+    end
+
+    for _, gui in ipairs(LocalPlayer.PlayerGui:GetDescendants()) do
+        if (gui:IsA("ImageLabel") or gui:IsA("ImageButton")) and gui.Name:lower():find("card") and texture then
+            gui.Image = texture
+        end
+    end
+end
+
+-- Auto-apply cosmetics.
+local lastSkinTool = nil
+RunService.RenderStepped:Connect(function()
+    if cfg.SkinChangerEnabled and cfg.AutoApplySkin then
+        local tool = getEquippedGun()
+        if tool and tool ~= lastSkinTool then
+            lastSkinTool = tool
+            applySelectedSkin()
+        end
+    end
+    if cfg.CardChangerEnabled and cfg.AutoApplyCard then
+        applySelectedCard()
+    end
+end)
+
+task.delay(2, function()
+    refreshSkinList()
+    refreshCardList()
 end)
 
 -- ============================================================
