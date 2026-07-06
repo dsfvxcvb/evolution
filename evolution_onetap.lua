@@ -760,6 +760,8 @@ local function unhideAutoKillTarget()
                 obj.OutlineTransparency = orig.outline
             elseif obj:IsA("BillboardGui") or obj:IsA("SurfaceGui") then
                 obj.Enabled = orig.enabled
+            elseif obj:IsA("Humanoid") then
+                obj.DisplayDistanceType = orig.display
             end
         end
     end
@@ -792,6 +794,11 @@ local function hideAutoKillTarget(model)
                 autoKillHiddenParts[obj] = { enabled = obj.Enabled }
             end
             obj.Enabled = false
+        elseif obj:IsA("Humanoid") then
+            if autoKillHiddenParts[obj] == nil then
+                autoKillHiddenParts[obj] = { display = obj.DisplayDistanceType }
+            end
+            obj.DisplayDistanceType = Enum.HumanoidDisplayDistanceType.None
         end
     end
 end
@@ -866,7 +873,7 @@ RunService.RenderStepped:Connect(function()
             if not cfg.AutoKillEnabled or currentAutoKillTarget ~= firedTarget then return end
 
             local slotName = getWeaponSlot()
-            if firedTarget ~= currentAutoKillTarget or LocalPlayer.Character:GetAttribute("currentWeapon") ~= slotName then
+            if not isAlive(firedTarget) or hasShield(firedTarget) or LocalPlayer.Character:GetAttribute("currentWeapon") ~= slotName then
                 hasFiredAtCurrent = false
                 return
             end
