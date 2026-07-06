@@ -1015,6 +1015,20 @@ function applySelectedSkin()
 
         local overlay = skinObj:Clone()
         overlay.Name = "AppliedSkinOverlay"
+
+        -- Clean up the overlay so it doesn't anchor the player or fight the tool's physics.
+        for _, d in ipairs(overlay:GetDescendants()) do
+            if d:IsA("BasePart") then
+                d.Anchored = false
+                d.CanCollide = false
+                d.Massless = true
+            elseif d:IsA("Motor6D") or d:IsA("Weld") or d:IsA("ManualWeld") then
+                d:Destroy()
+            elseif d:IsA("LocalScript") or d:IsA("Script") then
+                d:Destroy()
+            end
+        end
+
         overlay.Parent = currentTool
 
         local skinHandle = overlay:FindFirstChild("Handle") or overlay:FindFirstChildWhichIsA("BasePart")
@@ -1106,7 +1120,7 @@ function applySelectedCard()
     copyOrUpdate("Pants")
     copyOrUpdate("ShirtGraphic")
 
-    -- Remove old accessories using the humanoid when possible.
+    -- Remove old accessories.
     for _, acc in ipairs(char:GetDescendants()) do
         if acc:IsA("Accessory") then
             pcall(function() hum:RemoveAccessory(acc) end)
@@ -1114,12 +1128,42 @@ function applySelectedCard()
         end
     end
 
-    -- Add new accessories.
+    -- Add new accessories (try humanoid first, then direct parent).
     for _, acc in ipairs(cardObj:GetDescendants()) do
         if acc:IsA("Accessory") then
+            local clone = acc:Clone()
             pcall(function()
-                hum:AddAccessory(acc:Clone())
+                local handle = clone:FindFirstChildOfClass("BasePart") or clone:FindFirstChildWhichIsA("BasePart")
+                if handle then
+                    handle.Anchored = false
+                    handle.CanCollide = false
+                    handle.Massless = true
+                end
+                hum:AddAccessory(clone)
             end)
+            if not clone.Parent then
+                clone.Parent = char
+            end
+        end
+    end
+
+    -- Copy effects (particles, trails, beams, guis, sounds).
+    for _, d in ipairs(cardObj:GetDescendants()) do
+        local copy = nil
+        if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") or d:IsA("BillboardGui") or d:IsA("SurfaceGui") or d:IsA("Sound") then
+            copy = d:Clone()
+        end
+        if copy then
+            local target = nil
+            if d.Parent and d.Parent:IsA("BasePart") then
+                target = char:FindFirstChild(d.Parent.Name)
+            end
+            if not target then
+                target = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
+            end
+            if target then
+                copy.Parent = target
+            end
         end
     end
 
