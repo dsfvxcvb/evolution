@@ -799,7 +799,8 @@ RunService.RenderStepped:Connect(function()
 
     local myChar = LocalPlayer.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then
+    local myHum = myChar and myChar:FindFirstChildOfClass("Humanoid")
+    if not myHRP or not myHum or myHum.Health <= 0 or not myChar:GetAttribute("deployed") then
         unhideAutoKillTarget()
         return
     end
@@ -826,6 +827,7 @@ RunService.RenderStepped:Connect(function()
     if target ~= lastAutoKillTarget then
         unhideAutoKillTarget()
         lastAutoKillTarget = target
+        hasFiredAtCurrent = false
     end
 
     local targetRoot = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Head") or target.PrimaryPart
@@ -838,21 +840,25 @@ RunService.RenderStepped:Connect(function()
 
     setAutoKillWeapon()
 
-    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetRoot.Position)
-
     if not hasFiredAtCurrent then
         hasFiredAtCurrent = true
-        pcall(function()
-            if WeaponClient.fire then
-                WeaponClient.fire()
+        local firedTarget = target
+        task.delay(0.12, function()
+            if not cfg.AutoKillEnabled or currentAutoKillTarget ~= firedTarget then return end
+            local tRoot = firedTarget:FindFirstChild("HumanoidRootPart") or firedTarget:FindFirstChild("Head") or firedTarget.PrimaryPart
+            if tRoot then
+                Camera.CFrame = CFrame.new(Camera.CFrame.Position, tRoot.Position)
             end
+            pcall(function()
+                if WeaponClient.fire then
+                    WeaponClient.fire()
+                end
+            end)
         end)
     end
 
     hideAutoKillTarget(target)
 end)
-
--- ============================================================
 -- ESP LOGIC (static 2D boxes)
 -- ============================================================
 local espDrawings = {}
