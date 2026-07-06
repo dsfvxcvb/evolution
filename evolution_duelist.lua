@@ -1026,27 +1026,9 @@ function applySelectedSkin()
             local toolHandle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
             if not toolHandle then return end
 
-            -- Capture how the server-aligned skin is attached.
+            -- Remove any previously-applied skin.
             local oldSkin = tool:FindFirstChild("Skin")
-            local oldHandle = nil
-            local savedWeldC0, savedWeldC1 = CFrame.new(), CFrame.new()
-            local foundWeld = false
-
-            if oldSkin then
-                for _, w in ipairs(toolHandle:GetChildren()) do
-                    if (w:IsA("Motor6D") or w:IsA("Weld")) and w.Part1 and w.Part1:IsDescendantOf(oldSkin) then
-                        oldHandle = w.Part1
-                        savedWeldC0 = w.C0
-                        savedWeldC1 = w.C1
-                        foundWeld = true
-                        break
-                    end
-                end
-                if not oldHandle then
-                    oldHandle = oldSkin:FindFirstChild("Handle1") or oldSkin:FindFirstChild("Handle") or oldSkin:FindFirstChildWhichIsA("BasePart")
-                end
-                oldSkin:Destroy()
-            end
+            if oldSkin then oldSkin:Destroy() end
 
             local newSkin = skinObj:Clone()
             newSkin.Name = "Skin"
@@ -1083,20 +1065,41 @@ function applySelectedSkin()
                 return largest
             end
 
-            local skinHandle = pickHandle(newSkin, oldHandle and oldHandle.Name)
+            -- Find the skin's authored grip attachment and its parent part.
+            local toolGrip = toolHandle:FindFirstChild("GripPosition")
+            local skinGrip, skinGripPart = nil, nil
+            for _, a in ipairs(newSkin:GetDescendants()) do
+                if a:IsA("Attachment") and a.Name == "GripPosition" and a.Parent:IsA("BasePart") then
+                    skinGrip = a
+                    skinGripPart = a.Parent
+                    break
+                end
+            end
+
+            local skinHandle = skinGripPart or pickHandle(newSkin)
             if not skinHandle then
                 newSkin:Destroy()
                 return
             end
 
-            newSkin.Parent = tool
-            newSkin.PrimaryPart = skinHandle
-
-            if oldHandle then
-                skinHandle.CFrame = oldHandle.CFrame
+            -- Align the whole skin rigidly so its GripPosition matches the tool's GripPosition.
+            -- The old server weld always flipped the skin 180° around Y, so apply that rotation
+            -- relative to the grip; without it the gun is held backwards/sideways.
+            if toolGrip and skinGrip then
+                local targetCF = toolGrip.WorldCFrame * CFrame.Angles(0, math.pi, 0)
+                local newHandleCF = targetCF * skinGrip.CFrame:Inverse()
+                local transform = newHandleCF * skinHandle.CFrame:Inverse()
+                for _, part in ipairs(newSkin:GetDescendants()) do
+                    if part:IsA("BasePart") then
+                        part.CFrame = transform * part.CFrame
+                    end
+                end
             else
                 skinHandle.CFrame = toolHandle.CFrame
             end
+
+            newSkin.Parent = tool
+            newSkin.PrimaryPart = skinHandle
 
             -- Preserve original internal welds if the skin uses them; otherwise weld loose parts.
             local hasInternalWeld = false
@@ -1133,14 +1136,8 @@ function applySelectedSkin()
             local mainWeld = Instance.new("Weld")
             mainWeld.Part0 = toolHandle
             mainWeld.Part1 = skinHandle
-            if foundWeld then
-                mainWeld.C0 = savedWeldC0
-                mainWeld.C1 = savedWeldC1
-            else
-                local targetCFrame = oldHandle and oldHandle.CFrame or toolHandle.CFrame
-                mainWeld.C0 = toolHandle.CFrame:Inverse() * targetCFrame
-                mainWeld.C1 = CFrame.new()
-            end
+            mainWeld.C0 = toolHandle.CFrame:Inverse() * skinHandle.CFrame
+            mainWeld.C1 = CFrame.new()
             mainWeld.Parent = skinHandle
 
             newSkin:SetAttribute("EvolutionSkinKey", cfg.SelectedSkinKey)
@@ -1185,8 +1182,14 @@ function applySelectedCard()
                     local myPart = char:FindFirstChild(fromPart.Name)
                     if myPart and myPart:IsA("BasePart") then
                         if fromPart:IsA("MeshPart") and myPart:IsA("MeshPart") then
-                            myPart.MeshId = fromPart.MeshId
-                            myPart.TextureID = fromPart.TextureID
+                            if fromPart.MeshId ~= "" then myPart.MeshId = fromPart.MeshId end
+                            if fromPart.TextureID ~= "" then myPart.TextureID = fromPart.TextureID end
+                        elseif fromPart:FindFirstChildOfClass("SpecialMesh") and myPart:FindFirstChildOfClass("SpecialMesh") then
+                            local fromMesh = fromPart:FindFirstChildOfClass("SpecialMesh")
+                            local myMesh = myPart:FindFirstChildOfClass("SpecialMesh")
+                            if fromMesh.MeshId ~= "" then myMesh.MeshId = fromMesh.MeshId end
+                            if fromMesh.TextureId ~= "" then myMesh.TextureId = fromMesh.TextureId end
+                            if fromMesh.MeshType then myMesh.MeshType = fromMesh.MeshType end
                         end
                         myPart.Color = fromPart.Color
                         myPart.Size = fromPart.Size
@@ -1249,13 +1252,19 @@ function applySelectedCard()
             local cardHead = cardObj:FindFirstChild("Head")
             local myHead = char:FindFirstChild("Head")
             if cardHead and myHead then
-                for _, d in ipairs(myHead:GetChildren()) do
-                    if d:IsA("Decal") then d:Destroy() end
+                local hasCardFace = false
+                for _, d in ipairs(cardHead:GetDescendants()) do
+                    if d:IsA("Decal") then hasCardFace = true break end
                 end
-                for _, d in ipairs(cardHead:GetChildren()) do
-                    if d:IsA("Decal") then
-                        local clone = d:Clone()
-                        clone.Parent = myHead
+                if hasCardFace then
+                    for _, d in ipairs(myHead:GetChildren()) do
+                        if d:IsA("Decal") then d:Destroy() end
+                    end
+                    for _, d in ipairs(cardHead:GetDescendants()) do
+                        if d:IsA("Decal") then
+                            local clone = d:Clone()
+                            clone.Parent = myHead
+                        end
                     end
                 end
             end
