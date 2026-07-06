@@ -43,6 +43,7 @@ local Tabs = {
 local SilentAimBox = Tabs.Main:AddLeftGroupbox('Silent Aim')
 local FovBox = Tabs.Main:AddLeftGroupbox('FOV Circle')
 local MovementBox = Tabs.Main:AddLeftGroupbox('Movement')
+local AutoKillBox = Tabs.Main:AddRightGroupbox('AutoKill')
 local EspBox = Tabs.Main:AddRightGroupbox('ESP')
 local WorldBox = Tabs.Main:AddRightGroupbox('World')
 
@@ -54,6 +55,9 @@ getgenv().EvolutionOneTap = {
     AutoFire = false,
     Hitchance = 100,
     MaxDistance = 1500,
+
+    AutoKillEnabled = false,
+    AutoKillMethod = 'Sniper',
 
     ShowFOV = true,
     FOVRadius = 150,
@@ -127,6 +131,22 @@ SilentAimBox:AddSlider('OT_MaxDistance', {
     Max = 5000,
     Rounding = 0,
     Callback = function(v) cfg.MaxDistance = v end
+})
+
+-- ============================================================
+-- AUTOKILL UI
+-- ============================================================
+AutoKillBox:AddToggle('OT_AutoKillUse', {
+    Text = 'Use',
+    Default = cfg.AutoKillEnabled,
+    Callback = function(v) cfg.AutoKillEnabled = v end
+})
+
+AutoKillBox:AddDropdown('OT_AutoKillMethod', {
+    Text = 'Method',
+    Default = cfg.AutoKillMethod,
+    Values = {'Sniper', 'Pistol', 'Knife'},
+    Callback = function(v) cfg.AutoKillMethod = v end
 })
 
 -- ============================================================
@@ -590,6 +610,129 @@ RunService.RenderStepped:Connect(function()
 
     lastTrigger = tick()
     pcall(WeaponClient.fire)
+end)
+
+-- ============================================================
+-- AUTOKILL LOGIC
+-- ============================================================
+local function hasShield(model)
+    if model:FindFirstChildOfClass("ForceField") then return true end
+    if model:GetAttribute("Shielded") == true then return true end
+    if model:GetAttribute("Invincible") == true then return true end
+    return false
+end
+
+local function getAutoKillTarget()
+    local myChar = LocalPlayer.Character
+    local myRoot = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Head"))
+    if not myRoot then return nil end
+
+    local myPos = myRoot.Position
+    local bestModel = nil
+    local bestDist = math.huge
+
+    for _, model in ipairs(CollectionService:GetTagged("Character")) do
+        if model == myChar then continue end
+        if not isAlive(model) then continue end
+        if hasShield(model) then continue end
+
+        local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head") or model.PrimaryPart
+        if not root then continue end
+
+        local dist = (root.Position - myPos).Magnitude
+        if dist < bestDist then
+            bestDist = dist
+            bestModel = model
+        end
+    end
+
+    return bestModel
+end
+
+local function findTool(method)
+    local char = LocalPlayer.Character
+    local backpack = LocalPlayer:FindFirstChild("Backpack")
+    local function matches(tool)
+        return tool:IsA("Tool") and string.find(tool.Name:lower(), method:lower(), 1, true)
+    end
+
+    if char then
+        for _, t in ipairs(char:GetChildren()) do
+            if matches(t) then return t end
+        end
+    end
+    if backpack then
+        for _, t in ipairs(backpack:GetChildren()) do
+            if matches(t) then return t end
+        end
+    end
+    return nil
+end
+
+local function equipTool(tool)
+    local char = LocalPlayer.Character
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if hum and tool then
+        pcall(function() hum:EquipTool(tool) end)
+    end
+end
+
+local currentAutoKillTarget = nil
+local lastAutoKillAttack = 0
+RunService.RenderStepped:Connect(function()
+    if not cfg.AutoKillEnabled then
+        currentAutoKillTarget = nil
+        return
+    end
+
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    if not myHRP then return end
+
+    if currentAutoKillTarget then
+        if not currentAutoKillTarget.Parent or not isAlive(currentAutoKillTarget) or hasShield(currentAutoKillTarget) then
+            currentAutoKillTarget = nil
+        end
+    end
+
+    if not currentAutoKillTarget then
+        currentAutoKillTarget = getAutoKillTarget()
+    end
+
+    local target = currentAutoKillTarget
+    if not target then return end
+
+    local targetRoot = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Head") or target.PrimaryPart
+    if not targetRoot then
+        currentAutoKillTarget = nil
+        return
+    end
+
+    local distance = cfg.AutoKillMethod == 'Knife' and 2.5 or 6.5
+    targetRoot.CFrame = myHRP.CFrame * CFrame.new(0, 0, -distance)
+
+    local tool = findTool(cfg.AutoKillMethod)
+    if not tool then return end
+
+    local currentTool = myChar:FindFirstChildOfClass("Tool")
+    if currentTool ~= tool then
+        equipTool(tool)
+    end
+
+    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetRoot.Position)
+
+    local cooldown = cfg.AutoKillMethod == 'Knife' and 0.4 or 0.15
+    if tick() - lastAutoKillAttack >= cooldown then
+        lastAutoKillAttack = tick()
+        pcall(function()
+            if tool:IsA("Tool") then
+                tool:Activate()
+            end
+            if cfg.AutoKillMethod ~= 'Knife' and WeaponClient.fire then
+                WeaponClient.fire()
+            end
+        end)
+    end
 end)
 
 -- ============================================================
