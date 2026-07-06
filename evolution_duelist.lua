@@ -989,23 +989,61 @@ function applySelectedSkin()
     local tool = getEquippedGun()
     if not tool then return end
 
-    -- Wait for the server-applied skin model to exist, then replace its contents.
-    -- This keeps the Skin wrapper that WeaponsClient expects and avoids the gun going invisible.
+    -- Wait for the server skin to load, then overlay the selected skin and hide the original.
     task.delay(0.25, function()
         local currentTool = getEquippedGun()
         if currentTool ~= tool then return end
 
-        local existingSkin = currentTool:FindFirstChild("Skin")
-        if existingSkin then
-            existingSkin:ClearAllChildren()
-            for _, c in ipairs(skinObj:GetChildren()) do
-                c:Clone().Parent = existingSkin
+        -- Remove any previous overlay.
+        local prev = currentTool:FindFirstChild("AppliedSkinOverlay")
+        if prev then prev:Destroy() end
+
+        local toolHandle = currentTool:FindFirstChild("Handle") or currentTool:FindFirstChildWhichIsA("BasePart")
+        if not toolHandle then return end
+
+        -- Hide the server-applied skin model so it doesn't overlap.
+        local serverSkin = currentTool:FindFirstChild("Skin")
+        if serverSkin then
+            for _, d in ipairs(serverSkin:GetDescendants()) do
+                if d:IsA("BasePart") then
+                    d.Transparency = 1
+                elseif d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") then
+                    d.Enabled = false
+                end
             end
-        else
-            local clone = skinObj:Clone()
-            clone.Name = "Skin"
-            clone.Parent = currentTool
         end
+
+        local overlay = skinObj:Clone()
+        overlay.Name = "AppliedSkinOverlay"
+        overlay.Parent = currentTool
+
+        local skinHandle = overlay:FindFirstChild("Handle") or overlay:FindFirstChildWhichIsA("BasePart")
+        if not skinHandle then
+            overlay:Destroy()
+            return
+        end
+
+        overlay.PrimaryPart = skinHandle
+        skinHandle.CFrame = toolHandle.CFrame
+
+        -- Weld overlay parts to its handle.
+        for _, part in ipairs(overlay:GetDescendants()) do
+            if part:IsA("BasePart") and part ~= skinHandle then
+                local weld = Instance.new("Weld")
+                weld.Part0 = skinHandle
+                weld.Part1 = part
+                weld.C0 = skinHandle.CFrame:Inverse() * part.CFrame
+                weld.Parent = skinHandle
+            end
+        end
+
+        -- Weld overlay handle to the tool handle.
+        local mainWeld = Instance.new("Weld")
+        mainWeld.Part0 = toolHandle
+        mainWeld.Part1 = skinHandle
+        mainWeld.C0 = CFrame.new()
+        mainWeld.C1 = CFrame.new()
+        mainWeld.Parent = skinHandle
     end)
 end
 
@@ -1023,13 +1061,24 @@ function applySelectedCard()
     if cardObj:IsA("HumanoidDescription") then
         desc = cardObj
     else
-        -- Card might be a character model; build a description from it.
-        pcall(function()
-            desc = Players:GetHumanoidDescriptionFromCharacter(cardObj)
-        end)
-        if not desc then
-            local hd = cardObj:FindFirstChildOfClass("HumanoidDescription")
-            if hd then desc = hd end
+        -- Try to build a description from the card model.
+        local hd = cardObj:FindFirstChildOfClass("HumanoidDescription")
+        if hd then
+            desc = hd
+        else
+            -- Some games require the model to be in Workspace for this API.
+            pcall(function()
+                desc = Players:GetHumanoidDescriptionFromCharacter(cardObj)
+            end)
+            if not desc then
+                local clone = cardObj:Clone()
+                pcall(function()
+                    clone.Parent = Workspace
+                    clone:MoveTo(Vector3.new(0, -5000, 0))
+                    desc = Players:GetHumanoidDescriptionFromCharacter(clone)
+                end)
+                pcall(function() clone:Destroy() end)
+            end
         end
     end
 
@@ -1040,7 +1089,7 @@ function applySelectedCard()
         return
     end
 
-    -- Fallback: copy basic appearance objects manually.
+    -- Fallback: copy basic appearance objects and accessories manually.
     local function copyOrUpdate(className)
         local from = cardObj:FindFirstChildOfClass(className)
         if not from then return end
@@ -1057,16 +1106,20 @@ function applySelectedCard()
     copyOrUpdate("Pants")
     copyOrUpdate("ShirtGraphic")
 
-    -- Remove old accessories and clone new ones.
+    -- Remove old accessories using the humanoid when possible.
     for _, acc in ipairs(char:GetDescendants()) do
         if acc:IsA("Accessory") then
+            pcall(function() hum:RemoveAccessory(acc) end)
             acc:Destroy()
         end
     end
+
+    -- Add new accessories.
     for _, acc in ipairs(cardObj:GetDescendants()) do
         if acc:IsA("Accessory") then
-            local clone = acc:Clone()
-            clone.Parent = char
+            pcall(function()
+                hum:AddAccessory(acc:Clone())
+            end)
         end
     end
 
