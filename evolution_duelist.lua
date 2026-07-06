@@ -472,6 +472,34 @@ local GameG = (typeof(getrenv) == "function" and getrenv()._G) or _G
 -- Active while WeaponsClient is processing a shot (Process -> castBullet).
 local shotActiveUntil = 0
 
+-- Tries to identify a weapon raycast by its origin (muzzle or camera center).
+local function isWeaponRaycastOrigin(origin)
+    local char = LocalPlayer.Character
+    if not char then return false end
+
+    -- Camera-center ray (castBullet's first ray and getCrosshairTargetCharacter).
+    if (origin - Camera.CFrame.Position).Magnitude < 0.01 then
+        return true
+    end
+
+    -- Muzzle attachment / part on the equipped gun.
+    for _, d in ipairs(char:GetDescendants()) do
+        if d.Name == "Muzzle" then
+            local pos = nil
+            if d:IsA("Attachment") then
+                pos = d.WorldPosition
+            elseif d:IsA("BasePart") then
+                pos = d.Position
+            end
+            if pos and (pos - origin).Magnitude < 0.01 then
+                return true
+            end
+        end
+    end
+
+    return false
+end
+
 -- Hook workspace.Raycast via the game metatable so WeaponsClient's castBullet hits our target.
 local mt = (typeof(getrawmetatable) == "function" and getrawmetatable(game)) or (debug and debug.getmetatable(game))
 local oldNamecall
@@ -491,26 +519,35 @@ if mt then
 
         if method == "Raycast" and self:IsA("Workspace") and cfg.SilentAimEnabled and not computingTarget then
             if tick() <= shotActiveUntil then
-                local fromWeaponsClient = false
+                local origin = a1
 
-                if typeof(getcallingscript) == "function" then
-                    local calling = getcallingscript()
-                    fromWeaponsClient = calling and calling:IsA("ModuleScript") and calling.Name == "WeaponsClient"
-                end
+                -- Don't redirect the per-frame CameraUpdate head-origin raycast.
+                local myChar = LocalPlayer.Character
+                local myHead = myChar and myChar:FindFirstChild("Head")
+                if myHead and (origin - myHead.Position).Magnitude < 1.5 then
+                    -- fall through to passthrough
+                else
+                    local isBullet = false
 
-                if not fromWeaponsClient then
-                    local stack = debug.traceback("", 2)
-                    fromWeaponsClient = string.find(stack, "WeaponsClient", 1, true)
-                        or string.find(stack, "castBullet", 1, true)
-                        or string.find(stack, "firePellet", 1, true)
-                end
+                    -- Primary: call came from the WeaponsClient module.
+                    if typeof(getcallingscript) == "function" then
+                        local calling = getcallingscript()
+                        isBullet = calling and calling:IsA("ModuleScript") and calling.Name == "WeaponsClient"
+                    end
 
-                if fromWeaponsClient then
-                    -- Don't redirect the per-frame CameraUpdate head-origin raycast.
-                    local myChar = LocalPlayer.Character
-                    local myHead = myChar and myChar:FindFirstChild("Head")
-                    local origin = a1
-                    if not (myHead and (origin - myHead.Position).Magnitude < 1.5) then
+                    if not isBullet then
+                        local stack = debug.traceback("", 2)
+                        isBullet = string.find(stack, "WeaponsClient", 1, true)
+                            or string.find(stack, "castBullet", 1, true)
+                            or string.find(stack, "firePellet", 1, true)
+                    end
+
+                    -- Fallback for carbine/rifle or any helper module that fires from muzzle/camera.
+                    if not isBullet then
+                        isBullet = isWeaponRaycastOrigin(origin)
+                    end
+
+                    if isBullet then
                         local target = getTarget()
                         if target then
                             local pos = target.Position
