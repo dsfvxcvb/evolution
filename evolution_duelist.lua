@@ -538,7 +538,7 @@ end
 -- Hook outgoing remotes so the tracer looks right and we know when a shot is fired.
 local oldFireServer = nil
 local function hookedFireServer(self, cmd, ...)
-    if self ~= WeaponsRemote then
+    if not (self:IsA("RemoteEvent") and self.Name == "Weapons" and self.Parent and self.Parent.Name == "Events") then
         return oldFireServer(self, cmd, ...)
     end
 
