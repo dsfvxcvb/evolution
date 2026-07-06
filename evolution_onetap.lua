@@ -743,7 +743,7 @@ end
 
 local currentAutoKillTarget = nil
 local lastAutoKillTarget = nil
-local lastAutoKillAttack = 0
+local hasFiredAtCurrent = false
 local autoKillHiddenParts = {}
 
 local function unhideAutoKillTarget()
@@ -792,6 +792,7 @@ RunService.RenderStepped:Connect(function()
     if not cfg.AutoKillEnabled then
         currentAutoKillTarget = nil
         lastAutoKillTarget = nil
+        hasFiredAtCurrent = false
         unhideAutoKillTarget()
         return
     end
@@ -806,12 +807,14 @@ RunService.RenderStepped:Connect(function()
     if currentAutoKillTarget then
         if not currentAutoKillTarget.Parent or not isAlive(currentAutoKillTarget) or hasShield(currentAutoKillTarget) then
             currentAutoKillTarget = nil
+            hasFiredAtCurrent = false
         end
     end
 
     if not currentAutoKillTarget then
         currentAutoKillTarget = getAutoKillTarget()
         lastAutoKillTarget = currentAutoKillTarget
+        hasFiredAtCurrent = false
     end
 
     local target = currentAutoKillTarget
@@ -837,8 +840,8 @@ RunService.RenderStepped:Connect(function()
 
     Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetRoot.Position)
 
-    if tick() - lastAutoKillAttack >= 0.05 then
-        lastAutoKillAttack = tick()
+    if not hasFiredAtCurrent then
+        hasFiredAtCurrent = true
         pcall(function()
             if WeaponClient.fire then
                 WeaponClient.fire()
