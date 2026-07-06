@@ -742,16 +742,83 @@ local function equipTool(tool)
 end
 
 local currentAutoKillTarget = nil
+local lastAutoKillTarget = nil
 local lastAutoKillAttack = 0
+
+local autoKillVisualModel = nil
+local autoKillVisualParts = {}
+local autoKillOriginalLTM = {}
+getgenv().AutoKillOriginalCFrames = {}
+
+local function restoreAutoKillVisual()
+    for part, orig in pairs(autoKillOriginalLTM) do
+        if part.Parent then
+            part.LocalTransparencyModifier = orig
+        end
+    end
+end
+
+local function clearAutoKillVisual()
+    restoreAutoKillVisual()
+    if autoKillVisualModel then
+        pcall(function() autoKillVisualModel:Destroy() end)
+        autoKillVisualModel = nil
+    end
+    autoKillVisualParts = {}
+    autoKillOriginalLTM = {}
+    getgenv().AutoKillOriginalCFrames = {}
+end
+
+local function mapVisualParts(real, clone, map, ltms)
+    for _, realChild in ipairs(real:GetChildren()) do
+        local cloneChild = clone:FindFirstChild(realChild.Name)
+        if not cloneChild then continue end
+
+        if realChild:IsA("BasePart") and cloneChild:IsA("BasePart") then
+            map[realChild] = cloneChild
+            ltms[realChild] = realChild.LocalTransparencyModifier
+            cloneChild.CanCollide = false
+            cloneChild.Anchored = true
+            cloneChild.CanTouch = false
+            cloneChild.CanQuery = false
+            cloneChild.LocalTransparencyModifier = 0
+        elseif realChild:IsA("Model") and cloneChild:IsA("Model") then
+            mapVisualParts(realChild, cloneChild, map, ltms)
+        end
+    end
+end
+
+local function buildAutoKillVisual(target)
+    clearAutoKillVisual()
+    local clone = target:Clone()
+    if not clone then return end
+
+    clone.Name = "AutoKillVisual"
+    for _, d in ipairs(clone:GetDescendants()) do
+        if d:IsA("Script") or d:IsA("LocalScript") or d:IsA("Humanoid") or d:IsA("BillboardGui") or d:IsA("Sound") or d:IsA("ParticleEmitter") then
+            d:Destroy()
+        end
+    end
+    clone.Parent = Workspace
+    autoKillVisualModel = clone
+
+    mapVisualParts(target, clone, autoKillVisualParts, autoKillOriginalLTM)
+end
+
 RunService.RenderStepped:Connect(function()
     if not cfg.AutoKillEnabled then
         currentAutoKillTarget = nil
+        lastAutoKillTarget = nil
+        clearAutoKillVisual()
         return
     end
 
     local myChar = LocalPlayer.Character
     local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    if not myHRP then return end
+    if not myHRP then
+        clearAutoKillVisual()
+        return
+    end
 
     if currentAutoKillTarget then
         if not currentAutoKillTarget.Parent or not isAlive(currentAutoKillTarget) or hasShield(currentAutoKillTarget) then
@@ -761,15 +828,42 @@ RunService.RenderStepped:Connect(function()
 
     if not currentAutoKillTarget then
         currentAutoKillTarget = getAutoKillTarget()
+        if currentAutoKillTarget then
+            buildAutoKillVisual(currentAutoKillTarget)
+            lastAutoKillTarget = currentAutoKillTarget
+        end
     end
 
     local target = currentAutoKillTarget
-    if not target then return end
+    if not target then
+        clearAutoKillVisual()
+        return
+    end
+
+    if target ~= lastAutoKillTarget then
+        buildAutoKillVisual(target)
+        lastAutoKillTarget = target
+    end
 
     local targetRoot = target:FindFirstChild("HumanoidRootPart") or target:FindFirstChild("Head") or target.PrimaryPart
     if not targetRoot then
         currentAutoKillTarget = nil
         return
+    end
+
+    getgenv().AutoKillOriginalCFrames = {}
+    for realPart, clonePart in pairs(autoKillVisualParts) do
+        if realPart.Parent and clonePart.Parent then
+            local cf = realPart.CFrame
+            getgenv().AutoKillOriginalCFrames[realPart] = cf
+            clonePart.CFrame = cf
+        end
+    end
+
+    for realPart in pairs(autoKillVisualParts) do
+        if realPart.Parent then
+            realPart.LocalTransparencyModifier = 1
+        end
     end
 
     targetRoot.CFrame = myHRP.CFrame * CFrame.new(0, 0, -6.5)
@@ -870,13 +964,16 @@ RunService.RenderStepped:Connect(function()
             continue
         end
 
-        local dist = myPos and (root.Position - myPos).Magnitude or 0
+        local rootCFrame = getgenv().AutoKillOriginalCFrames[root] or root.CFrame
+        local rootPos = rootCFrame.Position
+
+        local dist = myPos and (rootPos - myPos).Magnitude or 0
         if dist > cfg.EspMaxDistance then
             removeEsp(model)
             continue
         end
 
-        local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+        local screenPos, onScreen = Camera:WorldToViewportPoint(rootPos)
         if not onScreen then
             removeEsp(model)
             continue
