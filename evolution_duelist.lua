@@ -293,7 +293,10 @@ EspBox:AddSlider('DT_EspMaxDist', {
 SkinBox:AddToggle('DT_SkinChanger', {
     Text = 'Enabled',
     Default = cfg.SkinChangerEnabled,
-    Callback = function(v) cfg.SkinChangerEnabled = v end
+    Callback = function(v)
+        cfg.SkinChangerEnabled = v
+        if v then applySelectedSkin() end
+    end
 })
 
 SkinBox:AddToggle('DT_AutoApplySkin', {
@@ -304,14 +307,16 @@ SkinBox:AddToggle('DT_AutoApplySkin', {
 
 local SkinDropdown = SkinBox:AddDropdown('DT_SelectedSkin', {
     Text = 'Skin',
-    Default = cfg.SelectedSkinKey,
-    Values = {},
-    AllowNull = true,
-    Callback = function(v) cfg.SelectedSkinKey = v end
+    Default = 'None',
+    Values = {'None'},
+    AllowNull = false,
+    Callback = function(v)
+        cfg.SelectedSkinKey = (v ~= 'None' and v or nil)
+        if cfg.SkinChangerEnabled then applySelectedSkin() end
+    end
 })
 
 SkinBox:AddButton('Refresh Skins', function()
-    -- populated in logic section
     if typeof(refreshSkinList) == "function" then refreshSkinList() end
 end)
 
@@ -322,7 +327,10 @@ end)
 CardBox:AddToggle('DT_CardChanger', {
     Text = 'Enabled',
     Default = cfg.CardChangerEnabled,
-    Callback = function(v) cfg.CardChangerEnabled = v end
+    Callback = function(v)
+        cfg.CardChangerEnabled = v
+        if v then applySelectedCard() end
+    end
 })
 
 CardBox:AddToggle('DT_AutoApplyCard', {
@@ -333,10 +341,13 @@ CardBox:AddToggle('DT_AutoApplyCard', {
 
 local CardDropdown = CardBox:AddDropdown('DT_SelectedCard', {
     Text = 'Player Card',
-    Default = cfg.SelectedCardKey,
-    Values = {},
-    AllowNull = true,
-    Callback = function(v) cfg.SelectedCardKey = v end
+    Default = 'None',
+    Values = {'None'},
+    AllowNull = false,
+    Callback = function(v)
+        cfg.SelectedCardKey = (v ~= 'None' and v or nil)
+        if cfg.CardChangerEnabled then applySelectedCard() end
+    end
 })
 
 CardBox:AddButton('Refresh Cards', function()
@@ -887,24 +898,36 @@ local cardRegistry = {}
 
 local function scanSkins()
     local list = {}
-    local checked = {}
 
-    local function addFolder(folder, prefix)
+    local function addModels(folder, prefix)
         for _, item in ipairs(folder:GetChildren()) do
-            if item:IsA("Model") or item:IsA("Folder") then
+            if item:IsA("Model") then
                 local key = (prefix and prefix .. " / " or "") .. item.Name
                 table.insert(list, {Key = key, Object = item, Gun = prefix})
-                if item:IsA("Folder") and #item:GetChildren() > 0 then
-                    addFolder(item, key)
-                end
+            elseif item:IsA("Folder") then
+                addModels(item, prefix and prefix .. " / " .. item.Name or item.Name)
             end
         end
     end
 
     local function check(folder)
-        if not folder or checked[folder] then return end
-        checked[folder] = true
-        addFolder(folder, folder.Name)
+        if not folder then return end
+        if folder.Name:lower() == "skins" then
+            -- Assets.Skins uses category folders (Pistol, Carabine, etc.)
+            for _, cat in ipairs(folder:GetChildren()) do
+                if cat:IsA("Folder") then
+                    for _, skin in ipairs(cat:GetChildren()) do
+                        if skin:IsA("Model") then
+                            table.insert(list, {Key = cat.Name .. " / " .. skin.Name, Object = skin, Gun = cat.Name})
+                        end
+                    end
+                elseif cat:IsA("Model") then
+                    table.insert(list, {Key = folder.Name .. " / " .. cat.Name, Object = cat, Gun = folder.Name})
+                end
+            end
+        else
+            addModels(folder, folder.Name)
+        end
     end
 
     local rs = ReplicatedStorage
@@ -927,9 +950,15 @@ end
 local function scanCards()
     local list = {}
 
+    local function isCardModel(model)
+        return model:IsA("Model") and (model:FindFirstChildOfClass("Humanoid") or model:FindFirstChildOfClass("BodyColors"))
+    end
+
     local function addFolder(folder)
         for _, item in ipairs(folder:GetChildren()) do
-            table.insert(list, {Key = item.Name, Object = item})
+            if isCardModel(item) then
+                table.insert(list, {Key = item.Name, Object = item})
+            end
         end
     end
 
@@ -955,246 +984,267 @@ end
 function refreshSkinList()
     local skins = scanSkins()
     skinRegistry = {}
-    local values = {}
+    local values = {'None'}
     for _, s in ipairs(skins) do
         skinRegistry[s.Key] = s.Object
         table.insert(values, s.Key)
     end
     SkinDropdown:SetValues(values)
-    if #values > 0 and not skinRegistry[cfg.SelectedSkinKey] then
-        cfg.SelectedSkinKey = values[1]
-        SkinDropdown:SetValue(values[1])
+    if not skinRegistry[cfg.SelectedSkinKey] then
+        cfg.SelectedSkinKey = nil
+        SkinDropdown:SetValue('None')
     end
 end
 
 function refreshCardList()
     local cards = scanCards()
     cardRegistry = {}
-    local values = {}
+    local values = {'None'}
     for _, c in ipairs(cards) do
         cardRegistry[c.Key] = c.Object
         table.insert(values, c.Key)
     end
     CardDropdown:SetValues(values)
-    if #values > 0 and not cardRegistry[cfg.SelectedCardKey] then
-        cfg.SelectedCardKey = values[1]
-        CardDropdown:SetValue(values[1])
+    if not cardRegistry[cfg.SelectedCardKey] then
+        cfg.SelectedCardKey = nil
+        CardDropdown:SetValue('None')
     end
 end
 
+local skinApplyInProgress = false
 function applySelectedSkin()
+    if skinApplyInProgress then return end
     if not cfg.SkinChangerEnabled then return end
     local skinObj = cfg.SelectedSkinKey and skinRegistry[cfg.SelectedSkinKey]
-    if not skinObj then return end
+    if not skinObj or not skinObj:IsA("Model") then return end
     local tool = getEquippedGun()
     if not tool then return end
 
-    -- Wait for the server skin to load, then replace the entire Skin model with the selected one.
-    task.delay(0.25, function()
-        local currentTool = getEquippedGun()
-        if currentTool ~= tool then return end
+    skinApplyInProgress = true
+    task.defer(function()
+        pcall(function()
+            local toolHandle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
+            if not toolHandle then return end
 
-        local toolHandle = currentTool:FindFirstChild("Handle") or currentTool:FindFirstChildWhichIsA("BasePart")
-        if not toolHandle then return end
-
-        -- Destroy the server-applied skin so the old skin is completely gone.
-        local oldSkin = currentTool:FindFirstChild("Skin")
-        if oldSkin then oldSkin:Destroy() end
-
-        local newSkin = skinObj:Clone()
-        newSkin.Name = "Skin"
-
-        -- Clean up the new skin so it doesn't anchor or fight the tool.
-        for _, d in ipairs(newSkin:GetDescendants()) do
-            if d:IsA("BasePart") then
-                d.Anchored = false
-                d.CanCollide = false
-                d.Massless = true
-            elseif d:IsA("Motor6D") or d:IsA("Weld") or d:IsA("ManualWeld") then
-                d:Destroy()
-            elseif d:IsA("LocalScript") or d:IsA("Script") then
-                d:Destroy()
+            -- Try to keep the same grip offset the server skin used.
+            local savedC0, savedC1 = CFrame.new(), CFrame.new()
+            local oldSkin = tool:FindFirstChild("Skin")
+            if oldSkin then
+                local oldHandle = oldSkin:FindFirstChild("Handle1") or oldSkin:FindFirstChildWhichIsA("BasePart")
+                if oldHandle then
+                    for _, w in ipairs(toolHandle:GetChildren()) do
+                        if (w:IsA("Motor6D") or w:IsA("Weld")) and w.Part1 == oldHandle then
+                            savedC0 = w.C0
+                            savedC1 = w.C1
+                            break
+                        end
+                    end
+                end
+                oldSkin:Destroy()
             end
-        end
 
-        newSkin.Parent = currentTool
+            local newSkin = skinObj:Clone()
+            newSkin.Name = "Skin"
 
-        -- The skin's main part is usually named Handle1; fall back to any BasePart.
-        local skinHandle = newSkin:FindFirstChild("Handle1") or newSkin:FindFirstChildWhichIsA("BasePart")
-        if not skinHandle then
-            newSkin:Destroy()
-            return
-        end
-
-        newSkin.PrimaryPart = skinHandle
-        skinHandle.CFrame = toolHandle.CFrame
-
-        -- Weld all other skin parts to the skin handle.
-        for _, part in ipairs(newSkin:GetDescendants()) do
-            if part:IsA("BasePart") and part ~= skinHandle then
-                local weld = Instance.new("Weld")
-                weld.Part0 = skinHandle
-                weld.Part1 = part
-                weld.C0 = skinHandle.CFrame:Inverse() * part.CFrame
-                weld.Parent = skinHandle
+            for _, d in ipairs(newSkin:GetDescendants()) do
+                if d:IsA("BasePart") then
+                    d.Anchored = false
+                    d.CanCollide = false
+                    d.Massless = true
+                elseif d:IsA("Motor6D") or d:IsA("Weld") or d:IsA("ManualWeld") then
+                    d:Destroy()
+                elseif d:IsA("LocalScript") or d:IsA("Script") then
+                    d:Destroy()
+                end
             end
-        end
 
-        -- Weld the skin handle to the tool's invisible handle.
-        local mainWeld = Instance.new("Weld")
-        mainWeld.Part0 = toolHandle
-        mainWeld.Part1 = skinHandle
-        mainWeld.C0 = CFrame.new()
-        mainWeld.C1 = CFrame.new()
-        mainWeld.Parent = skinHandle
+            newSkin.Parent = tool
+
+            local skinHandle = newSkin:FindFirstChild("Handle1") or newSkin:FindFirstChildWhichIsA("BasePart")
+            if not skinHandle then
+                newSkin:Destroy()
+                return
+            end
+
+            newSkin.PrimaryPart = skinHandle
+            skinHandle.CFrame = toolHandle.CFrame
+
+            for _, part in ipairs(newSkin:GetDescendants()) do
+                if part:IsA("BasePart") and part ~= skinHandle then
+                    local weld = Instance.new("Weld")
+                    weld.Part0 = skinHandle
+                    weld.Part1 = part
+                    weld.C0 = skinHandle.CFrame:Inverse() * part.CFrame
+                    weld.Parent = skinHandle
+                end
+            end
+
+            local mainWeld = Instance.new("Weld")
+            mainWeld.Part0 = toolHandle
+            mainWeld.Part1 = skinHandle
+            mainWeld.C0 = savedC0
+            mainWeld.C1 = savedC1
+            mainWeld.Parent = skinHandle
+
+            newSkin:SetAttribute("EvolutionSkinKey", cfg.SelectedSkinKey)
+        end)
+        skinApplyInProgress = false
     end)
 end
 
+local cardApplyInProgress = false
 function applySelectedCard()
+    if cardApplyInProgress then return end
     if not cfg.CardChangerEnabled then return end
     local cardObj = cfg.SelectedCardKey and cardRegistry[cfg.SelectedCardKey]
-    if not cardObj then return end
+    if not cardObj or not cardObj:IsA("Model") then return end
 
     local char = LocalPlayer.Character
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
 
-    local desc = nil
-
-    if cardObj:IsA("HumanoidDescription") then
-        desc = cardObj
-    else
-        -- Try to build a description from the card model.
-        local hd = cardObj:FindFirstChildOfClass("HumanoidDescription")
-        if hd then
-            desc = hd
-        else
-            -- Some games require the model to be in Workspace for this API.
-            pcall(function()
-                desc = Players:GetHumanoidDescriptionFromCharacter(cardObj)
-            end)
-            if not desc then
-                local clone = cardObj:Clone()
-                pcall(function()
-                    clone.Parent = Workspace
-                    clone:MoveTo(Vector3.new(0, -5000, 0))
-                    desc = Players:GetHumanoidDescriptionFromCharacter(clone)
-                end)
-                pcall(function() clone:Destroy() end)
-            end
-        end
-    end
-
-    -- ApplyDescription is blocked client-side, so we have to build the outfit manually.
-
-    -- 1) Copy body colors / clothing.
-    local function copyOrUpdate(className)
-        local from = cardObj:FindFirstChildOfClass(className)
-        if not from then return end
-        local to = char:FindFirstChildOfClass(className)
-        if to then
-            to:Destroy()
-        end
-        local clone = from:Clone()
-        clone.Parent = char
-    end
-
-    copyOrUpdate("BodyColors")
-    copyOrUpdate("Shirt")
-    copyOrUpdate("Pants")
-    copyOrUpdate("ShirtGraphic")
-
-    -- 2) Copy body part meshes (so the body shape matches the card).
-    for _, fromPart in ipairs(cardObj:GetDescendants()) do
-        if fromPart:IsA("MeshPart") or fromPart:IsA("Part") then
-            local myPart = char:FindFirstChild(fromPart.Name)
-            if myPart and (myPart:IsA("MeshPart") or myPart:IsA("Part")) then
-                if fromPart:IsA("MeshPart") and myPart:IsA("MeshPart") then
-                    myPart.MeshId = fromPart.MeshId
-                    myPart.TextureID = fromPart.TextureID
+    cardApplyInProgress = true
+    task.defer(function()
+        pcall(function()
+            -- 1) Body colors / clothing.
+            local function copyClass(class)
+                local from = cardObj:FindFirstChildOfClass(class)
+                local existing = char:FindFirstChildOfClass(class)
+                if existing then existing:Destroy() end
+                if from then
+                    local clone = from:Clone()
+                    clone.Parent = char
                 end
-                myPart.Color = fromPart.Color
-                myPart.Size = fromPart.Size
-                myPart.Transparency = fromPart.Transparency
-                myPart.Reflectance = fromPart.Reflectance
-                myPart.Material = fromPart.Material
             end
-        end
-    end
 
-    -- 3) Remove old accessories.
-    for _, acc in ipairs(char:GetDescendants()) do
-        if acc:IsA("Accessory") then
-            pcall(function() hum:RemoveAccessory(acc) end)
-            acc:Destroy()
-        end
-    end
+            copyClass("BodyColors")
+            copyClass("Shirt")
+            copyClass("Pants")
+            copyClass("ShirtGraphic")
 
-    -- 4) Add new accessories.
-    for _, acc in ipairs(cardObj:GetDescendants()) do
-        if acc:IsA("Accessory") then
-            local clone = acc:Clone()
-            local handle = clone:FindFirstChildOfClass("BasePart") or clone:FindFirstChildWhichIsA("BasePart")
-            if handle then
-                handle.Anchored = false
-                handle.CanCollide = false
-                handle.Massless = true
+            -- 2) Body part meshes / appearance.
+            for _, fromPart in ipairs(cardObj:GetDescendants()) do
+                if fromPart:IsA("BasePart") then
+                    local myPart = char:FindFirstChild(fromPart.Name)
+                    if myPart and myPart:IsA("BasePart") then
+                        if fromPart:IsA("MeshPart") and myPart:IsA("MeshPart") then
+                            myPart.MeshId = fromPart.MeshId
+                            myPart.TextureID = fromPart.TextureID
+                        end
+                        myPart.Color = fromPart.Color
+                        myPart.Size = fromPart.Size
+                        myPart.Transparency = fromPart.Transparency
+                        myPart.Reflectance = fromPart.Reflectance
+                        myPart.Material = fromPart.Material
+                    end
+                end
             end
-            clone.Parent = char
-        end
-    end
 
-    -- 5) Copy effects.
-    for _, d in ipairs(cardObj:GetDescendants()) do
-        local copy = nil
-        if d:IsA("ParticleEmitter") or d:IsA("Trail") or d:IsA("Beam") or d:IsA("BillboardGui") or d:IsA("SurfaceGui") or d:IsA("Sound") then
-            copy = d:Clone()
-        end
-        if copy then
-            local target = nil
-            if d.Parent and d.Parent:IsA("BasePart") then
-                target = char:FindFirstChild(d.Parent.Name)
+            -- 3) Remove old accessories.
+            for _, acc in ipairs(char:GetDescendants()) do
+                if acc:IsA("Accessory") then
+                    pcall(function() hum:RemoveAccessory(acc) end)
+                    acc:Destroy()
+                end
             end
-            if not target then
-                target = char:FindFirstChild("Head") or char:FindFirstChild("HumanoidRootPart") or char:FindFirstChildWhichIsA("BasePart")
-            end
-            if target then
-                copy.Parent = target
-            end
-        end
-    end
 
-    -- 6) Copy face decal from card's head to local head.
-    local cardHead = cardObj:FindFirstChild("Head")
-    local myHead = char:FindFirstChild("Head")
-    if cardHead and myHead then
-        local cardFace = cardHead:FindFirstChildOfClass("Decal")
-        if cardFace then
-            for _, d in ipairs(myHead:GetChildren()) do
-                if d:IsA("Decal") then d:Destroy() end
+            -- 4) Add card accessories.
+            for _, acc in ipairs(cardObj:GetDescendants()) do
+                if acc:IsA("Accessory") then
+                    local clone = acc:Clone()
+                    for _, p in ipairs(clone:GetDescendants()) do
+                        if p:IsA("BasePart") then
+                            p.Anchored = false
+                            p.CanCollide = false
+                            p.Massless = true
+                        end
+                    end
+                    clone.Parent = char
+                end
             end
-            local clone = cardFace:Clone()
-            clone.Parent = myHead
-        end
-    end
+
+            -- 5) Remove old evolution attachments.
+            for _, part in ipairs(char:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    for _, att in ipairs(part:GetChildren()) do
+                        if att:IsA("Attachment") and att:GetAttribute("EvolutionCardAtt") then
+                            att:Destroy()
+                        end
+                    end
+                end
+            end
+
+            -- 6) Copy attachments (effects) from matching card parts.
+            for _, fromPart in ipairs(cardObj:GetDescendants()) do
+                if fromPart:IsA("BasePart") then
+                    local myPart = char:FindFirstChild(fromPart.Name)
+                    if myPart then
+                        for _, att in ipairs(fromPart:GetChildren()) do
+                            if att:IsA("Attachment") then
+                                local clone = att:Clone()
+                                clone:SetAttribute("EvolutionCardAtt", true)
+                                clone.Parent = myPart
+                            end
+                        end
+                    end
+                end
+            end
+
+            -- 7) Face decal.
+            local cardHead = cardObj:FindFirstChild("Head")
+            local myHead = char:FindFirstChild("Head")
+            if cardHead and myHead then
+                for _, d in ipairs(myHead:GetChildren()) do
+                    if d:IsA("Decal") then d:Destroy() end
+                end
+                for _, d in ipairs(cardHead:GetChildren()) do
+                    if d:IsA("Decal") then
+                        local clone = d:Clone()
+                        clone.Parent = myHead
+                    end
+                end
+            end
+
+            char:SetAttribute("EvolutionCardKey", cfg.SelectedCardKey)
+        end)
+        cardApplyInProgress = false
+    end)
 end
 
--- Auto-apply cosmetics.
+-- Auto-apply cosmetics and force them back if the server resets them.
 local lastSkinTool = nil
-local lastAppliedCardKey = nil
+local lastCardApply = 0
 RunService.RenderStepped:Connect(function()
-    if cfg.SkinChangerEnabled and cfg.AutoApplySkin then
+    if cfg.SkinChangerEnabled and cfg.AutoApplySkin and cfg.SelectedSkinKey then
         local tool = getEquippedGun()
-        if tool and tool ~= lastSkinTool then
-            lastSkinTool = tool
-            applySelectedSkin()
+        if tool then
+            local skin = tool:FindFirstChild("Skin")
+            if not skin or skin:GetAttribute("EvolutionSkinKey") ~= cfg.SelectedSkinKey then
+                applySelectedSkin()
+            end
+        end
+        lastSkinTool = tool
+    end
+
+    if cfg.CardChangerEnabled and cfg.AutoApplyCard and cfg.SelectedCardKey then
+        if tick() - lastCardApply >= 0.2 then
+            lastCardApply = tick()
+            local char = LocalPlayer.Character
+            if not char or char:GetAttribute("EvolutionCardKey") ~= cfg.SelectedCardKey then
+                applySelectedCard()
+            end
         end
     end
-    if cfg.CardChangerEnabled and cfg.AutoApplyCard then
-        if cfg.SelectedCardKey and cfg.SelectedCardKey ~= lastAppliedCardKey then
-            lastAppliedCardKey = cfg.SelectedCardKey
-            applySelectedCard()
-        end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function(char)
+    lastSkinTool = nil
+    task.wait(0.2)
+    if cfg.SkinChangerEnabled and cfg.AutoApplySkin and cfg.SelectedSkinKey then
+        applySelectedSkin()
+    end
+    if cfg.CardChangerEnabled and cfg.AutoApplyCard and cfg.SelectedCardKey then
+        applySelectedCard()
     end
 end)
 
