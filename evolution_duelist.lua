@@ -109,47 +109,42 @@ local Combat = Window:Page({ Name = "Combat", Icon = "swords" })
 local Player = Window:Page({ Name = "Player", Icon = "user" })
 local Settings = Window:Page({ Name = "Settings", Icon = "settings" })
 
--- Subpages (each appears as a titled tab/group)
-local AimbotSub = Combat:SubPage({ Name = "Aimbot", Icon = "crosshair", OneColumn = true })
-local FovSub = Combat:SubPage({ Name = "FOV Circle", Icon = "eye", OneColumn = true })
-local EspSub = Combat:SubPage({ Name = "ESP", Icon = "scan", OneColumn = true })
-
-local SkinSub = Player:SubPage({ Name = "Gun Skins", Icon = "palette", OneColumn = true })
-local CardSub = Player:SubPage({ Name = "Player Card", Icon = "contact", OneColumn = true })
-
+-- Subpages
+local Home = Combat:SubPage({ Name = "Home", Icon = "home" })
+local PlayerMain = Player:SubPage({ Name = "Main", Icon = "user" })
 local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
 
 -- Sections
-local AimbotSection = AimbotSub:Section({ Name = "Aimbot", Side = 1 })
-local FovSection = FovSub:Section({ Name = "FOV Circle", Side = 1 })
-local EspSection = EspSub:Section({ Name = "ESP", Side = 1 })
+local HomeLeft = Home:Section({ Name = "Aimbot", Side = 1 })
+local HomeRight = Home:Section({ Name = "FOV Circle", Side = 2 })
+local HomeLeft2 = Home:Section({ Name = "ESP", Side = 1 })
 
-local SkinSection = SkinSub:Section({ Name = "Gun Skins", Side = 1 })
-local CardSection = CardSub:Section({ Name = "Player Card", Side = 1 })
+local PlayerLeft = PlayerMain:Section({ Name = "Gun Skins", Side = 1 })
+local PlayerRight = PlayerMain:Section({ Name = "Player Card", Side = 2 })
 
 -- Silent Aim
-AimbotSection:Toggle({
+HomeLeft:Toggle({
     Name = "Silent Aim",
     Default = cfg.SilentAimEnabled,
     Flag = "Duelist_SilentAim",
     Callback = function(State) cfg.SilentAimEnabled = State end
 })
 
-AimbotSection:Toggle({
+HomeLeft:Toggle({
     Name = "Auto Fire",
     Default = cfg.AutoFire,
     Flag = "Duelist_AutoFire",
     Callback = function(State) cfg.AutoFire = State end
 })
 
-AimbotSection:Toggle({
+HomeLeft:Toggle({
     Name = "Team Check",
     Default = cfg.TeamCheck,
     Flag = "Duelist_TeamCheck",
     Callback = function(State) cfg.TeamCheck = State end
 })
 
-AimbotSection:Slider({
+HomeLeft:Slider({
     Name = "Hitchance",
     Min = 0,
     Max = 100,
@@ -159,7 +154,7 @@ AimbotSection:Slider({
     Callback = function(Value) cfg.Hitchance = Value end
 })
 
-AimbotSection:Slider({
+HomeLeft:Slider({
     Name = "Max Distance",
     Min = 50,
     Max = 5000,
@@ -168,7 +163,7 @@ AimbotSection:Slider({
     Callback = function(Value) cfg.MaxDistance = Value end
 })
 
-AimbotSection:Dropdown({
+HomeLeft:Dropdown({
     Name = "Hit Part",
     Items = { "Head", "UpperTorso", "HumanoidRootPart" },
     Default = cfg.HitPart,
@@ -177,14 +172,14 @@ AimbotSection:Dropdown({
 })
 
 -- FOV Circle
-FovSection:Toggle({
+HomeRight:Toggle({
     Name = "Visible",
     Default = cfg.ShowFOV,
     Flag = "Duelist_ShowFOV",
     Callback = function(State) cfg.ShowFOV = State end
 })
 
-FovSection:Slider({
+HomeRight:Slider({
     Name = "Radius",
     Min = 10,
     Max = 1000,
@@ -193,7 +188,7 @@ FovSection:Slider({
     Callback = function(Value) cfg.FOVRadius = Value end
 })
 
-FovSection:Slider({
+HomeRight:Slider({
     Name = "Fill Transparency",
     Min = 0,
     Max = 100,
@@ -202,14 +197,14 @@ FovSection:Slider({
     Callback = function(Value) cfg.FOVFillTransparency = Value / 100 end
 })
 
-FovSection:Toggle({
+HomeRight:Toggle({
     Name = "Outline",
     Default = cfg.FOVOutline,
     Flag = "Duelist_FOVOutline",
     Callback = function(State) cfg.FOVOutline = State end
 })
 
-FovSection:Slider({
+HomeRight:Slider({
     Name = "Outline Thickness",
     Min = 0,
     Max = 10,
@@ -218,35 +213,35 @@ FovSection:Slider({
     Callback = function(Value) cfg.FOVOutlineThickness = Value end
 })
 
-FovSection:Toggle({
+HomeRight:Toggle({
     Name = "Gradient",
     Default = cfg.FOVGradient,
     Flag = "Duelist_FOVGradient",
     Callback = function(State) cfg.FOVGradient = State end
 })
 
-FovSection:Colorpicker({
+HomeRight:Colorpicker({
     Name = "Gradient Top",
     Default = cfg.FOVGradientTop,
     Flag = "Duelist_FOVGradientTop",
     Callback = function(Value) cfg.FOVGradientTop = Value end
 })
 
-FovSection:Colorpicker({
+HomeRight:Colorpicker({
     Name = "Gradient Bottom",
     Default = cfg.FOVGradientBottom,
     Flag = "Duelist_FOVGradientBottom",
     Callback = function(Value) cfg.FOVGradientBottom = Value end
 })
 
-FovSection:Toggle({
+HomeRight:Toggle({
     Name = "Gradient Spin",
     Default = cfg.FOVGradientSpin,
     Flag = "Duelist_FOVGradientSpin",
     Callback = function(State) cfg.FOVGradientSpin = State end
 })
 
-FovSection:Slider({
+HomeRight:Slider({
     Name = "Gradient Spin Speed",
     Min = 0,
     Max = 500,
@@ -256,70 +251,70 @@ FovSection:Slider({
 })
 
 -- ESP
-EspSection:Toggle({
+HomeLeft2:Toggle({
     Name = "Enabled",
     Default = cfg.EspEnabled,
     Flag = "Duelist_EspEnabled",
     Callback = function(State) cfg.EspEnabled = State end
 })
 
-EspSection:Toggle({
+HomeLeft2:Toggle({
     Name = "Boxes",
     Default = cfg.EspBoxes,
     Flag = "Duelist_EspBoxes",
     Callback = function(State) cfg.EspBoxes = State end
 })
 
-EspSection:Colorpicker({
+HomeLeft2:Colorpicker({
     Name = "Box Color",
     Default = cfg.EspBoxColor,
     Flag = "Duelist_EspBoxColor",
     Callback = function(Value) cfg.EspBoxColor = Value end
 })
 
-EspSection:Toggle({
+HomeLeft2:Toggle({
     Name = "Names",
     Default = cfg.EspNames,
     Flag = "Duelist_EspNames",
     Callback = function(State) cfg.EspNames = State end
 })
 
-EspSection:Colorpicker({
+HomeLeft2:Colorpicker({
     Name = "Name Color",
     Default = cfg.EspNameColor,
     Flag = "Duelist_EspNameColor",
     Callback = function(Value) cfg.EspNameColor = Value end
 })
 
-EspSection:Toggle({
+HomeLeft2:Toggle({
     Name = "Health",
     Default = cfg.EspHealth,
     Flag = "Duelist_EspHealth",
     Callback = function(State) cfg.EspHealth = State end
 })
 
-EspSection:Colorpicker({
+HomeLeft2:Colorpicker({
     Name = "Health Color",
     Default = cfg.EspHealthColor,
     Flag = "Duelist_EspHealthColor",
     Callback = function(Value) cfg.EspHealthColor = Value end
 })
 
-EspSection:Toggle({
+HomeLeft2:Toggle({
     Name = "Distance",
     Default = cfg.EspDistance,
     Flag = "Duelist_EspDistance",
     Callback = function(State) cfg.EspDistance = State end
 })
 
-EspSection:Colorpicker({
+HomeLeft2:Colorpicker({
     Name = "Distance Color",
     Default = cfg.EspDistanceColor,
     Flag = "Duelist_EspDistanceColor",
     Callback = function(Value) cfg.EspDistanceColor = Value end
 })
 
-EspSection:Slider({
+HomeLeft2:Slider({
     Name = "Max Distance",
     Min = 100,
     Max = 10000,
@@ -329,7 +324,7 @@ EspSection:Slider({
 })
 
 -- Gun skins
-SkinSection:Toggle({
+PlayerLeft:Toggle({
     Name = "Skin Changer",
     Default = cfg.SkinChangerEnabled,
     Flag = "Duelist_SkinChangerEnabled",
@@ -347,7 +342,7 @@ SkinSection:Toggle({
     end
 })
 
-SkinSection:Toggle({
+PlayerLeft:Toggle({
     Name = "Auto Apply On Equip",
     Default = cfg.AutoApplySkin,
     Flag = "Duelist_AutoApplySkin",
@@ -355,7 +350,7 @@ SkinSection:Toggle({
 })
 
 local pistolSkinDebounce = nil
-local PistolSkinDropdown = SkinSection:Dropdown({
+local PistolSkinDropdown = PlayerLeft:Dropdown({
     Name = "Pistol Skin",
     Items = { "None" },
     Default = "None",
@@ -377,7 +372,7 @@ local PistolSkinDropdown = SkinSection:Dropdown({
 })
 
 local rifleSkinDebounce = nil
-local RifleSkinDropdown = SkinSection:Dropdown({
+local RifleSkinDropdown = PlayerLeft:Dropdown({
     Name = "Rifle Skin",
     Items = { "None" },
     Default = "None",
@@ -398,14 +393,14 @@ local RifleSkinDropdown = SkinSection:Dropdown({
     end
 })
 
-SkinSection:Button({
+PlayerLeft:Button({
     Name = "Refresh Skins",
     Callback = function()
         if typeof(refreshSkinList) == "function" then refreshSkinList() end
     end
 })
 
-SkinSection:Button({
+PlayerLeft:Button({
     Name = "Apply Skin Now",
     Callback = function()
         if typeof(applySelectedSkin) == "function" then applySelectedSkin() end
@@ -413,7 +408,7 @@ SkinSection:Button({
 })
 
 -- Player Card
-CardSection:Toggle({
+PlayerRight:Toggle({
     Name = "Card Changer",
     Default = cfg.CardChangerEnabled,
     Flag = "Duelist_CardChangerEnabled",
@@ -423,14 +418,14 @@ CardSection:Toggle({
     end
 })
 
-CardSection:Toggle({
+PlayerRight:Toggle({
     Name = "Auto Apply",
     Default = cfg.AutoApplyCard,
     Flag = "Duelist_AutoApplyCard",
     Callback = function(State) cfg.AutoApplyCard = State end
 })
 
-local CardDropdown = CardSection:Dropdown({
+local CardDropdown = PlayerRight:Dropdown({
     Name = "Player Card",
     Items = { "None" },
     Default = "None",
@@ -441,14 +436,14 @@ local CardDropdown = CardSection:Dropdown({
     end
 })
 
-CardSection:Button({
+PlayerRight:Button({
     Name = "Refresh Cards",
     Callback = function()
         if typeof(refreshCardList) == "function" then refreshCardList() end
     end
 })
 
-CardSection:Button({
+PlayerRight:Button({
     Name = "Apply Card Now",
     Callback = function()
         if typeof(applySelectedCard) == "function" then applySelectedCard() end
