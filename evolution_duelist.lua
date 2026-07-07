@@ -188,7 +188,7 @@ CombatLeft:Toggle({
 })
 
 CombatLeft:Toggle({
-    Name = "Target Reward TargetShoot",
+    Name = "Target Orb",
     Default = cfg.TargetShootEnabled,
     Flag = "Duelist_TargetShoot",
     Callback = function(State) cfg.TargetShootEnabled = State end
