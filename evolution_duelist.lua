@@ -174,7 +174,7 @@ CombatLeft:Dropdown({
 
 -- FOV Circle
 VisualsLeft:Toggle({
-    Name = "Visible",
+    Name = "FOV Circle",
     Default = cfg.ShowFOV,
     Flag = "Duelist_ShowFOV",
     Callback = function(State) cfg.ShowFOV = State end
@@ -214,26 +214,42 @@ VisualsLeft:Slider({
     Callback = function(Value) cfg.FOVOutlineThickness = Value end
 })
 
-VisualsLeft:Toggle({
+local GradientToggle = VisualsLeft:Toggle({
     Name = "Gradient",
     Default = cfg.FOVGradient,
     Flag = "Duelist_FOVGradient",
     Callback = function(State) cfg.FOVGradient = State end
 })
 
-VisualsLeft:Colorpicker({
-    Name = "Gradient Top",
-    Default = cfg.FOVGradientTop,
-    Flag = "Duelist_FOVGradientTop",
-    Callback = function(Value) cfg.FOVGradientTop = Value end
-})
+local gradientChained = pcall(function()
+    GradientToggle:Colorpicker({
+        Name = "",
+        Default = cfg.FOVGradientTop,
+        Flag = "Duelist_FOVGradientTop",
+        Callback = function(Value) cfg.FOVGradientTop = Value end
+    })
+    GradientToggle:Colorpicker({
+        Name = "",
+        Default = cfg.FOVGradientBottom,
+        Flag = "Duelist_FOVGradientBottom",
+        Callback = function(Value) cfg.FOVGradientBottom = Value end
+    })
+end)
 
-VisualsLeft:Colorpicker({
-    Name = "Gradient Bottom",
-    Default = cfg.FOVGradientBottom,
-    Flag = "Duelist_FOVGradientBottom",
-    Callback = function(Value) cfg.FOVGradientBottom = Value end
-})
+if not gradientChained then
+    VisualsLeft:Colorpicker({
+        Name = "Gradient Top",
+        Default = cfg.FOVGradientTop,
+        Flag = "Duelist_FOVGradientTop",
+        Callback = function(Value) cfg.FOVGradientTop = Value end
+    })
+    VisualsLeft:Colorpicker({
+        Name = "Gradient Bottom",
+        Default = cfg.FOVGradientBottom,
+        Flag = "Duelist_FOVGradientBottom",
+        Callback = function(Value) cfg.FOVGradientBottom = Value end
+    })
+end
 
 VisualsLeft:Toggle({
     Name = "Gradient Spin",
@@ -253,7 +269,7 @@ VisualsLeft:Slider({
 
 -- ESP
 VisualsRight:Toggle({
-    Name = "Enabled",
+    Name = "ESP",
     Default = cfg.EspEnabled,
     Flag = "Duelist_EspEnabled",
     Callback = function(State) cfg.EspEnabled = State end
