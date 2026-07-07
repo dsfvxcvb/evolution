@@ -109,13 +109,13 @@ local Main = Window:Page({ Name = "Main", Icon = "home" })
 local Settings = Window:Page({ Name = "Settings", Icon = "settings" })
 
 -- Subpages
-local Home = Main:SubPage({ Name = "Home", Icon = "home" })
+local Combat = Main:SubPage({ Name = "Combat", Icon = "swords" })
 local Visuals = Main:SubPage({ Name = "Visuals", Icon = "eye" })
 local Player = Main:SubPage({ Name = "Player", Icon = "user" })
 local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
 
 -- Sections
-local HomeLeft = Home:Section({ Name = "Aimbot", Side = 1 })
+local CombatLeft = Combat:Section({ Name = "Aimbot", Side = 1 })
 
 local VisualsLeft = Visuals:Section({ Name = "FOV Circle", Side = 1 })
 local VisualsRight = Visuals:Section({ Name = "ESP", Side = 2 })
@@ -124,28 +124,28 @@ local PlayerLeft = Player:Section({ Name = "Gun Skins", Side = 1 })
 local PlayerRight = Player:Section({ Name = "Player Card", Side = 2 })
 
 -- Silent Aim
-HomeLeft:Toggle({
+CombatLeft:Toggle({
     Name = "Silent Aim",
     Default = cfg.SilentAimEnabled,
     Flag = "Duelist_SilentAim",
     Callback = function(State) cfg.SilentAimEnabled = State end
 })
 
-HomeLeft:Toggle({
+CombatLeft:Toggle({
     Name = "Auto Fire",
     Default = cfg.AutoFire,
     Flag = "Duelist_AutoFire",
     Callback = function(State) cfg.AutoFire = State end
 })
 
-HomeLeft:Toggle({
+CombatLeft:Toggle({
     Name = "Team Check",
     Default = cfg.TeamCheck,
     Flag = "Duelist_TeamCheck",
     Callback = function(State) cfg.TeamCheck = State end
 })
 
-HomeLeft:Slider({
+CombatLeft:Slider({
     Name = "Hitchance",
     Min = 0,
     Max = 100,
@@ -155,7 +155,7 @@ HomeLeft:Slider({
     Callback = function(Value) cfg.Hitchance = Value end
 })
 
-HomeLeft:Slider({
+CombatLeft:Slider({
     Name = "Max Distance",
     Min = 50,
     Max = 5000,
@@ -164,7 +164,7 @@ HomeLeft:Slider({
     Callback = function(Value) cfg.MaxDistance = Value end
 })
 
-HomeLeft:Dropdown({
+CombatLeft:Dropdown({
     Name = "Hit Part",
     Items = { "Head", "UpperTorso", "HumanoidRootPart" },
     Default = cfg.HitPart,
