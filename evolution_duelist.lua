@@ -3,16 +3,7 @@
 -- Silent aim + bullet manipulation via workspace.Raycast hook.
 -- ============================================================
 
-local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
 
-if typeof(getgenv().Library) == "table" and typeof(getgenv().Library.Unload) == "function" then
-    pcall(function() getgenv().Library:Unload() end)
-end
-
-local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
-getgenv().Library = Library
-local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
-local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
 
 local Players = cloneref(game:GetService("Players"))
 local RunService = cloneref(game:GetService("RunService"))
@@ -38,8 +29,13 @@ getgenv().EvolutionDuelistCleanup = function()
         pcall(task.cancel, t)
     end
     table.clear(EvolutionTasks)
-    if typeof(getgenv().Library) == "table" and typeof(getgenv().Library.Unload) == "function" then
-        pcall(function() getgenv().Library:Unload() end)
+    if typeof(getgenv().EvolutionArcaneWindow) == "table" then
+        pcall(function() getgenv().EvolutionArcaneWindow:Destroy() end)
+    end
+    for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
+        if sg:IsA("ScreenGui") and sg.Name == "Evolution" then
+            pcall(function() sg:Destroy() end)
+        end
     end
 end
 local function trackConnection(c)
@@ -51,279 +47,245 @@ local function trackTask(t)
     return t
 end
 
-local Window = Library:CreateWindow({
-    Title = 'evolution',
-    Center = true,
-    AutoShow = true,
-    TabPadding = 8,
-    MenuFadeTime = 0.2
+-- ============================================================
+-- ARCANE UI
+-- ============================================================
+local Arcane = loadstring(game:HttpGet("https://raw.githubusercontent.com/Da7mu/Ui-Collection/refs/heads/main/Arcane%20Ui/Library.lua"))()
+getgenv().EvolutionArcaneWindow = Arcane
+
+local Window = Arcane:Window({
+    Name = "Evolution",
+    User = LocalPlayer.Name,
+    Logo = "137522241512688"
 })
 
-local Tabs = {
-    Main = Window:AddTab('Main'),
-    Cosmetics = Window:AddTab('Cosmetics'),
-    ['UI Settings'] = Window:AddTab('UI Settings'),
-}
+-- Pages
+local Combat = Window:Page({ Name = "Combat", Icon = "swords" })
+local Player = Window:Page({ Name = "Player", Icon = "user" })
+local Settings = Window:Page({ Name = "Settings", Icon = "settings" })
 
-local SilentAimBox = Tabs.Main:AddLeftGroupbox('Silent Aim')
-local FovBox = Tabs.Main:AddRightGroupbox('FOV Circle')
-local EspBox = Tabs.Main:AddRightGroupbox('ESP')
-local SkinBox = Tabs.Cosmetics:AddLeftGroupbox('Gun Skin')
-local CardBox = Tabs.Cosmetics:AddRightGroupbox('Player Card')
+-- Subpages
+local Home = Combat:SubPage({ Name = "Home", Icon = "home" })
+local PlayerMain = Player:SubPage({ Name = "Main", Icon = "user" })
+local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
 
--- ============================================================
--- CONFIG
--- ============================================================
-getgenv().EvolutionDuelist = {
-    SilentAimEnabled = false,
-    AutoFire = false,
-    TeamCheck = true,
-    Hitchance = 100,
-    MaxDistance = 1000,
-    HitPart = 'Head',
+-- Sections
+local HomeLeft = Home:Section({ Name = "Silent Aim", Side = 1 })
+local HomeRight = Home:Section({ Name = "FOV Circle", Side = 2 })
+local HomeLeft2 = Home:Section({ Name = "ESP", Side = 1 })
 
-    ShowFOV = true,
-    FOVRadius = 150,
-    FOVColor = Color3.fromRGB(255, 255, 255),
-    FOVFillTransparency = 0.65,
-    FOVOutline = true,
-    FOVOutlineColor = Color3.fromRGB(0, 0, 0),
-    FOVOutlineThickness = 1,
-    FOVGradient = true,
-    FOVGradientTop = Color3.fromRGB(211, 211, 211),
-    FOVGradientBottom = Color3.fromRGB(0, 0, 0),
-    FOVGradientSpin = true,
-    FOVGradientSpeed = 120,
+local PlayerLeft = PlayerMain:Section({ Name = "Gun Skins", Side = 1 })
+local PlayerRight = PlayerMain:Section({ Name = "Player Card", Side = 2 })
 
-    EspEnabled = false,
-    EspBoxes = true,
-    EspNames = true,
-    EspHealth = true,
-    EspDistance = true,
-    EspMaxDistance = 2000,
-    EspBoxColor = Color3.fromRGB(255, 255, 255),
-    EspNameColor = Color3.fromRGB(255, 255, 255),
-    EspHealthColor = Color3.fromRGB(0, 255, 0),
-    EspDistanceColor = Color3.fromRGB(255, 255, 255),
-
-    SkinChangerEnabled = false,
-    AutoApplySkin = true,
-    SelectedSkinKey = nil,
-    CardChangerEnabled = false,
-    AutoApplyCard = true,
-    SelectedCardKey = nil,
-}
-local cfg = getgenv().EvolutionDuelist
-
--- ============================================================
--- SILENT AIM UI
--- ============================================================
-SilentAimBox:AddToggle('DT_SilentAim', {
-    Text = 'Enabled',
+-- Silent Aim
+HomeLeft:Toggle({
+    Name = "Silent Aim",
     Default = cfg.SilentAimEnabled,
-    Callback = function(v) cfg.SilentAimEnabled = v end
-}):AddKeyPicker('DT_SilentAimKey', { Default = 'None', Mode = 'Toggle', Text = 'Silent Aim' })
+    Flag = "Duelist_SilentAim",
+    Callback = function(State) cfg.SilentAimEnabled = State end
+})
 
-SilentAimBox:AddToggle('DT_AutoFire', {
-    Text = 'Auto Fire',
+HomeLeft:Toggle({
+    Name = "Auto Fire",
     Default = cfg.AutoFire,
-    Callback = function(v) cfg.AutoFire = v end
+    Flag = "Duelist_AutoFire",
+    Callback = function(State) cfg.AutoFire = State end
 })
 
-SilentAimBox:AddToggle('DT_TeamCheck', {
-    Text = 'Team Check',
+HomeLeft:Toggle({
+    Name = "Team Check",
     Default = cfg.TeamCheck,
-    Callback = function(v) cfg.TeamCheck = v end
+    Flag = "Duelist_TeamCheck",
+    Callback = function(State) cfg.TeamCheck = State end
 })
 
-SilentAimBox:AddSlider('DT_Hitchance', {
-    Text = 'Hitchance',
-    Default = cfg.Hitchance,
+HomeLeft:Slider({
+    Name = "Hitchance",
     Min = 0,
     Max = 100,
-    Rounding = 0,
-    Suffix = '%',
-    Callback = function(v) cfg.Hitchance = v end
+    Default = cfg.Hitchance,
+    Suffix = "%",
+    Flag = "Duelist_Hitchance",
+    Callback = function(Value) cfg.Hitchance = Value end
 })
 
-SilentAimBox:AddSlider('DT_MaxDistance', {
-    Text = 'Max Distance',
-    Default = cfg.MaxDistance,
+HomeLeft:Slider({
+    Name = "Max Distance",
     Min = 50,
     Max = 5000,
-    Rounding = 0,
-    Callback = function(v) cfg.MaxDistance = v end
+    Default = cfg.MaxDistance,
+    Flag = "Duelist_MaxDistance",
+    Callback = function(Value) cfg.MaxDistance = Value end
 })
 
-SilentAimBox:AddDropdown('DT_HitPart', {
-    Text = 'Hit Part',
+HomeLeft:Dropdown({
+    Name = "Hit Part",
+    Items = { "Head", "UpperTorso", "HumanoidRootPart" },
     Default = cfg.HitPart,
-    Values = {'Head', 'UpperTorso', 'HumanoidRootPart'},
-    Callback = function(v) cfg.HitPart = v end
+    Flag = "Duelist_HitPart",
+    Callback = function(Value) cfg.HitPart = Value end
 })
 
--- ============================================================
--- FOV CIRCLE UI
--- ============================================================
-local ShowFOVToggle = FovBox:AddToggle('DT_ShowFOV', {
-    Text = 'Visible',
+-- FOV Circle
+HomeRight:Toggle({
+    Name = "Visible",
     Default = cfg.ShowFOV,
-    Callback = function(v) cfg.ShowFOV = v end
+    Flag = "Duelist_ShowFOV",
+    Callback = function(State) cfg.ShowFOV = State end
 })
 
-ShowFOVToggle:AddColorPicker('DT_FOVColor', {
-    Title = 'Fill Color',
-    Default = cfg.FOVColor,
-    Callback = function(v) cfg.FOVColor = v end
-})
-
-FovBox:AddSlider('DT_FOVRadius', {
-    Text = 'Radius',
-    Default = cfg.FOVRadius,
+HomeRight:Slider({
+    Name = "Radius",
     Min = 10,
     Max = 1000,
-    Rounding = 0,
-    Callback = function(v) cfg.FOVRadius = v end
+    Default = cfg.FOVRadius,
+    Flag = "Duelist_FOVRadius",
+    Callback = function(Value) cfg.FOVRadius = Value end
 })
 
-FovBox:AddSlider('DT_FOVFillTransparency', {
-    Text = 'Fill Transparency',
-    Default = cfg.FOVFillTransparency * 100,
+HomeRight:Slider({
+    Name = "Fill Transparency",
     Min = 0,
     Max = 100,
-    Rounding = 0,
-    Callback = function(v) cfg.FOVFillTransparency = v / 100 end
+    Default = cfg.FOVFillTransparency * 100,
+    Flag = "Duelist_FOVFillTransparency",
+    Callback = function(Value) cfg.FOVFillTransparency = Value / 100 end
 })
 
-local OutlineToggle = FovBox:AddToggle('DT_FOVOutline', {
-    Text = 'Outline',
+HomeRight:Toggle({
+    Name = "Outline",
     Default = cfg.FOVOutline,
-    Callback = function(v) cfg.FOVOutline = v end
+    Flag = "Duelist_FOVOutline",
+    Callback = function(State) cfg.FOVOutline = State end
 })
 
-OutlineToggle:AddColorPicker('DT_FOVOutlineColor', {
-    Title = 'Outline Color',
-    Default = cfg.FOVOutlineColor,
-    Callback = function(v) cfg.FOVOutlineColor = v end
-})
-
-FovBox:AddSlider('DT_FOVOutlineThickness', {
-    Text = 'Outline Thickness',
-    Default = cfg.FOVOutlineThickness,
+HomeRight:Slider({
+    Name = "Outline Thickness",
     Min = 0,
     Max = 10,
-    Rounding = 1,
-    Callback = function(v) cfg.FOVOutlineThickness = v end
+    Default = cfg.FOVOutlineThickness,
+    Flag = "Duelist_FOVOutlineThickness",
+    Callback = function(Value) cfg.FOVOutlineThickness = Value end
 })
 
-local GradientToggle = FovBox:AddToggle('DT_FOVGradient', {
-    Text = 'Gradient',
+HomeRight:Toggle({
+    Name = "Gradient",
     Default = cfg.FOVGradient,
-    Callback = function(v) cfg.FOVGradient = v end
+    Flag = "Duelist_FOVGradient",
+    Callback = function(State) cfg.FOVGradient = State end
 })
 
-GradientToggle:AddColorPicker('DT_FOVGradientTop', {
-    Title = 'Gradient Top',
+HomeRight:Colorpicker({
+    Name = "Gradient Top",
     Default = cfg.FOVGradientTop,
-    Callback = function(v) cfg.FOVGradientTop = v end
+    Flag = "Duelist_FOVGradientTop",
+    Callback = function(Value) cfg.FOVGradientTop = Value end
 })
 
-GradientToggle:AddColorPicker('DT_FOVGradientBottom', {
-    Title = 'Gradient Bottom',
+HomeRight:Colorpicker({
+    Name = "Gradient Bottom",
     Default = cfg.FOVGradientBottom,
-    Callback = function(v) cfg.FOVGradientBottom = v end
+    Flag = "Duelist_FOVGradientBottom",
+    Callback = function(Value) cfg.FOVGradientBottom = Value end
 })
 
-FovBox:AddToggle('DT_FOVGradientSpin', {
-    Text = 'Gradient Spin',
+HomeRight:Toggle({
+    Name = "Gradient Spin",
     Default = cfg.FOVGradientSpin,
-    Callback = function(v) cfg.FOVGradientSpin = v end
+    Flag = "Duelist_FOVGradientSpin",
+    Callback = function(State) cfg.FOVGradientSpin = State end
 })
 
-FovBox:AddSlider('DT_FOVGradientSpeed', {
-    Text = 'Gradient Spin Speed',
-    Default = cfg.FOVGradientSpeed,
+HomeRight:Slider({
+    Name = "Gradient Spin Speed",
     Min = 0,
     Max = 500,
-    Rounding = 0,
-    Callback = function(v) cfg.FOVGradientSpeed = v end
+    Default = cfg.FOVGradientSpeed,
+    Flag = "Duelist_FOVGradientSpeed",
+    Callback = function(Value) cfg.FOVGradientSpeed = Value end
 })
 
--- ============================================================
--- ESP UI
--- ============================================================
-EspBox:AddToggle('DT_EspEnabled', {
-    Text = 'Enabled',
+-- ESP
+HomeLeft2:Toggle({
+    Name = "Enabled",
     Default = cfg.EspEnabled,
-    Callback = function(v) cfg.EspEnabled = v end
+    Flag = "Duelist_EspEnabled",
+    Callback = function(State) cfg.EspEnabled = State end
 })
 
-local EspBoxesToggle = EspBox:AddToggle('DT_EspBoxes', {
-    Text = 'Boxes',
+HomeLeft2:Toggle({
+    Name = "Boxes",
     Default = cfg.EspBoxes,
-    Callback = function(v) cfg.EspBoxes = v end
+    Flag = "Duelist_EspBoxes",
+    Callback = function(State) cfg.EspBoxes = State end
 })
 
-EspBoxesToggle:AddColorPicker('DT_EspBoxColor', {
-    Title = 'Box Color',
+HomeLeft2:Colorpicker({
+    Name = "Box Color",
     Default = cfg.EspBoxColor,
-    Callback = function(v) cfg.EspBoxColor = v end
+    Flag = "Duelist_EspBoxColor",
+    Callback = function(Value) cfg.EspBoxColor = Value end
 })
 
-local EspNamesToggle = EspBox:AddToggle('DT_EspNames', {
-    Text = 'Names',
+HomeLeft2:Toggle({
+    Name = "Names",
     Default = cfg.EspNames,
-    Callback = function(v) cfg.EspNames = v end
+    Flag = "Duelist_EspNames",
+    Callback = function(State) cfg.EspNames = State end
 })
 
-EspNamesToggle:AddColorPicker('DT_EspNameColor', {
-    Title = 'Name Color',
+HomeLeft2:Colorpicker({
+    Name = "Name Color",
     Default = cfg.EspNameColor,
-    Callback = function(v) cfg.EspNameColor = v end
+    Flag = "Duelist_EspNameColor",
+    Callback = function(Value) cfg.EspNameColor = Value end
 })
 
-local EspHealthToggle = EspBox:AddToggle('DT_EspHealth', {
-    Text = 'Health',
+HomeLeft2:Toggle({
+    Name = "Health",
     Default = cfg.EspHealth,
-    Callback = function(v) cfg.EspHealth = v end
+    Flag = "Duelist_EspHealth",
+    Callback = function(State) cfg.EspHealth = State end
 })
 
-EspHealthToggle:AddColorPicker('DT_EspHealthColor', {
-    Title = 'Health Color',
+HomeLeft2:Colorpicker({
+    Name = "Health Color",
     Default = cfg.EspHealthColor,
-    Callback = function(v) cfg.EspHealthColor = v end
+    Flag = "Duelist_EspHealthColor",
+    Callback = function(Value) cfg.EspHealthColor = Value end
 })
 
-local EspDistanceToggle = EspBox:AddToggle('DT_EspDistance', {
-    Text = 'Distance',
+HomeLeft2:Toggle({
+    Name = "Distance",
     Default = cfg.EspDistance,
-    Callback = function(v) cfg.EspDistance = v end
+    Flag = "Duelist_EspDistance",
+    Callback = function(State) cfg.EspDistance = State end
 })
 
-EspDistanceToggle:AddColorPicker('DT_EspDistanceColor', {
-    Title = 'Distance Color',
+HomeLeft2:Colorpicker({
+    Name = "Distance Color",
     Default = cfg.EspDistanceColor,
-    Callback = function(v) cfg.EspDistanceColor = v end
+    Flag = "Duelist_EspDistanceColor",
+    Callback = function(Value) cfg.EspDistanceColor = Value end
 })
 
-EspBox:AddSlider('DT_EspMaxDist', {
-    Text = 'Max Distance',
-    Default = cfg.EspMaxDistance,
+HomeLeft2:Slider({
+    Name = "Max Distance",
     Min = 100,
     Max = 10000,
-    Rounding = 0,
-    Callback = function(v) cfg.EspMaxDistance = v end
+    Default = cfg.EspMaxDistance,
+    Flag = "Duelist_EspMaxDistance",
+    Callback = function(Value) cfg.EspMaxDistance = Value end
 })
 
--- ============================================================
--- COSMETICS UI
--- ============================================================
-SkinBox:AddToggle('DT_SkinChanger', {
-    Text = 'Enabled',
+-- Gun skins
+PlayerLeft:Toggle({
+    Name = "Skin Changer",
     Default = cfg.SkinChangerEnabled,
-    Callback = function(v)
-        cfg.SkinChangerEnabled = v
-        if v then
+    Flag = "Duelist_SkinChangerEnabled",
+    Callback = function(State)
+        cfg.SkinChangerEnabled = State
+        if State then
             applySelectedSkin()
         else
             local tool = getEquippedGun()
@@ -335,83 +297,131 @@ SkinBox:AddToggle('DT_SkinChanger', {
     end
 })
 
-SkinBox:AddToggle('DT_AutoApplySkin', {
-    Text = 'Auto Apply On Equip',
+PlayerLeft:Toggle({
+    Name = "Auto Apply On Equip",
     Default = cfg.AutoApplySkin,
-    Callback = function(v) cfg.AutoApplySkin = v end
+    Flag = "Duelist_AutoApplySkin",
+    Callback = function(State) cfg.AutoApplySkin = State end
 })
 
-local skinDebounce = nil
-local SkinDropdown = SkinBox:AddDropdown('DT_SelectedSkin', {
-    Text = 'Skin',
-    Default = 'None',
-    Values = {'None'},
-    AllowNull = false,
-    Callback = function(v)
-        cfg.SelectedSkinKey = (v ~= 'None' and v or nil)
-        if skinDebounce then pcall(task.cancel, skinDebounce) end
-        skinDebounce = trackTask(task.delay(0.15, function()
+local pistolSkinDebounce = nil
+local PistolSkinDropdown = PlayerLeft:Dropdown({
+    Name = "Pistol Skin",
+    Items = { "None" },
+    Default = "None",
+    Flag = "Duelist_PistolSkin",
+    Callback = function(Value)
+        cfg.SelectedPistolSkinKey = (Value ~= "None" and Value or nil)
+        if pistolSkinDebounce then pcall(task.cancel, pistolSkinDebounce) end
+        pistolSkinDebounce = trackTask(task.delay(0.15, function()
             for i, t in ipairs(EvolutionTasks) do
-                if t == skinDebounce then table.remove(EvolutionTasks, i) break end
+                if t == pistolSkinDebounce then table.remove(EvolutionTasks, i) break end
             end
-            skinDebounce = nil
+            pistolSkinDebounce = nil
             if not cfg.SkinChangerEnabled then return end
-            if cfg.SelectedSkinKey == (v ~= 'None' and v or nil) then
-                if cfg.SelectedSkinKey then
-                    applySelectedSkin()
-                else
-                    local tool = getEquippedGun()
-                    if tool then
-                        local old = tool:FindFirstChild("Skin")
-                        if old then old:Destroy() end
-                    end
-                end
+            if cfg.SelectedPistolSkinKey == (Value ~= "None" and Value or nil) then
+                applySelectedSkin()
             end
         end))
     end
 })
 
-SkinBox:AddButton('Refresh Skins', function()
-    if typeof(refreshSkinList) == "function" then refreshSkinList() end
-end)
-
-SkinBox:AddButton('Apply Skin Now', function()
-    if typeof(applySelectedSkin) == "function" then applySelectedSkin() end
-end)
-
-CardBox:AddToggle('DT_CardChanger', {
-    Text = 'Enabled',
-    Default = cfg.CardChangerEnabled,
-    Callback = function(v)
-        cfg.CardChangerEnabled = v
-        if v then applySelectedCard() end
+local rifleSkinDebounce = nil
+local RifleSkinDropdown = PlayerLeft:Dropdown({
+    Name = "Rifle Skin",
+    Items = { "None" },
+    Default = "None",
+    Flag = "Duelist_RifleSkin",
+    Callback = function(Value)
+        cfg.SelectedRifleSkinKey = (Value ~= "None" and Value or nil)
+        if rifleSkinDebounce then pcall(task.cancel, rifleSkinDebounce) end
+        rifleSkinDebounce = trackTask(task.delay(0.15, function()
+            for i, t in ipairs(EvolutionTasks) do
+                if t == rifleSkinDebounce then table.remove(EvolutionTasks, i) break end
+            end
+            rifleSkinDebounce = nil
+            if not cfg.SkinChangerEnabled then return end
+            if cfg.SelectedRifleSkinKey == (Value ~= "None" and Value or nil) then
+                applySelectedSkin()
+            end
+        end))
     end
 })
 
-CardBox:AddToggle('DT_AutoApplyCard', {
-    Text = 'Auto Apply',
-    Default = cfg.AutoApplyCard,
-    Callback = function(v) cfg.AutoApplyCard = v end
+PlayerLeft:Button({
+    Name = "Refresh Skins",
+    Callback = function()
+        if typeof(refreshSkinList) == "function" then refreshSkinList() end
+    end
 })
 
-local CardDropdown = CardBox:AddDropdown('DT_SelectedCard', {
-    Text = 'Player Card',
-    Default = 'None',
-    Values = {'None'},
-    AllowNull = false,
-    Callback = function(v)
-        cfg.SelectedCardKey = (v ~= 'None' and v or nil)
+PlayerLeft:Button({
+    Name = "Apply Skin Now",
+    Callback = function()
+        if typeof(applySelectedSkin) == "function" then applySelectedSkin() end
+    end
+})
+
+-- Player Card
+PlayerRight:Toggle({
+    Name = "Card Changer",
+    Default = cfg.CardChangerEnabled,
+    Flag = "Duelist_CardChangerEnabled",
+    Callback = function(State)
+        cfg.CardChangerEnabled = State
+        if State then applySelectedCard() end
+    end
+})
+
+PlayerRight:Toggle({
+    Name = "Auto Apply",
+    Default = cfg.AutoApplyCard,
+    Flag = "Duelist_AutoApplyCard",
+    Callback = function(State) cfg.AutoApplyCard = State end
+})
+
+local CardDropdown = PlayerRight:Dropdown({
+    Name = "Player Card",
+    Items = { "None" },
+    Default = "None",
+    Flag = "Duelist_PlayerCard",
+    Callback = function(Value)
+        cfg.SelectedCardKey = (Value ~= "None" and Value or nil)
         if cfg.CardChangerEnabled then applySelectedCard() end
     end
 })
 
-CardBox:AddButton('Refresh Cards', function()
-    if typeof(refreshCardList) == "function" then refreshCardList() end
-end)
+PlayerRight:Button({
+    Name = "Refresh Cards",
+    Callback = function()
+        if typeof(refreshCardList) == "function" then refreshCardList() end
+    end
+})
 
-CardBox:AddButton('Apply Card Now', function()
-    if typeof(applySelectedCard) == "function" then applySelectedCard() end
-end)
+PlayerRight:Button({
+    Name = "Apply Card Now",
+    Callback = function()
+        if typeof(applySelectedCard) == "function" then applySelectedCard() end
+    end
+})
+
+-- Configs
+ConfigSub:Config()
+
+-- Notification
+Arcane:Notification({
+    Name = "Evolution",
+    Description = "Duelist module loaded — Right Ctrl to toggle.",
+    Duration = 5,
+    Icon = "check",
+    Color = Color3.fromRGB(52, 255, 164)
+})
+
+-- Watermark
+Window:Watermark({
+    Title = "evolution | duelist"
+})
+
 
 -- ============================================================
 -- FOV CIRCLE LOGIC
@@ -948,22 +958,13 @@ end))
 -- ============================================================
 -- COSMETICS LOGIC
 -- ============================================================
-local skinRegistry = {}
+local pistolSkinRegistry = {}
+local rifleSkinRegistry = {}
 local cardRegistry = {}
 
 local function scanSkins()
-    local list = {}
-
-    local function addModels(folder, prefix)
-        for _, item in ipairs(folder:GetChildren()) do
-            if item:IsA("Model") then
-                local key = (prefix and prefix .. " / " or "") .. item.Name
-                table.insert(list, {Key = key, Object = item, Gun = prefix})
-            elseif item:IsA("Folder") then
-                addModels(item, prefix and prefix .. " / " .. item.Name or item.Name)
-            end
-        end
-    end
+    table.clear(pistolSkinRegistry)
+    table.clear(rifleSkinRegistry)
 
     local function check(folder)
         if not folder then return end
@@ -971,35 +972,35 @@ local function scanSkins()
             -- Assets.Skins uses category folders (Pistol, Carabine, etc.)
             for _, cat in ipairs(folder:GetChildren()) do
                 if cat:IsA("Folder") then
+                    local catName = cat.Name
+                    local isPistol = catName:lower():find("pistol")
+                    local isRifle = catName:lower():find("carabine") or catName:lower():find("rifle")
                     for _, skin in ipairs(cat:GetChildren()) do
                         if skin:IsA("Model") then
-                            table.insert(list, {Key = cat.Name .. " / " .. skin.Name, Object = skin, Gun = cat.Name})
+                            if isPistol then
+                                pistolSkinRegistry[skin.Name] = skin
+                            elseif isRifle then
+                                rifleSkinRegistry[skin.Name] = skin
+                            end
                         end
                     end
-                elseif cat:IsA("Model") then
-                    table.insert(list, {Key = folder.Name .. " / " .. cat.Name, Object = cat, Gun = folder.Name})
                 end
             end
-        else
-            addModels(folder, folder.Name)
         end
     end
 
     local rs = ReplicatedStorage
-    check(rs:FindFirstChild("Wraps"))
     check(rs:FindFirstChild("Skins"))
 
     local assets = rs:FindFirstChild("Assets")
     if assets then
         for _, c in ipairs(assets:GetChildren()) do
             local n = c.Name:lower()
-            if n:find("wrap") or n:find("skin") or n:find("gun") then
+            if n:find("skin") or n:find("gun") then
                 check(c)
             end
         end
     end
-
-    return list
 end
 
 local function scanCards()
@@ -1037,17 +1038,34 @@ local function scanCards()
 end
 
 function refreshSkinList()
-    local skins = scanSkins()
-    skinRegistry = {}
-    local values = {'None'}
-    for _, s in ipairs(skins) do
-        skinRegistry[s.Key] = s.Object
-        table.insert(values, s.Key)
+    scanSkins()
+
+    local function buildValues(registry)
+        local values = {'None'}
+        for name, _ in pairs(registry) do
+            table.insert(values, name)
+        end
+        table.sort(values, function(a, b) return a:lower() < b:lower() end)
+        return values
     end
-    SkinDropdown:SetValues(values)
-    if not skinRegistry[cfg.SelectedSkinKey] then
-        cfg.SelectedSkinKey = nil
-        SkinDropdown:SetValue('None')
+
+    local pistolValues = buildValues(pistolSkinRegistry)
+    local rifleValues = buildValues(rifleSkinRegistry)
+
+    if typeof(PistolSkinDropdown) == "table" then
+        pcall(function() PistolSkinDropdown:SetItems(pistolValues) end)
+        pcall(function() PistolSkinDropdown:Refresh(pistolValues) end)
+    end
+    if typeof(RifleSkinDropdown) == "table" then
+        pcall(function() RifleSkinDropdown:SetItems(rifleValues) end)
+        pcall(function() RifleSkinDropdown:Refresh(rifleValues) end)
+    end
+
+    if cfg.SelectedPistolSkinKey and not pistolSkinRegistry[cfg.SelectedPistolSkinKey] then
+        cfg.SelectedPistolSkinKey = nil
+    end
+    if cfg.SelectedRifleSkinKey and not rifleSkinRegistry[cfg.SelectedRifleSkinKey] then
+        cfg.SelectedRifleSkinKey = nil
     end
 end
 
@@ -1059,10 +1077,13 @@ function refreshCardList()
         cardRegistry[c.Key] = c.Object
         table.insert(values, c.Key)
     end
-    CardDropdown:SetValues(values)
+    table.sort(values, function(a, b) return a:lower() < b:lower() end)
+    if typeof(CardDropdown) == "table" then
+        pcall(function() CardDropdown:SetItems(values) end)
+        pcall(function() CardDropdown:Refresh(values) end)
+    end
     if not cardRegistry[cfg.SelectedCardKey] then
         cfg.SelectedCardKey = nil
-        CardDropdown:SetValue('None')
     end
 end
 
@@ -1071,18 +1092,24 @@ function applySelectedSkin()
     local tool = getEquippedGun()
     if not tool then return end
 
-    local skinObj = cfg.SelectedSkinKey and skinRegistry[cfg.SelectedSkinKey]
+    local isRifle = tool.Name:lower():find("carabine") or tool.Name:lower():find("rifle")
+    local selectedKey = isRifle and cfg.SelectedRifleSkinKey or cfg.SelectedPistolSkinKey
+    local registry = isRifle and rifleSkinRegistry or pistolSkinRegistry
+    local skinObj = selectedKey and registry[selectedKey]
+
     if not skinObj or not skinObj:IsA("Model") then
-        -- No skin selected; strip any applied skin so the server/owned skin shows.
+        -- No skin selected for this weapon type; strip any applied skin so the server/owned skin shows.
         local oldSkin = tool:FindFirstChild("Skin")
         if oldSkin then oldSkin:Destroy() end
         return
     end
 
     -- Snapshot the requested skin so rapid dropdown changes don't apply stale skins.
-    local requestedKey = cfg.SelectedSkinKey
+    local requestedKey = selectedKey
+    local requestedTag = (isRifle and "Carabine" or "Pistol") .. " / " .. selectedKey
     local ok, err = pcall(function()
-        if cfg.SelectedSkinKey ~= requestedKey then return end
+        local currentKey = isRifle and cfg.SelectedRifleSkinKey or cfg.SelectedPistolSkinKey
+        if currentKey ~= requestedKey then return end
 
         local toolHandle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
         if not toolHandle then return end
@@ -1160,7 +1187,7 @@ function applySelectedSkin()
         end
 
         -- Mark the skin BEFORE parenting so ChildAdded hooks know it's ours.
-        newSkin:SetAttribute("EvolutionSkinKey", requestedKey)
+        newSkin:SetAttribute("EvolutionSkinKey", requestedTag)
         newSkin.Parent = tool
         newSkin.PrimaryPart = skinHandle
 
@@ -1215,9 +1242,11 @@ local function hookTool(tool)
 
     trackConnection(tool.Equipped:Connect(function()
         if not cfg.SkinChangerEnabled then return end
-        if cfg.AutoApplySkin and cfg.SelectedSkinKey then
+        local isRifle = tool.Name:lower():find("carabine") or tool.Name:lower():find("rifle")
+        local key = isRifle and cfg.SelectedRifleSkinKey or cfg.SelectedPistolSkinKey
+        if cfg.AutoApplySkin and key then
             applySelectedSkin()
-        elseif not cfg.SelectedSkinKey then
+        elseif not key then
             local old = tool:FindFirstChild("Skin")
             if old then old:Destroy() end
         end
@@ -1225,9 +1254,11 @@ local function hookTool(tool)
 
     trackConnection(tool.ChildAdded:Connect(function(child)
         if child.Name ~= "Skin" then return end
-        local key = cfg.SelectedSkinKey
         if not cfg.SkinChangerEnabled then return end
-        if cfg.AutoApplySkin and key and child:GetAttribute("EvolutionSkinKey") ~= key then
+        local isRifle = tool.Name:lower():find("carabine") or tool.Name:lower():find("rifle")
+        local key = isRifle and cfg.SelectedRifleSkinKey or cfg.SelectedPistolSkinKey
+        local tag = key and ((isRifle and "Carabine" or "Pistol") .. " / " .. key) or nil
+        if cfg.AutoApplySkin and key and child:GetAttribute("EvolutionSkinKey") ~= tag then
             applySelectedSkin()
         elseif not key then
             child:Destroy()
@@ -1389,8 +1420,10 @@ trackConnection(RunService.RenderStepped:Connect(function()
         local tool = getEquippedGun()
         if tool then
             local skin = tool:FindFirstChild("Skin")
-            local key = cfg.SelectedSkinKey
-            local wrongSkin = skin and skin:GetAttribute("EvolutionSkinKey") ~= key
+            local isRifle = tool.Name:lower():find("carabine") or tool.Name:lower():find("rifle")
+            local key = isRifle and cfg.SelectedRifleSkinKey or cfg.SelectedPistolSkinKey
+            local tag = key and ((isRifle and "Carabine" or "Pistol") .. " / " .. key) or nil
+            local wrongSkin = skin and skin:GetAttribute("EvolutionSkinKey") ~= tag
             local shouldApply = key and (not skin or wrongSkin)
             local shouldRemove = not key and skin
             if (shouldApply or shouldRemove) and tick() - lastSkinApply >= 0.05 then
@@ -1427,29 +1460,5 @@ task.delay(2, function()
     refreshSkinList()
     refreshCardList()
 end)
-
--- ============================================================
--- UI SETTINGS
--- ============================================================
-local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
-
-MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', {
-    Default = 'RightShift',
-    NoUI = true,
-    Text = 'Menu keybind'
-})
-Library.ToggleKeybind = Options.MenuKeybind
-
-MenuGroup:AddButton('Unload', function()
-    Library:Unload()
-end)
-
-ThemeManager:SetLibrary(Library)
-SaveManager:SetLibrary(Library)
-SaveManager:IgnoreThemeSettings()
-SaveManager:SetIgnoreIndexes({ 'MenuKeybind', 'BackgroundColor', 'MainColor', 'AccentColor', 'OutlineColor', 'FontColor', 'ThemeManager' })
-ThemeManager:ApplyToTab(Tabs['UI Settings'])
-SaveManager:BuildConfigSection(Tabs['UI Settings'])
-SaveManager:LoadAutoloadConfig()
 
 print('[evolution] Duelist module loaded')
