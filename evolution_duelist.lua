@@ -614,15 +614,19 @@ PlayerLeft:Toggle({
     Flag = "Duelist_SkinChangerEnabled",
     Callback = function(State)
         cfg.SkinChangerEnabled = State
-        if State then
-            applySelectedSkin()
-        else
-            local tool = getEquippedGun()
-            if tool then
-                local old = tool:FindFirstChild("Skin")
-                if old then old:Destroy() end
+        task.defer(function()
+            if State then
+                if typeof(applySelectedSkin) == "function" then applySelectedSkin() end
+            else
+                local fn = getEquippedGun
+                if typeof(fn) ~= "function" then return end
+                local tool = fn()
+                if tool then
+                    local old = tool:FindFirstChild("Skin")
+                    if old then old:Destroy() end
+                end
             end
-        end
+        end)
     end
 })
 
@@ -698,7 +702,9 @@ PlayerRight:Toggle({
     Flag = "Duelist_CardChangerEnabled",
     Callback = function(State)
         cfg.CardChangerEnabled = State
-        if State then applySelectedCard() end
+        task.defer(function()
+            if State and typeof(applySelectedCard) == "function" then applySelectedCard() end
+        end)
     end
 })
 
@@ -937,7 +943,7 @@ end
 -- Prevents recursive raycast redirection while target selection runs.
 local computingTarget = false
 
-local function rawFindTarget(targetHitPart, useHitchance)
+local function rawFindTarget(targetHitPart, useHitchance, useMouse)
     if not CharactersFolder then return nil end
 
     local myChar = LocalPlayer.Character
@@ -948,7 +954,12 @@ local function rawFindTarget(targetHitPart, useHitchance)
     local origin = myHead.Position
     local bestDist = math.huge
     local bestPart = nil
-    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local center
+    if useMouse then
+        center = UserInputService:GetMouseLocation()
+    else
+        center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    end
 
     for _, model in ipairs(CharactersFolder:GetChildren()) do
         if model == myChar then continue end
@@ -985,11 +996,11 @@ local function rawFindTarget(targetHitPart, useHitchance)
 end
 
 local function rawAimAssistTarget()
-    return rawFindTarget(cfg.AimAssistHitPart, false)
+    return rawFindTarget(cfg.AimAssistHitPart, false, true)
 end
 
 local function rawSilentAimTarget()
-    return rawFindTarget(cfg.HitPart, true)
+    return rawFindTarget(cfg.HitPart, true, false)
 end
 
 local function getAimAssistTarget()
