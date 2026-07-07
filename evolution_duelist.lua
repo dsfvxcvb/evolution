@@ -76,6 +76,7 @@ end
 getgenv().EvolutionDuelist = {
     SilentAimEnabled = false,
     AutoFire = false,
+    TargetShootEnabled = false,
     TeamCheck = true,
     Hitchance = 100,
     MaxDistance = 1000,
@@ -114,16 +115,16 @@ getgenv().EvolutionDuelist = {
     SelectedCardKey = nil,
 
     TargetUIEnabled = false,
-    TargetUIColor = Color3.fromRGB(27, 206, 203),
-    TargetUIGlowColor = Color3.fromRGB(27, 206, 203),
+    TargetUIColor = Color3.fromRGB(0, 170, 255),
+    TargetUIGlowColor = Color3.fromRGB(0, 170, 255),
     TargetUIUseGlow = true,
     TargetUIStyle = "Old",
     TargetUIPosition = "Free",
     TargetHighlightEnabled = false,
-    TargetHighlightFill = Color3.fromRGB(27, 206, 203),
+    TargetHighlightFill = Color3.fromRGB(0, 170, 255),
     TargetHighlightOutline = Color3.fromRGB(255, 255, 255),
     TargetTracerEnabled = false,
-    TargetTracerColor = Color3.fromRGB(27, 206, 203),
+    TargetTracerColor = Color3.fromRGB(0, 170, 255),
     TargetTracerOutlineColor = Color3.fromRGB(0, 0, 0),
     TargetTracerThickness = 2,
     TargetTracerOutlineThickness = 4,
@@ -141,6 +142,8 @@ local Window = Arcane:Window({
     User = LocalPlayer.Name,
     Logo = "137522241512688"
 })
+
+pcall(function() Arcane:SetTheme("Ocean") end)
 
 -- Pages
 local Main = Window:Page({ Name = "Main", Icon = "home" })
@@ -177,6 +180,13 @@ CombatLeft:Toggle({
     Default = cfg.AutoFire,
     Flag = "Duelist_AutoFire",
     Callback = function(State) cfg.AutoFire = State end
+})
+
+CombatLeft:Toggle({
+    Name = "Target Reward TargetShoot",
+    Default = cfg.TargetShootEnabled,
+    Flag = "Duelist_TargetShoot",
+    Callback = function(State) cfg.TargetShootEnabled = State end
 })
 
 CombatLeft:Toggle({
@@ -829,6 +839,48 @@ local function getPriorityPart(model)
     end
 end
 
+-- Reward TargetShoot orb that spawns over killed players' heads.
+local function getTargetShoot()
+    if not cfg.SilentAimEnabled then return nil end
+    if not cfg.TargetShootEnabled then return nil end
+
+    local targetShoots = Workspace:FindFirstChild("TargetShoots")
+    if not targetShoots then return nil end
+
+    local myChar = LocalPlayer.Character
+    if not myChar then return nil end
+    local myHead = myChar:FindFirstChild("Head") or myChar:FindFirstChild("HumanoidRootPart")
+    if not myHead then return nil end
+
+    local origin = myHead.Position
+    local bestDist = math.huge
+    local bestPart = nil
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+
+    for _, part in ipairs(targetShoots:GetChildren()) do
+        if not part:IsA("BasePart") then continue end
+
+        local dist = (part.Position - origin).Magnitude
+        if dist > cfg.MaxDistance then continue end
+
+        local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+        if not onScreen then continue end
+        if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude > cfg.FOVRadius then continue end
+
+        local rp = RaycastParams.new()
+        rp.FilterType = Enum.RaycastFilterType.Blacklist
+        rp.FilterDescendantsInstances = {myChar, Camera, part}
+        if Workspace:Raycast(origin, (part.Position - origin).Unit * dist, rp) then continue end
+
+        if dist < bestDist then
+            bestDist = dist
+            bestPart = part
+        end
+    end
+
+    return bestPart
+end
+
 -- Prevents recursive raycast redirection while getTarget runs.
 local computingTarget = false
 
@@ -840,6 +892,10 @@ local function rawGetTarget()
     if not myChar then return nil end
     local myHead = myChar:FindFirstChild("Head") or myChar:FindFirstChild("HumanoidRootPart")
     if not myHead then return nil end
+
+    -- Reward TargetShoot takes priority when enabled.
+    local shoot = cfg.TargetShootEnabled and getTargetShoot()
+    if shoot then return shoot end
 
     local origin = myHead.Position
     local bestDist = math.huge
