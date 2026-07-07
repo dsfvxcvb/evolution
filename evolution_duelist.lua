@@ -67,6 +67,8 @@ getgenv().EvolutionDuelistCleanup = function()
             pcall(function()
                 tool:SetAttribute("FireRate", orig.FireRate)
                 tool:SetAttribute("Automatic", orig.Automatic)
+                tool:SetAttribute("Recoil", orig.Recoil)
+                tool:SetAttribute("Spread", orig.Spread)
             end)
         end
         table.clear(rfOrigs)
@@ -88,6 +90,7 @@ getgenv().EvolutionDuelist = {
     SilentAimEnabled = false,
     AutoFire = false,
     RapidFire = false,
+    NoRecoil = false,
     TargetShootEnabled = false,
     TeamCheck = true,
     Hitchance = 100,
@@ -175,6 +178,7 @@ local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
 -- Sections
 local CombatLeft = Combat:Section({ Name = "Aimbot", Side = 1 })
 local CombatAimAssist = Combat:Section({ Name = "Aim Assist", Side = 2 })
+local CombatGunMods = Combat:Section({ Name = "Gun Mods", Side = 2 })
 
 local VisualsLeft = Visuals:Section({ Name = "FOV Circle", Side = 1 })
 local VisualsTargetUI = Visuals:Section({ Name = "Target UI", Side = 2 })
@@ -200,13 +204,6 @@ CombatLeft:Toggle({
     Default = cfg.AutoFire,
     Flag = "Duelist_AutoFire",
     Callback = function(State) cfg.AutoFire = State end
-})
-
-CombatLeft:Toggle({
-    Name = "Rapid Fire",
-    Default = cfg.RapidFire,
-    Flag = "Duelist_RapidFire",
-    Callback = function(State) cfg.RapidFire = State end
 })
 
 CombatLeft:Toggle({
@@ -293,6 +290,21 @@ CombatAimAssist:Dropdown({
     Default = cfg.AimAssistHitPart,
     Flag = "Duelist_AimAssistHitPart",
     Callback = function(Value) cfg.AimAssistHitPart = Value end
+})
+
+-- Gun Mods
+CombatGunMods:Toggle({
+    Name = "Rapid Fire",
+    Default = cfg.RapidFire,
+    Flag = "Duelist_RapidFire",
+    Callback = function(State) cfg.RapidFire = State end
+})
+
+CombatGunMods:Toggle({
+    Name = "No Recoil",
+    Default = cfg.NoRecoil,
+    Flag = "Duelist_NoRecoil",
+    Callback = function(State) cfg.NoRecoil = State end
 })
 
 -- Target UI
@@ -1294,22 +1306,25 @@ trackConnection(RunService.RenderStepped:Connect(function()
     end
 end))
 
--- Rapid Fire attribute spoofing (client-side FireRate + force Automatic)
-local rapidFireOriginals = {}
-local function restoreRapidFire(tool)
-    local orig = rapidFireOriginals[tool]
+-- Gun Mods attribute spoofing (Rapid Fire + No Recoil)
+local gunModOriginals = {}
+local function restoreGunMods(tool)
+    local orig = gunModOriginals[tool]
     if not orig then return end
     pcall(function()
         tool:SetAttribute("FireRate", orig.FireRate)
         tool:SetAttribute("Automatic", orig.Automatic)
+        tool:SetAttribute("Recoil", orig.Recoil)
+        tool:SetAttribute("Spread", orig.Spread)
     end)
-    rapidFireOriginals[tool] = nil
+    gunModOriginals[tool] = nil
 end
 
 trackConnection(RunService.Heartbeat:Connect(function()
-    if not cfg.RapidFire then
-        for tool, _ in pairs(rapidFireOriginals) do
-            restoreRapidFire(tool)
+    local active = cfg.RapidFire or cfg.NoRecoil
+    if not active then
+        for tool, _ in pairs(gunModOriginals) do
+            restoreGunMods(tool)
         end
         return
     end
@@ -1320,20 +1335,25 @@ trackConnection(RunService.Heartbeat:Connect(function()
     local tool = char:FindFirstChildOfClass("Tool")
     if not tool or not tool:HasTag("Gun") then return end
 
-    if not rapidFireOriginals[tool] then
-        rapidFireOriginals[tool] = {
+    if not gunModOriginals[tool] then
+        gunModOriginals[tool] = {
             FireRate = tool:GetAttribute("FireRate"),
             Automatic = tool:GetAttribute("Automatic"),
+            Recoil = tool:GetAttribute("Recoil"),
+            Spread = tool:GetAttribute("Spread"),
         }
     end
 
     pcall(function()
-        tool:SetAttribute("FireRate", 9999)
-        tool:SetAttribute("Automatic", true)
+        local orig = gunModOriginals[tool]
+        tool:SetAttribute("FireRate", cfg.RapidFire and 9999 or orig.FireRate)
+        tool:SetAttribute("Automatic", cfg.RapidFire and true or orig.Automatic)
+        tool:SetAttribute("Recoil", cfg.NoRecoil and 0 or orig.Recoil)
+        tool:SetAttribute("Spread", cfg.NoRecoil and 0 or orig.Spread)
     end)
 end))
 
-getgenv().EvolutionDuelistRapidFireOriginals = rapidFireOriginals
+getgenv().EvolutionDuelistRapidFireOriginals = gunModOriginals
 
 -- ============================================================
 -- ESP LOGIC
