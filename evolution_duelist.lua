@@ -82,6 +82,11 @@ getgenv().EvolutionDuelist = {
     MaxDistance = 1000,
     HitPart = 'Head',
 
+    AimAssistEnabled = false,
+    AimAssistSmoothing = 0.1,
+    AimAssistPrediction = 0.1,
+    AimAssistHitPart = 'Head',
+
     ShowFOV = true,
     FOVRadius = 150,
     FOVColor = Color3.fromRGB(255, 255, 255),
@@ -221,6 +226,53 @@ CombatLeft:Dropdown({
     Default = cfg.HitPart,
     Flag = "Duelist_HitPart",
     Callback = function(Value) cfg.HitPart = Value end
+})
+
+-- Aim Assist
+local CombatAimAssist = Combat:Section({ Name = "Aim Assist", Side = 1 })
+
+local AimAssistToggle = CombatAimAssist:Toggle({
+    Name = "Aim Assist",
+    Default = cfg.AimAssistEnabled,
+    Flag = "Duelist_AimAssist",
+    Callback = function(State) cfg.AimAssistEnabled = State end
+})
+
+pcall(function()
+    AimAssistToggle:Keybind({
+        Name = "Aim Assist Key",
+        Default = Enum.KeyCode.Q,
+        Mode = "Toggle",
+        Flag = "Duelist_AimAssistKey"
+    })
+end)
+
+CombatAimAssist:Slider({
+    Name = "Smoothing",
+    Min = 0.01,
+    Max = 1,
+    Default = cfg.AimAssistSmoothing,
+    Decimals = 0.01,
+    Flag = "Duelist_AimAssistSmoothing",
+    Callback = function(Value) cfg.AimAssistSmoothing = Value end
+})
+
+CombatAimAssist:Slider({
+    Name = "Prediction",
+    Min = 0,
+    Max = 1,
+    Default = cfg.AimAssistPrediction,
+    Decimals = 0.01,
+    Flag = "Duelist_AimAssistPrediction",
+    Callback = function(Value) cfg.AimAssistPrediction = Value end
+})
+
+CombatAimAssist:Dropdown({
+    Name = "Aim Part",
+    Items = { "Head", "UpperTorso", "HumanoidRootPart" },
+    Default = cfg.AimAssistHitPart,
+    Flag = "Duelist_AimAssistHitPart",
+    Callback = function(Value) cfg.AimAssistHitPart = Value end
 })
 
 -- Target UI
@@ -2513,6 +2565,21 @@ trackConnection(RunService.RenderStepped:Connect(function()
     else
         if duelistTargetTracer then duelistTargetTracer.Visible = false end
         if duelistTargetTracerOutline then duelistTargetTracerOutline.Visible = false end
+    end
+
+    -- Aim Assist (uses the same target as the indicators)
+    if cfg.AimAssistEnabled and targetInfo and targetInfo.Model and targetInfo.Model.Parent then
+        local aimPart = targetInfo.Model:FindFirstChild(cfg.AimAssistHitPart) or targetInfo.Part
+        if aimPart and aimPart.Parent then
+            local velocity = Vector3.zero
+            pcall(function()
+                velocity = aimPart.AssemblyLinearVelocity or aimPart.Velocity or Vector3.zero
+            end)
+            local predictedPos = aimPart.Position + velocity * cfg.AimAssistPrediction
+            local targetCF = CFrame.new(Camera.CFrame.Position, predictedPos)
+            local smoothing = math.clamp(cfg.AimAssistSmoothing, 0.01, 1)
+            Camera.CFrame = Camera.CFrame:Lerp(targetCF, smoothing)
+        end
     end
 end))
 
