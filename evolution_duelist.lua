@@ -26,7 +26,7 @@ for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
 end
 local EvolutionConnections = {}
 local EvolutionTasks = {}
-local duelistTargetScreen, duelistTargetMain, duelistTargetElements, duelistTargetHighlight, duelistTargetTracer, duelistTargetTracerOutline, lastDuelistTargetPlayer
+local duelistTargetScreen, duelistTargetMain, duelistTargetElements, duelistTargetHighlight, duelistTargetTracer, duelistTargetTracerOutline, lastDuelistTargetPlayer, currentTargetUIStyle
 getgenv().EvolutionDuelistCleanup = function()
     for _, c in ipairs(EvolutionConnections) do
         pcall(function() c:Disconnect() end)
