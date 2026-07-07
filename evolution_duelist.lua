@@ -28,11 +28,16 @@ if getgenv().EvolutionDuelistCleanup then
     pcall(getgenv().EvolutionDuelistCleanup)
 end
 local EvolutionConnections = {}
+local EvolutionTasks = {}
 getgenv().EvolutionDuelistCleanup = function()
     for _, c in ipairs(EvolutionConnections) do
         pcall(function() c:Disconnect() end)
     end
     table.clear(EvolutionConnections)
+    for _, t in ipairs(EvolutionTasks) do
+        pcall(task.cancel, t)
+    end
+    table.clear(EvolutionTasks)
     if typeof(getgenv().Library) == "table" and typeof(getgenv().Library.Unload) == "function" then
         pcall(function() getgenv().Library:Unload() end)
     end
@@ -40,6 +45,10 @@ end
 local function trackConnection(c)
     table.insert(EvolutionConnections, c)
     return c
+end
+local function trackTask(t)
+    table.insert(EvolutionTasks, t)
+    return t
 end
 
 local Window = Library:CreateWindow({
@@ -332,6 +341,7 @@ SkinBox:AddToggle('DT_AutoApplySkin', {
     Callback = function(v) cfg.AutoApplySkin = v end
 })
 
+local skinDebounce = nil
 local SkinDropdown = SkinBox:AddDropdown('DT_SelectedSkin', {
     Text = 'Skin',
     Default = 'None',
@@ -339,17 +349,25 @@ local SkinDropdown = SkinBox:AddDropdown('DT_SelectedSkin', {
     AllowNull = false,
     Callback = function(v)
         cfg.SelectedSkinKey = (v ~= 'None' and v or nil)
-        if cfg.SkinChangerEnabled then
-            if cfg.SelectedSkinKey then
-                applySelectedSkin()
-            else
-                local tool = getEquippedGun()
-                if tool then
-                    local old = tool:FindFirstChild("Skin")
-                    if old then old:Destroy() end
+        if skinDebounce then pcall(task.cancel, skinDebounce) end
+        skinDebounce = trackTask(task.delay(0.15, function()
+            for i, t in ipairs(EvolutionTasks) do
+                if t == skinDebounce then table.remove(EvolutionTasks, i) break end
+            end
+            skinDebounce = nil
+            if not cfg.SkinChangerEnabled then return end
+            if cfg.SelectedSkinKey == (v ~= 'None' and v or nil) then
+                if cfg.SelectedSkinKey then
+                    applySelectedSkin()
+                else
+                    local tool = getEquippedGun()
+                    if tool then
+                        local old = tool:FindFirstChild("Skin")
+                        if old then old:Destroy() end
+                    end
                 end
             end
-        end
+        end))
     end
 })
 
