@@ -116,6 +116,7 @@ getgenv().EvolutionDuelist = {
     TargetUIEnabled = false,
     TargetUIColor = Color3.fromRGB(27, 206, 203),
     TargetUIGlowColor = Color3.fromRGB(27, 206, 203),
+    TargetUIUseGlow = true,
     TargetUIStyle = "Old",
     TargetUIPosition = "Free",
     TargetHighlightEnabled = false,
@@ -226,12 +227,6 @@ local targetUIColorChained = pcall(function()
         Flag = "Duelist_TargetUIColor",
         Callback = function(Value) cfg.TargetUIColor = Value end
     })
-    TargetUIToggle:Colorpicker({
-        Name = "",
-        Default = cfg.TargetUIGlowColor,
-        Flag = "Duelist_TargetUIGlowColor",
-        Callback = function(Value) cfg.TargetUIGlowColor = Value end
-    })
 end)
 if not targetUIColorChained then
     CombatTargetUI:Colorpicker({
@@ -240,6 +235,23 @@ if not targetUIColorChained then
         Flag = "Duelist_TargetUIColor",
         Callback = function(Value) cfg.TargetUIColor = Value end
     })
+end
+
+local UseGlowToggle = CombatTargetUI:Toggle({
+    Name = "Use Glow",
+    Default = cfg.TargetUIUseGlow,
+    Flag = "Duelist_TargetUIUseGlow",
+    Callback = function(State) cfg.TargetUIUseGlow = State end
+})
+local glowColorChained = pcall(function()
+    UseGlowToggle:Colorpicker({
+        Name = "",
+        Default = cfg.TargetUIGlowColor,
+        Flag = "Duelist_TargetUIGlowColor",
+        Callback = function(Value) cfg.TargetUIGlowColor = Value end
+    })
+end)
+if not glowColorChained then
     CombatTargetUI:Colorpicker({
         Name = "Glow Color",
         Default = cfg.TargetUIGlowColor,
@@ -253,7 +265,17 @@ CombatTargetUI:Dropdown({
     Items = { "Old", "Modern" },
     Default = cfg.TargetUIStyle,
     Flag = "Duelist_TargetUIStyle",
-    Callback = function(Value) cfg.TargetUIStyle = Value end
+    Callback = function(Value)
+        cfg.TargetUIStyle = Value
+        if duelistTargetScreen then
+            pcall(function() duelistTargetScreen:Destroy() end)
+            duelistTargetScreen = nil
+            duelistTargetMain = nil
+            duelistTargetElements = {}
+            currentTargetUIStyle = nil
+            createTargetUI()
+        end
+    end
 })
 
 CombatTargetUI:Dropdown({
@@ -775,8 +797,15 @@ if previousHooks then
     getgenv().EvolutionDuelistHooks = nil
 end
 
-local CharactersFolder = Workspace:WaitForChild("Characters", 10) or Workspace:FindFirstChild("Characters")
-local WeaponsRemote = ReplicatedStorage:WaitForChild("Events", 10):WaitForChild("Weapons", 10)
+local CharactersFolder
+pcall(function()
+    CharactersFolder = Workspace:WaitForChild("Characters", 10) or Workspace:FindFirstChild("Characters")
+end)
+
+local WeaponsRemote
+pcall(function()
+    WeaponsRemote = ReplicatedStorage:WaitForChild("Events", 10):WaitForChild("Weapons", 10)
+end)
 
 local function isAlive(model)
     if not model then return false end
@@ -1010,11 +1039,13 @@ local function hookedFireServer(self, cmd, ...)
     return oldFireServer(self, cmd, ...)
 end
 
-if typeof(hookfunction) == "function" then
-    oldFireServer = hookfunction(WeaponsRemote.FireServer, hookedFireServer)
-else
-    oldFireServer = WeaponsRemote.FireServer
-    WeaponsRemote.FireServer = hookedFireServer
+if WeaponsRemote then
+    if typeof(hookfunction) == "function" then
+        oldFireServer = hookfunction(WeaponsRemote.FireServer, hookedFireServer)
+    else
+        oldFireServer = WeaponsRemote.FireServer
+        WeaponsRemote.FireServer = hookedFireServer
+    end
 end
 
 -- Remember hooks so a reload can restore them instead of stacking hooks.
@@ -1687,10 +1718,122 @@ end
 duelistTargetScreen = nil
 duelistTargetMain = nil
 duelistTargetElements = {}
+currentTargetUIStyle = nil
 duelistTargetHighlight = nil
 duelistTargetTracer = nil
 duelistTargetTracerOutline = nil
 lastDuelistTargetPlayer = nil
+
+local function applyModernStyle()
+    if not duelistTargetMain or not duelistTargetScreen then return end
+    local main = duelistTargetMain
+    local mainRadius = 12
+
+    local function round(frame, radius)
+        if not frame or not frame:IsA("GuiObject") then return end
+        local corner = frame:FindFirstChildOfClass("UICorner")
+        if not corner then
+            corner = Instance.new("UICorner")
+            corner.Parent = frame
+        end
+        corner.CornerRadius = UDim.new(0, radius)
+    end
+
+    -- Remove old image glow; modern uses rounded frame glow.
+    if duelistTargetElements.Glow then
+        pcall(function() duelistTargetElements.Glow:Destroy() end)
+        duelistTargetElements.Glow = nil
+    end
+
+    -- Round every top-level frame in the ScreenGui.
+    for _, sibling in ipairs(duelistTargetScreen:GetChildren()) do
+        if sibling:IsA("Frame") then
+            round(sibling, mainRadius)
+            if sibling ~= main then
+                sibling.ClipsDescendants = true
+            end
+        end
+    end
+
+    -- Move existing content into a clipping wrapper so square corners don't poke through.
+    local Content = main:FindFirstChild("Content")
+    if not Content then
+        Content = Instance.new("Frame")
+        Content.Name = "Content"
+        Content.BackgroundTransparency = 1
+        Content.Size = UDim2.new(1, 0, 1, 0)
+        Content.Position = UDim2.new(0, 0, 0, 0)
+        Content.ClipsDescendants = true
+        Content.ZIndex = main.ZIndex
+        local contentCorner = Instance.new("UICorner")
+        contentCorner.CornerRadius = UDim.new(0, mainRadius)
+        contentCorner.Parent = Content
+        for _, child in ipairs(main:GetChildren()) do
+            if not child:IsA("UICorner") then
+                child.Parent = Content
+            end
+        end
+        Content.Parent = main
+    end
+
+    -- Modern glow: concentric rounded frames behind the panel.
+    local glowColor = cfg.TargetUIGlowColor or cfg.TargetUIColor or Color3.fromRGB(27, 206, 203)
+    local glowLayers = 8
+    local glowMaxInset = 12
+    local targetCombinedTransparency = 0.85
+    local perLayerTransparency = targetCombinedTransparency ^ (1 / glowLayers)
+
+    local GlowHolder = main:FindFirstChild("GlowHolder")
+    if GlowHolder then
+        pcall(function() GlowHolder:Destroy() end)
+    end
+
+    GlowHolder = Instance.new("Frame")
+    GlowHolder.Name = "GlowHolder"
+    GlowHolder.BackgroundTransparency = 1
+    GlowHolder.Position = UDim2.new(0, 0, 0, 0)
+    GlowHolder.Size = UDim2.new(1, 0, 1, 0)
+    GlowHolder.ZIndex = main.ZIndex - 1
+    GlowHolder.Parent = main
+    GlowHolder.Visible = cfg.TargetUIUseGlow
+
+    for i = 1, glowLayers do
+        local t = i / glowLayers
+        local inset = glowMaxInset * t
+        local layer = Instance.new("Frame")
+        layer.Name = "GlowLayer" .. i
+        layer.BackgroundColor3 = glowColor
+        layer.BackgroundTransparency = perLayerTransparency
+        layer.BorderSizePixel = 0
+        layer.Position = UDim2.new(0, -inset, 0, -inset)
+        layer.Size = UDim2.new(1, inset * 2, 1, inset * 2)
+        layer.ZIndex = GlowHolder.ZIndex - (glowLayers - i)
+        layer.Parent = GlowHolder
+        local layerCorner = Instance.new("UICorner")
+        layerCorner.CornerRadius = UDim.new(0, mainRadius + inset)
+        layerCorner.Parent = layer
+    end
+
+    duelistTargetElements.GlowHolder = GlowHolder
+
+    -- Round descendants, keeping bar fills and the top accent sharp.
+    local function roundDescendants(obj, depth)
+        for _, child in ipairs(obj:GetChildren()) do
+            if child:IsA("Frame") then
+                local name = child.Name
+                if name ~= "HealthFill" and name ~= "AmmoFill" and name ~= "TopBar" then
+                    round(child, math.max(2, mainRadius - depth))
+                end
+                roundDescendants(child, depth + 1)
+            elseif child:IsA("ImageLabel") then
+                round(child, 32)
+            else
+                roundDescendants(child, depth)
+            end
+        end
+    end
+    roundDescendants(Content, 1)
+end
 
 local function createTargetUI()
     if duelistTargetScreen then return end
@@ -2139,6 +2282,11 @@ local function createTargetUI()
         AmmoFill = AmmoBarValue,
         AmmoText = AmmoText,
     }
+
+    currentTargetUIStyle = cfg.TargetUIStyle
+    if cfg.TargetUIStyle == "Modern" then
+        applyModernStyle()
+    end
 end
 
 local function updateTargetHighlight(targetInfo)
@@ -2182,7 +2330,16 @@ trackConnection(RunService.RenderStepped:Connect(function()
 
     -- Target UI
     if cfg.TargetUIEnabled and targetInfo then
-        createTargetUI()
+        if not duelistTargetScreen or currentTargetUIStyle ~= cfg.TargetUIStyle then
+            if duelistTargetScreen then
+                pcall(function() duelistTargetScreen:Destroy() end)
+            end
+            duelistTargetScreen = nil
+            duelistTargetMain = nil
+            duelistTargetElements = {}
+            currentTargetUIStyle = nil
+            createTargetUI()
+        end
         if duelistTargetScreen and duelistTargetElements.Avatar then
             duelistTargetScreen.Enabled = true
 
@@ -2225,9 +2382,20 @@ trackConnection(RunService.RenderStepped:Connect(function()
             if duelistTargetElements.TopBar then
                 duelistTargetElements.TopBar.BackgroundColor3 = cfg.TargetUIColor
             end
-            if duelistTargetElements.Glow then
-                duelistTargetElements.Glow.ImageColor3 = cfg.TargetUIGlowColor
-                duelistTargetElements.Glow.Visible = cfg.TargetUIStyle == "Old"
+            if cfg.TargetUIStyle == "Old" then
+                if duelistTargetElements.Glow then
+                    duelistTargetElements.Glow.ImageColor3 = cfg.TargetUIGlowColor
+                    duelistTargetElements.Glow.Visible = cfg.TargetUIUseGlow
+                end
+            elseif cfg.TargetUIStyle == "Modern" then
+                if duelistTargetElements.GlowHolder then
+                    duelistTargetElements.GlowHolder.Visible = cfg.TargetUIUseGlow
+                    for _, child in ipairs(duelistTargetElements.GlowHolder:GetChildren()) do
+                        if child:IsA("Frame") then
+                            child.BackgroundColor3 = cfg.TargetUIGlowColor
+                        end
+                    end
+                end
             end
 
             if duelistTargetMain then
