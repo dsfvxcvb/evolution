@@ -60,6 +60,7 @@ getgenv().EvolutionDuelistCleanup = function()
         pcall(function() duelistTargetTracerOutline:Remove() end)
         duelistTargetTracerOutline = nil
     end
+    pcall(function() RunService:UnbindFromRenderStep("EvolutionAimAssist") end)
 end
 local function trackConnection(c)
     table.insert(EvolutionConnections, c)
@@ -188,7 +189,7 @@ CombatLeft:Toggle({
 })
 
 CombatLeft:Toggle({
-    Name = "Target Orb",
+    Name = "Target Reward TargetShoot",
     Default = cfg.TargetShootEnabled,
     Flag = "Duelist_TargetShoot",
     Callback = function(State) cfg.TargetShootEnabled = State end
@@ -933,11 +934,10 @@ local function getTargetShoot()
     return bestPart
 end
 
--- Prevents recursive raycast redirection while getTarget runs.
+-- Prevents recursive raycast redirection while target selection runs.
 local computingTarget = false
 
-local function rawGetTarget()
-    if not cfg.SilentAimEnabled then return nil end
+local function rawFindTarget(targetHitPart, useHitchance)
     if not CharactersFolder then return nil end
 
     local myChar = LocalPlayer.Character
@@ -945,20 +945,22 @@ local function rawGetTarget()
     local myHead = myChar:FindFirstChild("Head") or myChar:FindFirstChild("HumanoidRootPart")
     if not myHead then return nil end
 
-    -- Reward TargetShoot takes priority when enabled.
-    local shoot = cfg.TargetShootEnabled and getTargetShoot()
-    if shoot then return shoot end
-
     local origin = myHead.Position
     local bestDist = math.huge
     local bestPart = nil
+    local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
 
     for _, model in ipairs(CharactersFolder:GetChildren()) do
         if model == myChar then continue end
         if not isAlive(model) then continue end
         if not isEnemy(model) then continue end
 
-        local part = getPriorityPart(model)
+        local part
+        if useHitchance then
+            part = getPriorityPart(model)
+        else
+            part = model:FindFirstChild(targetHitPart) or model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart")
+        end
         if not part then continue end
 
         local dist = (part.Position - origin).Magnitude
@@ -966,8 +968,6 @@ local function rawGetTarget()
 
         local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
         if not onScreen then continue end
-
-        local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
         if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude > cfg.FOVRadius then continue end
 
         local rp = RaycastParams.new()
@@ -984,6 +984,42 @@ local function rawGetTarget()
     return bestPart
 end
 
+local function rawAimAssistTarget()
+    return rawFindTarget(cfg.AimAssistHitPart, false)
+end
+
+local function rawSilentAimTarget()
+    return rawFindTarget(cfg.HitPart, true)
+end
+
+local function getAimAssistTarget()
+    if computingTarget then return nil end
+    computingTarget = true
+    local ok, result = pcall(rawAimAssistTarget)
+    computingTarget = false
+    if ok then return result end
+    return nil
+end
+
+local function getSilentAimTarget()
+    if computingTarget then return nil end
+    computingTarget = true
+    local ok, result = pcall(rawSilentAimTarget)
+    computingTarget = false
+    if ok then return result end
+    return nil
+end
+
+local function rawGetTarget()
+    if not cfg.SilentAimEnabled then return nil end
+
+    -- Reward TargetShoot takes priority when enabled.
+    local shoot = cfg.TargetShootEnabled and getTargetShoot()
+    if shoot then return shoot end
+
+    return getSilentAimTarget()
+end
+
 local function getTarget()
     if computingTarget then return nil end
     computingTarget = true
@@ -994,7 +1030,7 @@ local function getTarget()
 end
 
 local function getTargetPlayer()
-    local part = getTarget()
+    local part = getAimAssistTarget()
     if not part then return nil end
     local model = part:FindFirstAncestorOfClass("Model")
     if not model or not isAlive(model) then return nil end
@@ -2567,21 +2603,32 @@ trackConnection(RunService.RenderStepped:Connect(function()
         if duelistTargetTracerOutline then duelistTargetTracerOutline.Visible = false end
     end
 
-    -- Aim Assist (uses the same target as the indicators)
-    if cfg.AimAssistEnabled and targetInfo and targetInfo.Model and targetInfo.Model.Parent then
-        local aimPart = targetInfo.Model:FindFirstChild(cfg.AimAssistHitPart) or targetInfo.Part
-        if aimPart and aimPart.Parent then
-            local velocity = Vector3.zero
-            pcall(function()
-                velocity = aimPart.AssemblyLinearVelocity or aimPart.Velocity or Vector3.zero
-            end)
-            local predictedPos = aimPart.Position + velocity * cfg.AimAssistPrediction
-            local targetCF = CFrame.new(Camera.CFrame.Position, predictedPos)
-            local smoothing = math.clamp(cfg.AimAssistSmoothing, 0.01, 1)
-            Camera.CFrame = Camera.CFrame:Lerp(targetCF, smoothing)
-        end
-    end
 end))
+
+-- Aim Assist camlock (runs after the camera updates so it actually sticks)
+local function runAimAssist()
+    if not cfg.AimAssistEnabled then return end
+    local targetInfo = getTargetPlayer()
+    if not (targetInfo and targetInfo.Model and targetInfo.Model.Parent) then return end
+
+    local aimPart = targetInfo.Model:FindFirstChild(cfg.AimAssistHitPart) or targetInfo.Part
+    if not (aimPart and aimPart.Parent) then return end
+
+    local velocity = Vector3.zero
+    pcall(function()
+        velocity = aimPart.AssemblyLinearVelocity or aimPart.Velocity or Vector3.zero
+    end)
+
+    local predictedPos = aimPart.Position + velocity * cfg.AimAssistPrediction
+    local targetCF = CFrame.new(Camera.CFrame.Position, predictedPos)
+    local smoothing = math.clamp(cfg.AimAssistSmoothing, 0.01, 1)
+    Camera.CFrame = Camera.CFrame:Lerp(targetCF, smoothing)
+end
+
+pcall(function()
+    RunService:UnbindFromRenderStep("EvolutionAimAssist")
+end)
+RunService:BindToRenderStep("EvolutionAimAssist", Enum.RenderPriority.Camera.Value + 1, runAimAssist)
 
 -- Auto-apply cosmetics and force them back if the server resets them.
 local lastSkinTool = nil
