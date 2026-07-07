@@ -48,6 +48,51 @@ local function trackTask(t)
 end
 
 -- ============================================================
+-- CONFIG
+-- ============================================================
+getgenv().EvolutionDuelist = {
+    SilentAimEnabled = false,
+    AutoFire = false,
+    TeamCheck = true,
+    Hitchance = 100,
+    MaxDistance = 1000,
+    HitPart = 'Head',
+
+    ShowFOV = true,
+    FOVRadius = 150,
+    FOVColor = Color3.fromRGB(255, 255, 255),
+    FOVFillTransparency = 0.65,
+    FOVOutline = true,
+    FOVOutlineColor = Color3.fromRGB(0, 0, 0),
+    FOVOutlineThickness = 1,
+    FOVGradient = true,
+    FOVGradientTop = Color3.fromRGB(211, 211, 211),
+    FOVGradientBottom = Color3.fromRGB(0, 0, 0),
+    FOVGradientSpin = true,
+    FOVGradientSpeed = 120,
+
+    EspEnabled = false,
+    EspBoxes = true,
+    EspNames = true,
+    EspHealth = true,
+    EspDistance = true,
+    EspMaxDistance = 2000,
+    EspBoxColor = Color3.fromRGB(255, 255, 255),
+    EspNameColor = Color3.fromRGB(255, 255, 255),
+    EspHealthColor = Color3.fromRGB(0, 255, 0),
+    EspDistanceColor = Color3.fromRGB(255, 255, 255),
+
+    SkinChangerEnabled = false,
+    AutoApplySkin = true,
+    SelectedPistolSkinKey = nil,
+    SelectedRifleSkinKey = nil,
+    CardChangerEnabled = false,
+    AutoApplyCard = true,
+    SelectedCardKey = nil,
+}
+local cfg = getgenv().EvolutionDuelist
+
+-- ============================================================
 -- ARCANE UI
 -- ============================================================
 local Arcane = loadstring(game:HttpGet("https://raw.githubusercontent.com/Da7mu/Ui-Collection/refs/heads/main/Arcane%20Ui/Library.lua"))()
