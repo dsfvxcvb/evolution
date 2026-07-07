@@ -10,6 +10,8 @@ local RunService = cloneref(game:GetService("RunService"))
 local Workspace = cloneref(game:GetService("Workspace"))
 local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
 local UserInputService = cloneref(game:GetService("UserInputService"))
+local ContextActionService = cloneref(game:GetService("ContextActionService"))
+local VirtualInputManager = cloneref(game:GetService("VirtualInputManager"))
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -91,6 +93,9 @@ getgenv().EvolutionDuelist = {
     AutoFire = false,
     RapidFire = false,
     NoRecoil = false,
+    ShootInLobby = false,
+    WallCheck = true,
+    KOCheck = false,
     TargetShootEnabled = false,
     TeamCheck = true,
     Hitchance = 100,
@@ -177,6 +182,7 @@ local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
 
 -- Sections
 local CombatLeft = Combat:Section({ Name = "Aimbot", Side = 1 })
+local CombatChecks = Combat:Section({ Name = "Checks", Side = 1 })
 local CombatAimAssist = Combat:Section({ Name = "Aim Assist", Side = 2 })
 local CombatGunMods = Combat:Section({ Name = "Gun Mods", Side = 2 })
 
@@ -247,6 +253,21 @@ CombatLeft:Dropdown({
     Callback = function(Value) cfg.HitPart = Value end
 })
 
+-- Checks
+CombatChecks:Toggle({
+    Name = "Wall Check",
+    Default = cfg.WallCheck,
+    Flag = "Duelist_WallCheck",
+    Callback = function(State) cfg.WallCheck = State end
+})
+
+CombatChecks:Toggle({
+    Name = "KO Check",
+    Default = cfg.KOCheck,
+    Flag = "Duelist_KOCheck",
+    Callback = function(State) cfg.KOCheck = State end
+})
+
 -- Aim Assist
 local AimAssistToggle = CombatAimAssist:Toggle({
     Name = "Aim Assist",
@@ -305,6 +326,13 @@ CombatGunMods:Toggle({
     Default = cfg.NoRecoil,
     Flag = "Duelist_NoRecoil",
     Callback = function(State) cfg.NoRecoil = State end
+})
+
+CombatGunMods:Toggle({
+    Name = "Shoot In Lobby",
+    Default = cfg.ShootInLobby,
+    Flag = "Duelist_ShootInLobby",
+    Callback = function(State) cfg.ShootInLobby = State end
 })
 
 -- Target UI
@@ -996,6 +1024,10 @@ local function rawFindTarget(targetHitPart, useHitchance, useMouse)
         if model == myChar then continue end
         if not isAlive(model) then continue end
         if not isEnemy(model) then continue end
+        if cfg.KOCheck then
+            local ko = model:GetAttribute("KO") or model:GetAttribute("Knocked") or model:GetAttribute("Downed")
+            if ko then continue end
+        end
 
         local part
         if useHitchance then
@@ -1012,10 +1044,12 @@ local function rawFindTarget(targetHitPart, useHitchance, useMouse)
         if not onScreen then continue end
         if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude > cfg.FOVRadius then continue end
 
-        local rp = RaycastParams.new()
-        rp.FilterType = Enum.RaycastFilterType.Blacklist
-        rp.FilterDescendantsInstances = {myChar, Camera, model}
-        if Workspace:Raycast(origin, (part.Position - origin).Unit * dist, rp) then continue end
+        if cfg.WallCheck then
+            local rp = RaycastParams.new()
+            rp.FilterType = Enum.RaycastFilterType.Blacklist
+            rp.FilterDescendantsInstances = {myChar, Camera, model}
+            if Workspace:Raycast(origin, (part.Position - origin).Unit * dist, rp) then continue end
+        end
 
         if dist < bestDist then
             bestDist = dist
@@ -1245,6 +1279,11 @@ getgenv().EvolutionDuelistHooks = {
 -- Auto Fire
 local lastSemiTrigger = 0
 local autoFireHeld = false
+local manualShootHeld = false
+local manualVIMHeld = false
+local sendingVIM = false
+local shootBoundCache = nil
+local shootBoundCacheTime = 0
 
 local function getEquippedGun()
     local char = LocalPlayer.Character
@@ -1272,34 +1311,128 @@ local function setShootBind(down)
     pcall(function() GameG:FireBind("Shoot", down, false) end)
 end
 
+-- Detect whether the game's native Shoot bind is active (disabled in lobby/safe-zones).
+local function isShootBound()
+    local info
+    pcall(function()
+        info = ContextActionService:GetBoundActionInfo("Shoot")
+    end)
+    if type(info) ~= "table" then return false end
+    local inputTypes = info.inputTypes
+    return inputTypes and #inputTypes > 0
+end
+
+local function isShootBoundCached()
+    if tick() - shootBoundCacheTime < 0.5 then return shootBoundCache end
+    shootBoundCacheTime = tick()
+    shootBoundCache = isShootBound()
+    return shootBoundCache
+end
+
+-- VirtualInputManager click fallback for when the native Shoot bind is not active.
+local function sendVIMMouse(down)
+    if sendingVIM then return end
+    sendingVIM = true
+    pcall(function()
+        local vs = Camera.ViewportSize
+        local x = math.floor(vs.X / 2)
+        local y = math.floor(vs.Y / 2)
+        VirtualInputManager:SendMouseButtonEvent(x, y, 0, down, game, 0)
+    end)
+    sendingVIM = false
+end
+
+-- Track manual mouse/touch input so we can fire in lobby with Shoot In Lobby enabled.
+trackConnection(UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed or sendingVIM then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        manualShootHeld = true
+    end
+end))
+
+trackConnection(UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if sendingVIM then return end
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        manualShootHeld = false
+        if manualVIMHeld then
+            sendVIMMouse(false)
+            manualVIMHeld = false
+        end
+    end
+end))
+
 trackConnection(RunService.RenderStepped:Connect(function()
+    local bound = isShootBoundCached()
+    local gun = getEquippedGun()
+
+    -- Manual fire in lobby when the native Shoot bind is unbound.
+    if cfg.ShootInLobby and not bound and manualShootHeld then
+        if isAutomaticGun(gun) then
+            if not manualVIMHeld then
+                sendVIMMouse(true)
+                manualVIMHeld = true
+            end
+        else
+            local cooldown = cfg.RapidFire and 0.01 or 0.15
+            if tick() - lastSemiTrigger >= cooldown then
+                sendVIMMouse(true)
+                lastSemiTrigger = tick()
+                task.delay(cfg.RapidFire and 0.01 or 0.05, function()
+                    sendVIMMouse(false)
+                end)
+            end
+        end
+    elseif manualVIMHeld then
+        sendVIMMouse(false)
+        manualVIMHeld = false
+    end
+
     local shouldFire = cfg.SilentAimEnabled and cfg.AutoFire
     local target = shouldFire and getTarget() or nil
 
     if not target then
         if autoFireHeld then
-            setShootBind(false)
+            if bound then
+                setShootBind(false)
+            else
+                sendVIMMouse(false)
+            end
             autoFireHeld = false
         end
         return
     end
 
-    local gun = getEquippedGun()
     if isAutomaticGun(gun) then
-        -- Hold the bind so automatic weapons spray.
+        -- Hold the bind/click so automatic weapons spray.
         if not autoFireHeld then
-            setShootBind(true)
+            if bound then
+                setShootBind(true)
+            elseif cfg.ShootInLobby then
+                sendVIMMouse(true)
+            else
+                return
+            end
             autoFireHeld = true
         end
     else
         -- Tap for semi-auto (pistol).
         local cooldown = cfg.RapidFire and 0.01 or 0.15
         if tick() - lastSemiTrigger >= cooldown then
-            setShootBind(true)
+            if bound then
+                setShootBind(true)
+            elseif cfg.ShootInLobby then
+                sendVIMMouse(true)
+            else
+                return
+            end
             autoFireHeld = true
             lastSemiTrigger = tick()
             task.delay(cfg.RapidFire and 0.01 or 0.05, function()
-                setShootBind(false)
+                if bound then
+                    setShootBind(false)
+                else
+                    sendVIMMouse(false)
+                end
                 autoFireHeld = false
             end)
         end
@@ -1401,9 +1534,31 @@ local function removeEsp(model)
     end
 end
 
+local function hideAllEsp()
+    for _, t in pairs(espDrawings) do
+        pcall(function() t.Box.Visible = false end)
+        pcall(function() t.Name.Visible = false end)
+        pcall(function() t.Health.Visible = false end)
+        pcall(function() t.Distance.Visible = false end)
+    end
+end
+
 trackConnection(RunService.RenderStepped:Connect(function()
     if not cfg.EspEnabled or not CharactersFolder then
         for model, _ in pairs(espDrawings) do removeEsp(model) end
+        return
+    end
+
+    -- Hide ESP while the Evolution menu is open so it doesn't cover the UI
+    local menuOpen = false
+    pcall(function()
+        local sg = game:GetService("CoreGui"):FindFirstChild("Evolution")
+        if sg and sg:IsA("ScreenGui") then
+            menuOpen = sg.Enabled
+        end
+    end)
+    if menuOpen then
+        hideAllEsp()
         return
     end
 
