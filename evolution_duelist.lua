@@ -26,6 +26,7 @@ for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
 end
 local EvolutionConnections = {}
 local EvolutionTasks = {}
+local duelistTargetScreen, duelistTargetMain, duelistTargetElements, duelistTargetHighlight, duelistTargetTracer, duelistTargetTracerOutline, lastDuelistTargetPlayer
 getgenv().EvolutionDuelistCleanup = function()
     for _, c in ipairs(EvolutionConnections) do
         pcall(function() c:Disconnect() end)
@@ -1619,13 +1620,13 @@ local function getTargetAmmo(character)
     return 0, 0
 end
 
-local duelistTargetScreen = nil
-local duelistTargetMain = nil
-local duelistTargetElements = {}
-local duelistTargetHighlight = nil
-local duelistTargetTracer = nil
-local duelistTargetTracerOutline = nil
-local lastDuelistTargetPlayer = nil
+duelistTargetScreen = nil
+duelistTargetMain = nil
+duelistTargetElements = {}
+duelistTargetHighlight = nil
+duelistTargetTracer = nil
+duelistTargetTracerOutline = nil
+lastDuelistTargetPlayer = nil
 
 local function createTargetUI()
     if duelistTargetScreen then return end
