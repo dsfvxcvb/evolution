@@ -115,11 +115,17 @@ getgenv().EvolutionDuelist = {
 
     TargetUIEnabled = false,
     TargetUIColor = Color3.fromRGB(27, 206, 203),
+    TargetUIGlowColor = Color3.fromRGB(27, 206, 203),
+    TargetUIStyle = "Old",
+    TargetUIPosition = "Free",
     TargetHighlightEnabled = false,
     TargetHighlightFill = Color3.fromRGB(27, 206, 203),
     TargetHighlightOutline = Color3.fromRGB(255, 255, 255),
     TargetTracerEnabled = false,
     TargetTracerColor = Color3.fromRGB(27, 206, 203),
+    TargetTracerOutlineColor = Color3.fromRGB(0, 0, 0),
+    TargetTracerThickness = 2,
+    TargetTracerOutlineThickness = 4,
 }
 local cfg = getgenv().EvolutionDuelist
 
@@ -220,6 +226,12 @@ local targetUIColorChained = pcall(function()
         Flag = "Duelist_TargetUIColor",
         Callback = function(Value) cfg.TargetUIColor = Value end
     })
+    TargetUIToggle:Colorpicker({
+        Name = "",
+        Default = cfg.TargetUIGlowColor,
+        Flag = "Duelist_TargetUIGlowColor",
+        Callback = function(Value) cfg.TargetUIGlowColor = Value end
+    })
 end)
 if not targetUIColorChained then
     CombatTargetUI:Colorpicker({
@@ -228,7 +240,29 @@ if not targetUIColorChained then
         Flag = "Duelist_TargetUIColor",
         Callback = function(Value) cfg.TargetUIColor = Value end
     })
+    CombatTargetUI:Colorpicker({
+        Name = "Glow Color",
+        Default = cfg.TargetUIGlowColor,
+        Flag = "Duelist_TargetUIGlowColor",
+        Callback = function(Value) cfg.TargetUIGlowColor = Value end
+    })
 end
+
+CombatTargetUI:Dropdown({
+    Name = "Style",
+    Items = { "Old", "Modern" },
+    Default = cfg.TargetUIStyle,
+    Flag = "Duelist_TargetUIStyle",
+    Callback = function(Value) cfg.TargetUIStyle = Value end
+})
+
+CombatTargetUI:Dropdown({
+    Name = "Position",
+    Items = { "Free", "Follow Target" },
+    Default = cfg.TargetUIPosition,
+    Flag = "Duelist_TargetUIPosition",
+    Callback = function(Value) cfg.TargetUIPosition = Value end
+})
 
 -- Highlight
 local HighlightToggle = CombatHighlight:Toggle({
@@ -280,6 +314,12 @@ local tracerColorChained = pcall(function()
         Flag = "Duelist_TargetTracerColor",
         Callback = function(Value) cfg.TargetTracerColor = Value end
     })
+    TracerToggle:Colorpicker({
+        Name = "",
+        Default = cfg.TargetTracerOutlineColor,
+        Flag = "Duelist_TargetTracerOutlineColor",
+        Callback = function(Value) cfg.TargetTracerOutlineColor = Value end
+    })
 end)
 if not tracerColorChained then
     CombatTracer:Colorpicker({
@@ -288,7 +328,31 @@ if not tracerColorChained then
         Flag = "Duelist_TargetTracerColor",
         Callback = function(Value) cfg.TargetTracerColor = Value end
     })
+    CombatTracer:Colorpicker({
+        Name = "Outline Color",
+        Default = cfg.TargetTracerOutlineColor,
+        Flag = "Duelist_TargetTracerOutlineColor",
+        Callback = function(Value) cfg.TargetTracerOutlineColor = Value end
+    })
 end
+
+CombatTracer:Slider({
+    Name = "Thickness",
+    Min = 1,
+    Max = 10,
+    Default = cfg.TargetTracerThickness,
+    Flag = "Duelist_TargetTracerThickness",
+    Callback = function(Value) cfg.TargetTracerThickness = Value end
+})
+
+CombatTracer:Slider({
+    Name = "Outline Thickness",
+    Min = 1,
+    Max = 15,
+    Default = cfg.TargetTracerOutlineThickness,
+    Flag = "Duelist_TargetTracerOutlineThickness",
+    Callback = function(Value) cfg.TargetTracerOutlineThickness = Value end
+})
 
 -- FOV Circle
 VisualsLeft:Toggle({
@@ -1669,7 +1733,7 @@ local function createTargetUI()
     Glow.Image = "http://www.roblox.com/asset/?id=18245826428"
     Glow.ScaleType = Enum.ScaleType.Slice
     Glow.SliceCenter = Rect.new(Vector2.new(21, 21), Vector2.new(79, 79))
-    Glow.ImageColor3 = cfg.TargetUIColor
+    Glow.ImageColor3 = cfg.TargetUIGlowColor
     Glow.ImageTransparency = 0.85
     Glow.Position = UDim2.new(0, -20, 0, -20)
     Glow.Size = UDim2.new(1, 40, 1, 40)
@@ -1907,11 +1971,10 @@ local function createTargetUI()
 
     local HealthBarGradient = Instance.new("UIGradient")
     HealthBarGradient.Rotation = 0
-    HealthBarGradient.Color = makeGradient(
-        Color3.fromRGB(0, 255, 0),
-        Color3.fromRGB(255, 170, 0),
-        Color3.fromRGB(255, 0, 0)
-    )
+    HealthBarGradient.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(45, 195, 45)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(45, 195, 45))
+    }
     HealthBarGradient.Parent = HealthBarValue
 
     local HealthText = Instance.new("TextLabel")
@@ -2163,7 +2226,23 @@ trackConnection(RunService.RenderStepped:Connect(function()
                 duelistTargetElements.TopBar.BackgroundColor3 = cfg.TargetUIColor
             end
             if duelistTargetElements.Glow then
-                duelistTargetElements.Glow.ImageColor3 = cfg.TargetUIColor
+                duelistTargetElements.Glow.ImageColor3 = cfg.TargetUIGlowColor
+                duelistTargetElements.Glow.Visible = cfg.TargetUIStyle == "Old"
+            end
+
+            if duelistTargetMain then
+                if cfg.TargetUIPosition == "Follow Target" then
+                    local head = targetInfo.Model:FindFirstChild("Head")
+                    if head then
+                        local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+                        if onScreen then
+                            duelistTargetMain.Draggable = false
+                            duelistTargetMain.Position = UDim2.new(0, pos.X + 180, 0, pos.Y - 50)
+                        end
+                    end
+                else
+                    duelistTargetMain.Draggable = true
+                end
             end
         end
     else
@@ -2199,10 +2278,13 @@ trackConnection(RunService.RenderStepped:Connect(function()
         end
         duelistTargetTracerOutline.From = center
         duelistTargetTracerOutline.To = endPos
+        duelistTargetTracerOutline.Color = cfg.TargetTracerOutlineColor
+        duelistTargetTracerOutline.Thickness = cfg.TargetTracerOutlineThickness
         duelistTargetTracerOutline.Visible = true
         duelistTargetTracer.From = center
         duelistTargetTracer.To = endPos
         duelistTargetTracer.Color = cfg.TargetTracerColor
+        duelistTargetTracer.Thickness = cfg.TargetTracerThickness
         duelistTargetTracer.Visible = true
     else
         if duelistTargetTracer then duelistTargetTracer.Visible = false end
