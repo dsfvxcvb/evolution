@@ -38,6 +38,10 @@ getgenv().EvolutionDuelistCleanup = function()
     if typeof(getgenv().EvolutionArcaneWindow) == "table" then
         pcall(function() getgenv().EvolutionArcaneWindow:Destroy() end)
     end
+    if duelistTargetScreen then
+        pcall(function() duelistTargetScreen:Destroy() end)
+        duelistTargetScreen = nil
+    end
     for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
         if sg:IsA("ScreenGui") and (sg.Name == "Evolution" or sg.Name == "EvolutionTargetUI") then
             pcall(function() sg:Destroy() end)
@@ -142,7 +146,9 @@ local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
 
 -- Sections
 local CombatLeft = Combat:Section({ Name = "Aimbot", Side = 1 })
-local CombatTarget = Combat:Section({ Name = "Target Indicator", Side = 1 })
+local CombatTargetUI = Combat:Section({ Name = "Target UI", Side = 2 })
+local CombatHighlight = Combat:Section({ Name = "Highlight", Side = 2 })
+local CombatTracer = Combat:Section({ Name = "Tracer", Side = 2 })
 
 local VisualsLeft = Visuals:Section({ Name = "FOV Circle", Side = 1 })
 local VisualsRight = Visuals:Section({ Name = "ESP", Side = 2 })
@@ -199,8 +205,8 @@ CombatLeft:Dropdown({
     Callback = function(Value) cfg.HitPart = Value end
 })
 
--- Target Indicator
-local TargetUIToggle = CombatTarget:Toggle({
+-- Target UI
+local TargetUIToggle = CombatTargetUI:Toggle({
     Name = "Target UI",
     Default = cfg.TargetUIEnabled,
     Flag = "Duelist_TargetUI",
@@ -215,7 +221,7 @@ local targetUIColorChained = pcall(function()
     })
 end)
 if not targetUIColorChained then
-    CombatTarget:Colorpicker({
+    CombatTargetUI:Colorpicker({
         Name = "UI Color",
         Default = cfg.TargetUIColor,
         Flag = "Duelist_TargetUIColor",
@@ -223,7 +229,8 @@ if not targetUIColorChained then
     })
 end
 
-local HighlightToggle = CombatTarget:Toggle({
+-- Highlight
+local HighlightToggle = CombatHighlight:Toggle({
     Name = "Highlight",
     Default = cfg.TargetHighlightEnabled,
     Flag = "Duelist_TargetHighlight",
@@ -244,13 +251,13 @@ local highlightChained = pcall(function()
     })
 end)
 if not highlightChained then
-    CombatTarget:Colorpicker({
+    CombatHighlight:Colorpicker({
         Name = "Fill Color",
         Default = cfg.TargetHighlightFill,
         Flag = "Duelist_TargetHighlightFill",
         Callback = function(Value) cfg.TargetHighlightFill = Value end
     })
-    CombatTarget:Colorpicker({
+    CombatHighlight:Colorpicker({
         Name = "Outline Color",
         Default = cfg.TargetHighlightOutline,
         Flag = "Duelist_TargetHighlightOutline",
@@ -258,7 +265,8 @@ if not highlightChained then
     })
 end
 
-local TracerToggle = CombatTarget:Toggle({
+-- Tracer
+local TracerToggle = CombatTracer:Toggle({
     Name = "Tracer",
     Default = cfg.TargetTracerEnabled,
     Flag = "Duelist_TargetTracer",
@@ -273,7 +281,7 @@ local tracerColorChained = pcall(function()
     })
 end)
 if not tracerColorChained then
-    CombatTarget:Colorpicker({
+    CombatTracer:Colorpicker({
         Name = "Tracer Color",
         Default = cfg.TargetTracerColor,
         Flag = "Duelist_TargetTracerColor",
@@ -1621,180 +1629,451 @@ local lastDuelistTargetPlayer = nil
 
 local function createTargetUI()
     if duelistTargetScreen then return end
+
+    local function makeGradient(startCol, midCol, endCol)
+        return ColorSequence.new({
+            ColorSequenceKeypoint.new(0, startCol),
+            ColorSequenceKeypoint.new(0.5, midCol),
+            ColorSequenceKeypoint.new(1, endCol),
+        })
+    end
+
     duelistTargetScreen = Instance.new("ScreenGui")
     duelistTargetScreen.Name = "EvolutionTargetUI"
+    duelistTargetScreen.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
     duelistTargetScreen.Parent = cloneref(game:GetService("CoreGui"))
     duelistTargetScreen.ResetOnSpawn = false
     duelistTargetScreen.DisplayOrder = 9998
     duelistTargetScreen.IgnoreGuiInset = true
     duelistTargetScreen.Enabled = false
 
-    local main = Instance.new("Frame")
-    main.Name = "Main"
-    main.AnchorPoint = Vector2.new(0.5, 0)
-    main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
-    main.BorderSizePixel = 0
-    main.Position = UDim2.new(0.5, 0, 1, -160)
-    main.Size = UDim2.new(0, 300, 0, 120)
-    main.Active = true
-    main.Draggable = true
-    main.Parent = duelistTargetScreen
+    local MainFrame = Instance.new("Frame")
+    MainFrame.Name = "Main"
+    MainFrame.AnchorPoint = Vector2.new(0.5, 0)
+    MainFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    MainFrame.BorderSizePixel = 0
+    MainFrame.Position = UDim2.new(0.5, 0, 1, -250)
+    MainFrame.Size = UDim2.new(0, 322, 0, 147)
+    MainFrame.Active = true
+    MainFrame.Draggable = true
+    MainFrame.Parent = duelistTargetScreen
 
-    local corner = Instance.new("UICorner")
-    corner.CornerRadius = UDim.new(0, 6)
-    corner.Parent = main
+    local MainUIScale = Instance.new("UIScale")
+    MainUIScale.Scale = 1
+    MainUIScale.Parent = MainFrame
 
-    local stroke = Instance.new("UIStroke")
-    stroke.Name = "Border"
-    stroke.Color = cfg.TargetUIColor
-    stroke.Thickness = 1
-    stroke.Parent = main
+    local Glow = Instance.new("ImageLabel")
+    Glow.Name = "Glow"
+    Glow.BackgroundTransparency = 1
+    Glow.Image = "http://www.roblox.com/asset/?id=18245826428"
+    Glow.ScaleType = Enum.ScaleType.Slice
+    Glow.SliceCenter = Rect.new(Vector2.new(21, 21), Vector2.new(79, 79))
+    Glow.ImageColor3 = cfg.TargetUIColor
+    Glow.ImageTransparency = 0.85
+    Glow.Position = UDim2.new(0, -20, 0, -20)
+    Glow.Size = UDim2.new(1, 40, 1, 40)
+    Glow.ZIndex = MainFrame.ZIndex - 1
+    Glow.Parent = MainFrame
 
-    local topBar = Instance.new("Frame")
-    topBar.Name = "TopBar"
-    topBar.BackgroundColor3 = cfg.TargetUIColor
-    topBar.BorderSizePixel = 0
-    topBar.Size = UDim2.new(1, 0, 0, 3)
-    topBar.Parent = main
+    local OuterBorder = Instance.new("Frame")
+    OuterBorder.Name = "OuterBorder"
+    OuterBorder.BackgroundColor3 = cfg.TargetUIColor
+    OuterBorder.BorderSizePixel = 0
+    OuterBorder.Position = UDim2.new(0, 1, 0, 1)
+    OuterBorder.Size = UDim2.new(1, -2, 1, -2)
+    OuterBorder.Parent = MainFrame
 
-    local content = Instance.new("Frame")
-    content.Name = "Content"
-    content.BackgroundTransparency = 1
-    content.Position = UDim2.new(0, 8, 0, 11)
-    content.Size = UDim2.new(1, -16, 1, -19)
-    content.Parent = main
+    local InnerBorder = Instance.new("Frame")
+    InnerBorder.Name = "InnerBorder"
+    InnerBorder.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+    InnerBorder.BorderSizePixel = 0
+    InnerBorder.Position = UDim2.new(0, 1, 0, 1)
+    InnerBorder.Size = UDim2.new(1, -2, 1, -2)
+    InnerBorder.Parent = OuterBorder
 
-    local avatar = Instance.new("ImageLabel")
-    avatar.Name = "Avatar"
-    avatar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
-    avatar.BorderSizePixel = 0
-    avatar.Size = UDim2.new(0, 70, 1, 0)
-    avatar.ScaleType = Enum.ScaleType.Fit
-    avatar.Parent = content
+    local ContentFrame = Instance.new("Frame")
+    ContentFrame.Name = "ContentFrame"
+    ContentFrame.BackgroundTransparency = 1
+    ContentFrame.BorderSizePixel = 0
+    ContentFrame.Position = UDim2.new(0, 1, 0, 2)
+    ContentFrame.Size = UDim2.new(1, -2, 1, -4)
+    ContentFrame.Parent = InnerBorder
 
-    local avatarCorner = Instance.new("UICorner")
-    avatarCorner.CornerRadius = UDim.new(0, 4)
-    avatarCorner.Parent = avatar
+    local UIPadding_1 = Instance.new("UIPadding")
+    UIPadding_1.PaddingLeft = UDim.new(0, 6)
+    UIPadding_1.Parent = ContentFrame
 
-    local info = Instance.new("Frame")
-    info.Name = "Info"
-    info.BackgroundTransparency = 1
-    info.Position = UDim2.new(0, 78, 0, 0)
-    info.Size = UDim2.new(1, -78, 1, 0)
-    info.Parent = content
+    local Holder = Instance.new("Frame")
+    Holder.Name = "Holder"
+    Holder.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    Holder.BorderSizePixel = 0
+    Holder.Position = UDim2.new(0, -3, 0, 16)
+    Holder.Size = UDim2.new(1, 0, 1, -18)
+    Holder.Parent = ContentFrame
 
-    local nameLabel = Instance.new("TextLabel")
-    nameLabel.Name = "Name"
-    nameLabel.Font = Enum.Font.SourceSansSemibold
-    nameLabel.Text = "Player (@player)"
-    nameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
-    nameLabel.TextSize = 13
-    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
-    nameLabel.BackgroundTransparency = 1
-    nameLabel.Size = UDim2.new(1, 0, 0, 18)
-    nameLabel.Parent = info
+    local HolderInner1 = Instance.new("Frame")
+    HolderInner1.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    HolderInner1.BorderSizePixel = 0
+    HolderInner1.Position = UDim2.new(0, 1, 0, 1)
+    HolderInner1.Size = UDim2.new(1, -2, 1, -2)
+    HolderInner1.Parent = Holder
 
-    local distLabel = Instance.new("TextLabel")
-    distLabel.Name = "Distance"
-    distLabel.Font = Enum.Font.SourceSans
-    distLabel.Text = "0m"
-    distLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
-    distLabel.TextSize = 12
-    distLabel.TextXAlignment = Enum.TextXAlignment.Left
-    distLabel.BackgroundTransparency = 1
-    distLabel.Position = UDim2.new(0, 0, 0, 20)
-    distLabel.Size = UDim2.new(1, 0, 0, 16)
-    distLabel.Parent = info
+    local HolderInner2 = Instance.new("Frame")
+    HolderInner2.BackgroundColor3 = Color3.fromRGB(20, 20, 20)
+    HolderInner2.BorderSizePixel = 0
+    HolderInner2.Position = UDim2.new(0, 1, 0, 1)
+    HolderInner2.Size = UDim2.new(1, -2, 1, -2)
+    HolderInner2.Parent = HolderInner1
 
-    local healthBack = Instance.new("Frame")
-    healthBack.Name = "HealthBack"
-    healthBack.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    healthBack.BorderSizePixel = 0
-    healthBack.Position = UDim2.new(0, 0, 0, 42)
-    healthBack.Size = UDim2.new(1, 0, 0, 16)
-    healthBack.Parent = info
+    local UIPadding_2 = Instance.new("UIPadding")
+    UIPadding_2.PaddingLeft = UDim.new(0, 4)
+    UIPadding_2.PaddingTop = UDim.new(0, 4)
+    UIPadding_2.Parent = HolderInner2
 
-    local healthBackCorner = Instance.new("UICorner")
-    healthBackCorner.CornerRadius = UDim.new(0, 3)
-    healthBackCorner.Parent = healthBack
+    local ContentArea = Instance.new("Frame")
+    ContentArea.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    ContentArea.BorderSizePixel = 0
+    ContentArea.Size = UDim2.new(1, -4, 1, -4)
+    ContentArea.Parent = HolderInner2
 
-    local healthFill = Instance.new("Frame")
-    healthFill.Name = "HealthFill"
-    healthFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    healthFill.BorderSizePixel = 0
-    healthFill.Size = UDim2.new(1, 0, 1, 0)
-    healthFill.Parent = healthBack
+    local ContentArea2 = Instance.new("Frame")
+    ContentArea2.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    ContentArea2.BorderSizePixel = 0
+    ContentArea2.Position = UDim2.new(0, 1, 0, 1)
+    ContentArea2.Size = UDim2.new(1, -2, 1, -2)
+    ContentArea2.Parent = ContentArea
 
-    local healthFillCorner = Instance.new("UICorner")
-    healthFillCorner.CornerRadius = UDim.new(0, 3)
-    healthFillCorner.Parent = healthFill
+    local ContentArea3 = Instance.new("Frame")
+    ContentArea3.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    ContentArea3.BorderSizePixel = 0
+    ContentArea3.Position = UDim2.new(0, 1, 0, 1)
+    ContentArea3.Size = UDim2.new(1, -2, 1, -2)
+    ContentArea3.Parent = ContentArea2
 
-    local healthGradient = Instance.new("UIGradient")
-    healthGradient.Color = ColorSequence.new({
-        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 0)),
-        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 170, 0)),
-        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
-    })
-    healthGradient.Parent = healthFill
+    local Gradient1 = Instance.new("UIGradient")
+    Gradient1.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 20))
+    }
+    Gradient1.Parent = ContentArea3
 
-    local healthText = Instance.new("TextLabel")
-    healthText.Name = "HealthText"
-    healthText.Font = Enum.Font.SourceSans
-    healthText.Text = "100/100"
-    healthText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    healthText.TextSize = 11
-    healthText.BackgroundTransparency = 1
-    healthText.Size = UDim2.new(1, 0, 1, 0)
-    healthText.Parent = healthBack
+    local UIPadding_3 = Instance.new("UIPadding")
+    UIPadding_3.PaddingBottom = UDim.new(0, 3)
+    UIPadding_3.PaddingLeft = UDim.new(0, 4)
+    UIPadding_3.PaddingRight = UDim.new(0, 3)
+    UIPadding_3.PaddingTop = UDim.new(0, 4)
+    UIPadding_3.Parent = ContentArea3
 
-    local ammoBack = Instance.new("Frame")
-    ammoBack.Name = "AmmoBack"
-    ammoBack.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-    ammoBack.BorderSizePixel = 0
-    ammoBack.Position = UDim2.new(0, 0, 0, 62)
-    ammoBack.Size = UDim2.new(1, 0, 0, 14)
-    ammoBack.Visible = false
-    ammoBack.Parent = info
+    local MainContent = Instance.new("Frame")
+    MainContent.BackgroundTransparency = 1
+    MainContent.BorderSizePixel = 0
+    MainContent.Size = UDim2.new(1, 0, 1, 3)
+    MainContent.Parent = ContentArea3
 
-    local ammoBackCorner = Instance.new("UICorner")
-    ammoBackCorner.CornerRadius = UDim.new(0, 3)
-    ammoBackCorner.Parent = ammoBack
+    local UIListLayout_1 = Instance.new("UIListLayout")
+    UIListLayout_1.Padding = UDim.new(0, 4)
+    UIListLayout_1.SortOrder = Enum.SortOrder.LayoutOrder
+    UIListLayout_1.Parent = MainContent
 
-    local ammoFill = Instance.new("Frame")
-    ammoFill.Name = "AmmoFill"
-    ammoFill.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
-    ammoFill.BorderSizePixel = 0
-    ammoFill.Size = UDim2.new(1, 0, 1, 0)
-    ammoFill.Parent = ammoBack
+    local UIPadding_4 = Instance.new("UIPadding")
+    UIPadding_4.PaddingBottom = UDim.new(0, 4)
+    UIPadding_4.Parent = MainContent
 
-    local ammoFillCorner = Instance.new("UICorner")
-    ammoFillCorner.CornerRadius = UDim.new(0, 3)
-    ammoFillCorner.Parent = ammoFill
+    local PlayerInfoContainer = Instance.new("Frame")
+    PlayerInfoContainer.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    PlayerInfoContainer.BorderSizePixel = 0
+    PlayerInfoContainer.Size = UDim2.new(1, -1, 1, 0)
+    PlayerInfoContainer.Parent = MainContent
 
-    local ammoText = Instance.new("TextLabel")
-    ammoText.Name = "AmmoText"
-    ammoText.Font = Enum.Font.SourceSans
-    ammoText.Text = "0/0"
-    ammoText.TextColor3 = Color3.fromRGB(255, 255, 255)
-    ammoText.TextSize = 11
-    ammoText.BackgroundTransparency = 1
-    ammoText.Size = UDim2.new(1, 0, 1, 0)
-    ammoText.Parent = ammoBack
+    local PlayerInfoInner1 = Instance.new("Frame")
+    PlayerInfoInner1.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    PlayerInfoInner1.BorderSizePixel = 0
+    PlayerInfoInner1.Position = UDim2.new(0, 1, 0, 1)
+    PlayerInfoInner1.Size = UDim2.new(1, -2, 1, -2)
+    PlayerInfoInner1.Parent = PlayerInfoContainer
 
-    duelistTargetMain = main
+    local PlayerInfoInner2 = Instance.new("Frame")
+    PlayerInfoInner2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    PlayerInfoInner2.BorderSizePixel = 0
+    PlayerInfoInner2.Position = UDim2.new(0, 1, 0, 1)
+    PlayerInfoInner2.Size = UDim2.new(1, -2, 1, -2)
+    PlayerInfoInner2.Parent = PlayerInfoInner1
+
+    local Gradient2 = Instance.new("UIGradient")
+    Gradient2.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 20))
+    }
+    Gradient2.Parent = PlayerInfoInner2
+
+    local TopBar = Instance.new("Frame")
+    TopBar.Name = "TopBar"
+    TopBar.BackgroundColor3 = cfg.TargetUIColor
+    TopBar.BorderSizePixel = 0
+    TopBar.Size = UDim2.new(1, 0, 0, 2)
+    TopBar.Parent = PlayerInfoInner2
+
+    local InfoHolder = Instance.new("Frame")
+    InfoHolder.BackgroundTransparency = 1
+    InfoHolder.BorderSizePixel = 0
+    InfoHolder.Position = UDim2.new(0, 1, 0, 22)
+    InfoHolder.Size = UDim2.new(1, -2, 1, -24)
+    InfoHolder.Parent = PlayerInfoInner2
+
+    local UIPadding_5 = Instance.new("UIPadding")
+    UIPadding_5.PaddingBottom = UDim.new(0, 2)
+    UIPadding_5.PaddingLeft = UDim.new(0, 3)
+    UIPadding_5.PaddingRight = UDim.new(0, 3)
+    UIPadding_5.PaddingTop = UDim.new(0, -1)
+    UIPadding_5.Parent = InfoHolder
+
+    local PlayerInfo = Instance.new("Frame")
+    PlayerInfo.BackgroundTransparency = 1
+    PlayerInfo.BorderSizePixel = 0
+    PlayerInfo.Size = UDim2.new(1, 0, 1, 0)
+    PlayerInfo.Parent = InfoHolder
+
+    local IconFrame = Instance.new("Frame")
+    IconFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    IconFrame.BorderSizePixel = 0
+    IconFrame.Size = UDim2.new(0, 68, 1, 0)
+    IconFrame.Parent = PlayerInfo
+
+    local IconInner1 = Instance.new("Frame")
+    IconInner1.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    IconInner1.BorderSizePixel = 0
+    IconInner1.Position = UDim2.new(0, 1, 0, 1)
+    IconInner1.Size = UDim2.new(1, -2, 1, -2)
+    IconInner1.Parent = IconFrame
+
+    local IconInner2 = Instance.new("Frame")
+    IconInner2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    IconInner2.BorderSizePixel = 0
+    IconInner2.Position = UDim2.new(0, 1, 0, 1)
+    IconInner2.Size = UDim2.new(1, -2, 1, -2)
+    IconInner2.Parent = IconInner1
+
+    local Gradient4 = Instance.new("UIGradient")
+    Gradient4.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 20))
+    }
+    Gradient4.Parent = IconInner2
+
+    local PlayerIcon = Instance.new("ImageLabel")
+    PlayerIcon.Name = "Avatar"
+    PlayerIcon.Image = "rbxthumb://type=AvatarHeadShot&id=1&w=420&h=420"
+    PlayerIcon.BackgroundTransparency = 1
+    PlayerIcon.BorderSizePixel = 0
+    PlayerIcon.Size = UDim2.new(1, 0, 1, 0)
+    PlayerIcon.Parent = IconInner2
+
+    local HealthFrame = Instance.new("Frame")
+    HealthFrame.AnchorPoint = Vector2.new(0, 1)
+    HealthFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    HealthFrame.BorderSizePixel = 0
+    HealthFrame.Position = UDim2.new(0, 72, 1, 0)
+    HealthFrame.Size = UDim2.new(1, -72, 0, 14)
+    HealthFrame.Parent = PlayerInfo
+
+    local HealthInner1 = Instance.new("Frame")
+    HealthInner1.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    HealthInner1.BorderSizePixel = 0
+    HealthInner1.Position = UDim2.new(0, 1, 0, 1)
+    HealthInner1.Size = UDim2.new(1, -2, 1, -2)
+    HealthInner1.Parent = HealthFrame
+
+    local HealthInner2 = Instance.new("Frame")
+    HealthInner2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    HealthInner2.BorderSizePixel = 0
+    HealthInner2.Position = UDim2.new(0, 1, 0, 1)
+    HealthInner2.Size = UDim2.new(1, -2, 1, -2)
+    HealthInner2.Parent = HealthInner1
+
+    local Gradient5 = Instance.new("UIGradient")
+    Gradient5.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 20))
+    }
+    Gradient5.Parent = HealthInner2
+
+    local HealthBarValue = Instance.new("Frame")
+    HealthBarValue.Name = "HealthFill"
+    HealthBarValue.BackgroundColor3 = Color3.fromRGB(45, 195, 45)
+    HealthBarValue.BorderSizePixel = 0
+    HealthBarValue.Size = UDim2.new(1, 0, 1, 0)
+    HealthBarValue.Parent = HealthInner2
+
+    local HealthBarGradient = Instance.new("UIGradient")
+    HealthBarGradient.Rotation = 0
+    HealthBarGradient.Color = makeGradient(
+        Color3.fromRGB(0, 255, 0),
+        Color3.fromRGB(255, 170, 0),
+        Color3.fromRGB(255, 0, 0)
+    )
+    HealthBarGradient.Parent = HealthBarValue
+
+    local HealthText = Instance.new("TextLabel")
+    HealthText.Name = "HealthText"
+    HealthText.Font = Enum.Font.SourceSans
+    HealthText.Text = "100/100"
+    HealthText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    HealthText.TextSize = 12
+    HealthText.AnchorPoint = Vector2.new(0.5, 0.5)
+    HealthText.BackgroundTransparency = 1
+    HealthText.BorderSizePixel = 0
+    HealthText.Position = UDim2.new(0.5, 0, 0.5, 0)
+    HealthText.Size = UDim2.new(1, 0, 1, 0)
+    HealthText.Parent = HealthInner2
+
+    local InfoFrame = Instance.new("Frame")
+    InfoFrame.BackgroundTransparency = 1
+    InfoFrame.BorderSizePixel = 0
+    InfoFrame.Position = UDim2.new(0.27, 0, 0.029, 0)
+    InfoFrame.Size = UDim2.new(0, 198, 0, 31)
+    InfoFrame.Parent = PlayerInfo
+
+    local UIListLayout_2 = Instance.new("UIListLayout")
+    UIListLayout_2.Padding = UDim.new(0, 2)
+    UIListLayout_2.SortOrder = Enum.SortOrder.LayoutOrder
+    UIListLayout_2.Parent = InfoFrame
+
+    local NameLabel = Instance.new("TextLabel")
+    NameLabel.Name = "Name"
+    NameLabel.Font = Enum.Font.SourceSans
+    NameLabel.Text = "Player (@username)"
+    NameLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    NameLabel.TextSize = 12
+    NameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    NameLabel.TextYAlignment = Enum.TextYAlignment.Top
+    NameLabel.BackgroundTransparency = 1
+    NameLabel.BorderSizePixel = 0
+    NameLabel.Size = UDim2.new(0.39, 0, 0.42, 0)
+    NameLabel.Parent = InfoFrame
+
+    local DistanceLabel = Instance.new("TextLabel")
+    DistanceLabel.Name = "Distance"
+    DistanceLabel.Font = Enum.Font.SourceSans
+    DistanceLabel.Text = "0 studs"
+    DistanceLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    DistanceLabel.TextSize = 12
+    DistanceLabel.TextXAlignment = Enum.TextXAlignment.Left
+    DistanceLabel.TextYAlignment = Enum.TextYAlignment.Top
+    DistanceLabel.BackgroundTransparency = 1
+    DistanceLabel.BorderSizePixel = 0
+    DistanceLabel.Size = UDim2.new(0.39, 0, 0.42, 0)
+    DistanceLabel.Parent = InfoFrame
+
+    local AmmoFrame = Instance.new("Frame")
+    AmmoFrame.Name = "AmmoBack"
+    AmmoFrame.AnchorPoint = Vector2.new(0, 1)
+    AmmoFrame.BackgroundColor3 = Color3.fromRGB(10, 10, 10)
+    AmmoFrame.BorderSizePixel = 0
+    AmmoFrame.Position = UDim2.new(0, 72, 0.794, 0)
+    AmmoFrame.Size = UDim2.new(1, -72, 0, 14)
+    AmmoFrame.Visible = false
+    AmmoFrame.Parent = PlayerInfo
+
+    local AmmoInner1 = Instance.new("Frame")
+    AmmoInner1.BackgroundColor3 = Color3.fromRGB(45, 45, 45)
+    AmmoInner1.BorderSizePixel = 0
+    AmmoInner1.Position = UDim2.new(0, 1, 0, 1)
+    AmmoInner1.Size = UDim2.new(1, -2, 1, -2)
+    AmmoInner1.Parent = AmmoFrame
+
+    local AmmoInner2 = Instance.new("Frame")
+    AmmoInner2.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    AmmoInner2.BorderSizePixel = 0
+    AmmoInner2.Position = UDim2.new(0, 1, 0, 1)
+    AmmoInner2.Size = UDim2.new(1, -2, 1, -2)
+    AmmoInner2.Parent = AmmoInner1
+
+    local Gradient6 = Instance.new("UIGradient")
+    Gradient6.Color = ColorSequence.new{
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(30, 30, 30)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(20, 20, 20))
+    }
+    Gradient6.Parent = AmmoInner2
+
+    local AmmoBarValue = Instance.new("Frame")
+    AmmoBarValue.Name = "AmmoFill"
+    AmmoBarValue.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+    AmmoBarValue.BorderSizePixel = 0
+    AmmoBarValue.Size = UDim2.new(1, 0, 1, 0)
+    AmmoBarValue.Parent = AmmoInner2
+
+    local AmmoBarGradient = Instance.new("UIGradient")
+    AmmoBarGradient.Rotation = 0
+    AmmoBarGradient.Color = makeGradient(
+        Color3.fromRGB(255, 140, 0),
+        Color3.fromRGB(255, 85, 0),
+        Color3.fromRGB(255, 0, 0)
+    )
+    AmmoBarGradient.Parent = AmmoBarValue
+
+    local AmmoText = Instance.new("TextLabel")
+    AmmoText.Name = "AmmoText"
+    AmmoText.Font = Enum.Font.SourceSans
+    AmmoText.Text = "0/0"
+    AmmoText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    AmmoText.TextSize = 12
+    AmmoText.AnchorPoint = Vector2.new(0.5, 0.5)
+    AmmoText.BackgroundTransparency = 1
+    AmmoText.BorderSizePixel = 0
+    AmmoText.Position = UDim2.new(0.5, 0, 0.5, 0)
+    AmmoText.Size = UDim2.new(1, 0, 1, 0)
+    AmmoText.Parent = AmmoInner2
+
+    local TopLabel1Parent = Instance.new("Frame")
+    TopLabel1Parent.BackgroundTransparency = 1
+    TopLabel1Parent.BorderSizePixel = 0
+    TopLabel1Parent.Position = UDim2.new(0, 0, 0, 2)
+    TopLabel1Parent.Size = UDim2.new(1, 0, 0, 20)
+    TopLabel1Parent.Parent = PlayerInfoInner2
+
+    local TopLabel1 = Instance.new("TextLabel")
+    TopLabel1.Font = Enum.Font.SourceSans
+    TopLabel1.Text = "Info"
+    TopLabel1.TextColor3 = Color3.fromRGB(136, 136, 136)
+    TopLabel1.TextSize = 12
+    TopLabel1.TextXAlignment = Enum.TextXAlignment.Left
+    TopLabel1.BackgroundTransparency = 1
+    TopLabel1.BorderSizePixel = 0
+    TopLabel1.Size = UDim2.new(1, 0, 1, 0)
+    TopLabel1.Parent = TopLabel1Parent
+
+    local TopLabel2Parent = Instance.new("Frame")
+    TopLabel2Parent.BackgroundTransparency = 1
+    TopLabel2Parent.BorderSizePixel = 0
+    TopLabel2Parent.Size = UDim2.new(1, -4, 0, 20)
+    TopLabel2Parent.Parent = ContentFrame
+
+    local TopLabel2 = Instance.new("TextLabel")
+    TopLabel2.Font = Enum.Font.SourceSans
+    TopLabel2.Text = "Indicator"
+    TopLabel2.TextColor3 = Color3.fromRGB(180, 180, 180)
+    TopLabel2.TextSize = 12
+    TopLabel2.TextXAlignment = Enum.TextXAlignment.Left
+    TopLabel2.BackgroundTransparency = 1
+    TopLabel2.BorderSizePixel = 0
+    TopLabel2.Size = UDim2.new(0.5, 0, 1, 0)
+    TopLabel2.Parent = TopLabel2Parent
+
+    duelistTargetMain = MainFrame
     duelistTargetElements = {
-        Main = main,
-        Border = stroke,
-        TopBar = topBar,
-        Avatar = avatar,
-        Name = nameLabel,
-        Distance = distLabel,
-        HealthBack = healthBack,
-        HealthFill = healthFill,
-        HealthText = healthText,
-        AmmoBack = ammoBack,
-        AmmoFill = ammoFill,
-        AmmoText = ammoText,
+        Main = MainFrame,
+        UIScale = MainUIScale,
+        Glow = Glow,
+        OuterBorder = OuterBorder,
+        TopBar = TopBar,
+        Avatar = PlayerIcon,
+        Name = NameLabel,
+        Distance = DistanceLabel,
+        HealthFill = HealthBarValue,
+        HealthText = HealthText,
+        AmmoBack = AmmoFrame,
+        AmmoFill = AmmoBarValue,
+        AmmoText = AmmoText,
     }
 end
 
@@ -1876,8 +2155,15 @@ trackConnection(RunService.RenderStepped:Connect(function()
                 duelistTargetElements.AmmoBack.Visible = false
             end
 
-            duelistTargetElements.Border.Color = cfg.TargetUIColor
-            duelistTargetElements.TopBar.BackgroundColor3 = cfg.TargetUIColor
+            if duelistTargetElements.OuterBorder then
+                duelistTargetElements.OuterBorder.BackgroundColor3 = cfg.TargetUIColor
+            end
+            if duelistTargetElements.TopBar then
+                duelistTargetElements.TopBar.BackgroundColor3 = cfg.TargetUIColor
+            end
+            if duelistTargetElements.Glow then
+                duelistTargetElements.Glow.ImageColor3 = cfg.TargetUIColor
+            end
         end
     else
         if duelistTargetScreen then duelistTargetScreen.Enabled = false end
