@@ -119,6 +119,7 @@ local CombatLeft = Combat:Section({ Name = "Aimbot", Side = 1 })
 
 local VisualsLeft = Visuals:Section({ Name = "FOV Circle", Side = 1 })
 local VisualsRight = Visuals:Section({ Name = "ESP", Side = 2 })
+local VisualsGradient = Visuals:Section({ Name = "Gradient", Side = 1 })
 
 local PlayerLeft = Player:Section({ Name = "Gun Skins", Side = 1 })
 local PlayerRight = Player:Section({ Name = "Player Card", Side = 2 })
@@ -214,52 +215,36 @@ VisualsLeft:Slider({
     Callback = function(Value) cfg.FOVOutlineThickness = Value end
 })
 
-local GradientToggle = VisualsLeft:Toggle({
-    Name = "Gradient",
+VisualsGradient:Toggle({
+    Name = "Enabled",
     Default = cfg.FOVGradient,
     Flag = "Duelist_FOVGradient",
     Callback = function(State) cfg.FOVGradient = State end
 })
 
-local gradientChained = pcall(function()
-    GradientToggle:Colorpicker({
-        Name = "",
-        Default = cfg.FOVGradientTop,
-        Flag = "Duelist_FOVGradientTop",
-        Callback = function(Value) cfg.FOVGradientTop = Value end
-    })
-    GradientToggle:Colorpicker({
-        Name = "",
-        Default = cfg.FOVGradientBottom,
-        Flag = "Duelist_FOVGradientBottom",
-        Callback = function(Value) cfg.FOVGradientBottom = Value end
-    })
-end)
+VisualsGradient:Colorpicker({
+    Name = "Top",
+    Default = cfg.FOVGradientTop,
+    Flag = "Duelist_FOVGradientTop",
+    Callback = function(Value) cfg.FOVGradientTop = Value end
+})
 
-if not gradientChained then
-    VisualsLeft:Colorpicker({
-        Name = "Gradient Top",
-        Default = cfg.FOVGradientTop,
-        Flag = "Duelist_FOVGradientTop",
-        Callback = function(Value) cfg.FOVGradientTop = Value end
-    })
-    VisualsLeft:Colorpicker({
-        Name = "Gradient Bottom",
-        Default = cfg.FOVGradientBottom,
-        Flag = "Duelist_FOVGradientBottom",
-        Callback = function(Value) cfg.FOVGradientBottom = Value end
-    })
-end
+VisualsGradient:Colorpicker({
+    Name = "Bottom",
+    Default = cfg.FOVGradientBottom,
+    Flag = "Duelist_FOVGradientBottom",
+    Callback = function(Value) cfg.FOVGradientBottom = Value end
+})
 
-VisualsLeft:Toggle({
-    Name = "Gradient Spin",
+VisualsGradient:Toggle({
+    Name = "Spin",
     Default = cfg.FOVGradientSpin,
     Flag = "Duelist_FOVGradientSpin",
     Callback = function(State) cfg.FOVGradientSpin = State end
 })
 
-VisualsLeft:Slider({
-    Name = "Gradient Spin Speed",
+VisualsGradient:Slider({
+    Name = "Spin Speed",
     Min = 0,
     Max = 500,
     Default = cfg.FOVGradientSpeed,
