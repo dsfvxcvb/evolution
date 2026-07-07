@@ -1028,7 +1028,7 @@ local function rawGetTarget()
     local shoot = cfg.TargetShootEnabled and getTargetShoot()
     if shoot then return shoot end
 
-    return getSilentAimTarget()
+    return rawSilentAimTarget()
 end
 
 local function getTarget()
