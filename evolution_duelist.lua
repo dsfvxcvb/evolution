@@ -18,6 +18,12 @@ local Camera = Workspace.CurrentCamera
 if getgenv().EvolutionDuelistCleanup then
     pcall(getgenv().EvolutionDuelistCleanup)
 end
+-- Fallback: older versions didn't know about the target UI ScreenGui.
+for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
+    if sg:IsA("ScreenGui") and sg.Name == "EvolutionTargetUI" then
+        pcall(function() sg:Destroy() end)
+    end
+end
 local EvolutionConnections = {}
 local EvolutionTasks = {}
 getgenv().EvolutionDuelistCleanup = function()
@@ -33,9 +39,21 @@ getgenv().EvolutionDuelistCleanup = function()
         pcall(function() getgenv().EvolutionArcaneWindow:Destroy() end)
     end
     for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
-        if sg:IsA("ScreenGui") and sg.Name == "Evolution" then
+        if sg:IsA("ScreenGui") and (sg.Name == "Evolution" or sg.Name == "EvolutionTargetUI") then
             pcall(function() sg:Destroy() end)
         end
+    end
+    if duelistTargetHighlight then
+        pcall(function() duelistTargetHighlight:Destroy() end)
+        duelistTargetHighlight = nil
+    end
+    if duelistTargetTracer then
+        pcall(function() duelistTargetTracer:Remove() end)
+        duelistTargetTracer = nil
+    end
+    if duelistTargetTracerOutline then
+        pcall(function() duelistTargetTracerOutline:Remove() end)
+        duelistTargetTracerOutline = nil
     end
 end
 local function trackConnection(c)
@@ -89,6 +107,14 @@ getgenv().EvolutionDuelist = {
     CardChangerEnabled = false,
     AutoApplyCard = true,
     SelectedCardKey = nil,
+
+    TargetUIEnabled = false,
+    TargetUIColor = Color3.fromRGB(27, 206, 203),
+    TargetHighlightEnabled = false,
+    TargetHighlightFill = Color3.fromRGB(27, 206, 203),
+    TargetHighlightOutline = Color3.fromRGB(255, 255, 255),
+    TargetTracerEnabled = false,
+    TargetTracerColor = Color3.fromRGB(27, 206, 203),
 }
 local cfg = getgenv().EvolutionDuelist
 
@@ -116,6 +142,7 @@ local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
 
 -- Sections
 local CombatLeft = Combat:Section({ Name = "Aimbot", Side = 1 })
+local CombatTarget = Combat:Section({ Name = "Target Indicator", Side = 1 })
 
 local VisualsLeft = Visuals:Section({ Name = "FOV Circle", Side = 1 })
 local VisualsRight = Visuals:Section({ Name = "ESP", Side = 2 })
@@ -171,6 +198,88 @@ CombatLeft:Dropdown({
     Flag = "Duelist_HitPart",
     Callback = function(Value) cfg.HitPart = Value end
 })
+
+-- Target Indicator
+local TargetUIToggle = CombatTarget:Toggle({
+    Name = "Target UI",
+    Default = cfg.TargetUIEnabled,
+    Flag = "Duelist_TargetUI",
+    Callback = function(State) cfg.TargetUIEnabled = State end
+})
+local targetUIColorChained = pcall(function()
+    TargetUIToggle:Colorpicker({
+        Name = "",
+        Default = cfg.TargetUIColor,
+        Flag = "Duelist_TargetUIColor",
+        Callback = function(Value) cfg.TargetUIColor = Value end
+    })
+end)
+if not targetUIColorChained then
+    CombatTarget:Colorpicker({
+        Name = "UI Color",
+        Default = cfg.TargetUIColor,
+        Flag = "Duelist_TargetUIColor",
+        Callback = function(Value) cfg.TargetUIColor = Value end
+    })
+end
+
+local HighlightToggle = CombatTarget:Toggle({
+    Name = "Highlight",
+    Default = cfg.TargetHighlightEnabled,
+    Flag = "Duelist_TargetHighlight",
+    Callback = function(State) cfg.TargetHighlightEnabled = State end
+})
+local highlightChained = pcall(function()
+    HighlightToggle:Colorpicker({
+        Name = "",
+        Default = cfg.TargetHighlightFill,
+        Flag = "Duelist_TargetHighlightFill",
+        Callback = function(Value) cfg.TargetHighlightFill = Value end
+    })
+    HighlightToggle:Colorpicker({
+        Name = "",
+        Default = cfg.TargetHighlightOutline,
+        Flag = "Duelist_TargetHighlightOutline",
+        Callback = function(Value) cfg.TargetHighlightOutline = Value end
+    })
+end)
+if not highlightChained then
+    CombatTarget:Colorpicker({
+        Name = "Fill Color",
+        Default = cfg.TargetHighlightFill,
+        Flag = "Duelist_TargetHighlightFill",
+        Callback = function(Value) cfg.TargetHighlightFill = Value end
+    })
+    CombatTarget:Colorpicker({
+        Name = "Outline Color",
+        Default = cfg.TargetHighlightOutline,
+        Flag = "Duelist_TargetHighlightOutline",
+        Callback = function(Value) cfg.TargetHighlightOutline = Value end
+    })
+end
+
+local TracerToggle = CombatTarget:Toggle({
+    Name = "Tracer",
+    Default = cfg.TargetTracerEnabled,
+    Flag = "Duelist_TargetTracer",
+    Callback = function(State) cfg.TargetTracerEnabled = State end
+})
+local tracerColorChained = pcall(function()
+    TracerToggle:Colorpicker({
+        Name = "",
+        Default = cfg.TargetTracerColor,
+        Flag = "Duelist_TargetTracerColor",
+        Callback = function(Value) cfg.TargetTracerColor = Value end
+    })
+end)
+if not tracerColorChained then
+    CombatTarget:Colorpicker({
+        Name = "Tracer Color",
+        Default = cfg.TargetTracerColor,
+        Flag = "Duelist_TargetTracerColor",
+        Callback = function(Value) cfg.TargetTracerColor = Value end
+    })
+end
 
 -- FOV Circle
 VisualsLeft:Toggle({
@@ -672,6 +781,17 @@ local function getTarget()
     computingTarget = false
     if ok then return result end
     return nil
+end
+
+local function getTargetPlayer()
+    local part = getTarget()
+    if not part then return nil end
+    local model = part:FindFirstAncestorOfClass("Model")
+    if not model or not isAlive(model) then return nil end
+    local plr = Players:GetPlayerFromCharacter(model)
+    if not plr or plr == LocalPlayer then return nil end
+    if not isEnemy(model) then return nil end
+    return { Player = plr, Model = model, Part = part }
 end
 
 -- The game's bind system stores its functions in the real Roblox _G, not the executor _G.
@@ -1472,6 +1592,336 @@ function applySelectedCard()
         cardApplyInProgress = false
     end)
 end
+
+-- ============================================================
+-- TARGET INDICATOR LOGIC
+-- ============================================================
+
+local function getTargetAmmo(character)
+    if not character then return 0, 0 end
+    local tool = character:FindFirstChildOfClass("Tool")
+    if not tool then return 0, 0 end
+    local s = tool:FindFirstChild("Script")
+    if not s then return 0, 0 end
+    local ammo = s:FindFirstChild("Ammo")
+    local maxAmmo = s:FindFirstChild("MaxAmmo")
+    if ammo and maxAmmo and ammo:IsA("IntValue") and maxAmmo:IsA("IntValue") then
+        return ammo.Value, maxAmmo.Value
+    end
+    return 0, 0
+end
+
+local duelistTargetScreen = nil
+local duelistTargetMain = nil
+local duelistTargetElements = {}
+local duelistTargetHighlight = nil
+local duelistTargetTracer = nil
+local duelistTargetTracerOutline = nil
+local lastDuelistTargetPlayer = nil
+
+local function createTargetUI()
+    if duelistTargetScreen then return end
+    duelistTargetScreen = Instance.new("ScreenGui")
+    duelistTargetScreen.Name = "EvolutionTargetUI"
+    duelistTargetScreen.Parent = cloneref(game:GetService("CoreGui"))
+    duelistTargetScreen.ResetOnSpawn = false
+    duelistTargetScreen.DisplayOrder = 9998
+    duelistTargetScreen.IgnoreGuiInset = true
+    duelistTargetScreen.Enabled = false
+
+    local main = Instance.new("Frame")
+    main.Name = "Main"
+    main.AnchorPoint = Vector2.new(0.5, 0)
+    main.BackgroundColor3 = Color3.fromRGB(15, 15, 15)
+    main.BorderSizePixel = 0
+    main.Position = UDim2.new(0.5, 0, 1, -160)
+    main.Size = UDim2.new(0, 300, 0, 120)
+    main.Active = true
+    main.Draggable = true
+    main.Parent = duelistTargetScreen
+
+    local corner = Instance.new("UICorner")
+    corner.CornerRadius = UDim.new(0, 6)
+    corner.Parent = main
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Name = "Border"
+    stroke.Color = cfg.TargetUIColor
+    stroke.Thickness = 1
+    stroke.Parent = main
+
+    local topBar = Instance.new("Frame")
+    topBar.Name = "TopBar"
+    topBar.BackgroundColor3 = cfg.TargetUIColor
+    topBar.BorderSizePixel = 0
+    topBar.Size = UDim2.new(1, 0, 0, 3)
+    topBar.Parent = main
+
+    local content = Instance.new("Frame")
+    content.Name = "Content"
+    content.BackgroundTransparency = 1
+    content.Position = UDim2.new(0, 8, 0, 11)
+    content.Size = UDim2.new(1, -16, 1, -19)
+    content.Parent = main
+
+    local avatar = Instance.new("ImageLabel")
+    avatar.Name = "Avatar"
+    avatar.BackgroundColor3 = Color3.fromRGB(25, 25, 25)
+    avatar.BorderSizePixel = 0
+    avatar.Size = UDim2.new(0, 70, 1, 0)
+    avatar.ScaleType = Enum.ScaleType.Fit
+    avatar.Parent = content
+
+    local avatarCorner = Instance.new("UICorner")
+    avatarCorner.CornerRadius = UDim.new(0, 4)
+    avatarCorner.Parent = avatar
+
+    local info = Instance.new("Frame")
+    info.Name = "Info"
+    info.BackgroundTransparency = 1
+    info.Position = UDim2.new(0, 78, 0, 0)
+    info.Size = UDim2.new(1, -78, 1, 0)
+    info.Parent = content
+
+    local nameLabel = Instance.new("TextLabel")
+    nameLabel.Name = "Name"
+    nameLabel.Font = Enum.Font.SourceSansSemibold
+    nameLabel.Text = "Player (@player)"
+    nameLabel.TextColor3 = Color3.fromRGB(220, 220, 220)
+    nameLabel.TextSize = 13
+    nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+    nameLabel.BackgroundTransparency = 1
+    nameLabel.Size = UDim2.new(1, 0, 0, 18)
+    nameLabel.Parent = info
+
+    local distLabel = Instance.new("TextLabel")
+    distLabel.Name = "Distance"
+    distLabel.Font = Enum.Font.SourceSans
+    distLabel.Text = "0m"
+    distLabel.TextColor3 = Color3.fromRGB(180, 180, 180)
+    distLabel.TextSize = 12
+    distLabel.TextXAlignment = Enum.TextXAlignment.Left
+    distLabel.BackgroundTransparency = 1
+    distLabel.Position = UDim2.new(0, 0, 0, 20)
+    distLabel.Size = UDim2.new(1, 0, 0, 16)
+    distLabel.Parent = info
+
+    local healthBack = Instance.new("Frame")
+    healthBack.Name = "HealthBack"
+    healthBack.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    healthBack.BorderSizePixel = 0
+    healthBack.Position = UDim2.new(0, 0, 0, 42)
+    healthBack.Size = UDim2.new(1, 0, 0, 16)
+    healthBack.Parent = info
+
+    local healthBackCorner = Instance.new("UICorner")
+    healthBackCorner.CornerRadius = UDim.new(0, 3)
+    healthBackCorner.Parent = healthBack
+
+    local healthFill = Instance.new("Frame")
+    healthFill.Name = "HealthFill"
+    healthFill.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+    healthFill.BorderSizePixel = 0
+    healthFill.Size = UDim2.new(1, 0, 1, 0)
+    healthFill.Parent = healthBack
+
+    local healthFillCorner = Instance.new("UICorner")
+    healthFillCorner.CornerRadius = UDim.new(0, 3)
+    healthFillCorner.Parent = healthFill
+
+    local healthGradient = Instance.new("UIGradient")
+    healthGradient.Color = ColorSequence.new({
+        ColorSequenceKeypoint.new(0, Color3.fromRGB(0, 255, 0)),
+        ColorSequenceKeypoint.new(0.5, Color3.fromRGB(255, 170, 0)),
+        ColorSequenceKeypoint.new(1, Color3.fromRGB(255, 0, 0)),
+    })
+    healthGradient.Parent = healthFill
+
+    local healthText = Instance.new("TextLabel")
+    healthText.Name = "HealthText"
+    healthText.Font = Enum.Font.SourceSans
+    healthText.Text = "100/100"
+    healthText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    healthText.TextSize = 11
+    healthText.BackgroundTransparency = 1
+    healthText.Size = UDim2.new(1, 0, 1, 0)
+    healthText.Parent = healthBack
+
+    local ammoBack = Instance.new("Frame")
+    ammoBack.Name = "AmmoBack"
+    ammoBack.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+    ammoBack.BorderSizePixel = 0
+    ammoBack.Position = UDim2.new(0, 0, 0, 62)
+    ammoBack.Size = UDim2.new(1, 0, 0, 14)
+    ammoBack.Visible = false
+    ammoBack.Parent = info
+
+    local ammoBackCorner = Instance.new("UICorner")
+    ammoBackCorner.CornerRadius = UDim.new(0, 3)
+    ammoBackCorner.Parent = ammoBack
+
+    local ammoFill = Instance.new("Frame")
+    ammoFill.Name = "AmmoFill"
+    ammoFill.BackgroundColor3 = Color3.fromRGB(255, 140, 0)
+    ammoFill.BorderSizePixel = 0
+    ammoFill.Size = UDim2.new(1, 0, 1, 0)
+    ammoFill.Parent = ammoBack
+
+    local ammoFillCorner = Instance.new("UICorner")
+    ammoFillCorner.CornerRadius = UDim.new(0, 3)
+    ammoFillCorner.Parent = ammoFill
+
+    local ammoText = Instance.new("TextLabel")
+    ammoText.Name = "AmmoText"
+    ammoText.Font = Enum.Font.SourceSans
+    ammoText.Text = "0/0"
+    ammoText.TextColor3 = Color3.fromRGB(255, 255, 255)
+    ammoText.TextSize = 11
+    ammoText.BackgroundTransparency = 1
+    ammoText.Size = UDim2.new(1, 0, 1, 0)
+    ammoText.Parent = ammoBack
+
+    duelistTargetMain = main
+    duelistTargetElements = {
+        Main = main,
+        Border = stroke,
+        TopBar = topBar,
+        Avatar = avatar,
+        Name = nameLabel,
+        Distance = distLabel,
+        HealthBack = healthBack,
+        HealthFill = healthFill,
+        HealthText = healthText,
+        AmmoBack = ammoBack,
+        AmmoFill = ammoFill,
+        AmmoText = ammoText,
+    }
+end
+
+local function updateTargetHighlight(targetInfo)
+    if duelistTargetHighlight then
+        pcall(function() duelistTargetHighlight:Destroy() end)
+        duelistTargetHighlight = nil
+    end
+    if not cfg.TargetHighlightEnabled then return end
+    if not targetInfo or not targetInfo.Model then return end
+    local highlight = Instance.new("Highlight")
+    highlight.Name = "EvolutionTargetHighlight"
+    highlight.Parent = cloneref(game:GetService("CoreGui"))
+    highlight.Adornee = targetInfo.Model
+    highlight.FillColor = cfg.TargetHighlightFill
+    highlight.FillTransparency = 0.5
+    highlight.OutlineColor = cfg.TargetHighlightOutline
+    highlight.OutlineTransparency = 0
+    duelistTargetHighlight = highlight
+end
+
+local function ensureTargetTracer()
+    if not duelistTargetTracer then
+        duelistTargetTracer = Drawing.new("Line")
+        duelistTargetTracer.Visible = false
+        duelistTargetTracer.Thickness = 1.5
+        duelistTargetTracer.Color = cfg.TargetTracerColor
+        duelistTargetTracer.Transparency = 1
+        duelistTargetTracer.ZIndex = 2
+
+        duelistTargetTracerOutline = Drawing.new("Line")
+        duelistTargetTracerOutline.Visible = false
+        duelistTargetTracerOutline.Thickness = 3.5
+        duelistTargetTracerOutline.Color = Color3.fromRGB(0, 0, 0)
+        duelistTargetTracerOutline.Transparency = 1
+        duelistTargetTracerOutline.ZIndex = 1
+    end
+end
+
+trackConnection(RunService.RenderStepped:Connect(function()
+    local targetInfo = getTargetPlayer()
+
+    -- Target UI
+    if cfg.TargetUIEnabled and targetInfo then
+        createTargetUI()
+        if duelistTargetScreen and duelistTargetElements.Avatar then
+            duelistTargetScreen.Enabled = true
+
+            if targetInfo.Player ~= lastDuelistTargetPlayer then
+                duelistTargetElements.Avatar.Image = "rbxthumb://type=AvatarHeadShot&id=" .. targetInfo.Player.UserId .. "&w=420&h=420"
+                duelistTargetElements.Name.Text = targetInfo.Player.DisplayName .. " (@" .. targetInfo.Player.Name .. ")"
+                lastDuelistTargetPlayer = targetInfo.Player
+            end
+
+            local hum = targetInfo.Model:FindFirstChildOfClass("Humanoid")
+            if hum then
+                local pct = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+                duelistTargetElements.HealthFill.Size = UDim2.new(pct, 0, 1, 0)
+                duelistTargetElements.HealthText.Text = math.floor(hum.Health) .. "/" .. math.floor(hum.MaxHealth)
+            end
+
+            local myChar = LocalPlayer.Character
+            local myRoot = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Head"))
+            local targetRoot = targetInfo.Part
+            if myRoot and targetRoot and targetRoot.Parent then
+                local dist = (myRoot.Position - targetRoot.Position).Magnitude
+                duelistTargetElements.Distance.Text = math.floor(dist) .. "m"
+            else
+                duelistTargetElements.Distance.Text = "N/A"
+            end
+
+            local ammo, maxAmmo = getTargetAmmo(targetInfo.Model)
+            if maxAmmo > 0 then
+                duelistTargetElements.AmmoBack.Visible = true
+                local pct = math.clamp(ammo / maxAmmo, 0, 1)
+                duelistTargetElements.AmmoFill.Size = UDim2.new(pct, 0, 1, 0)
+                duelistTargetElements.AmmoText.Text = math.floor(ammo) .. "/" .. math.floor(maxAmmo)
+            else
+                duelistTargetElements.AmmoBack.Visible = false
+            end
+
+            duelistTargetElements.Border.Color = cfg.TargetUIColor
+            duelistTargetElements.TopBar.BackgroundColor3 = cfg.TargetUIColor
+        end
+    else
+        if duelistTargetScreen then duelistTargetScreen.Enabled = false end
+        lastDuelistTargetPlayer = nil
+    end
+
+    -- Highlight
+    if cfg.TargetHighlightEnabled and targetInfo then
+        if not duelistTargetHighlight or duelistTargetHighlight.Adornee ~= targetInfo.Model then
+            updateTargetHighlight(targetInfo)
+        end
+    else
+        updateTargetHighlight(nil)
+    end
+
+    -- Tracer
+    ensureTargetTracer()
+    if cfg.TargetTracerEnabled and targetInfo and targetInfo.Part and targetInfo.Part.Parent then
+        local targetPos = targetInfo.Part.Position
+        local screenPos, onScreen = Camera:WorldToViewportPoint(targetPos)
+        local viewportSize = Camera.ViewportSize
+        local center = Vector2.new(viewportSize.X / 2, viewportSize.Y / 2)
+        local endPos = Vector2.new(screenPos.X, screenPos.Y)
+        if not onScreen then
+            local dirX = screenPos.X - center.X
+            local dirY = screenPos.Y - center.Y
+            local mag = math.sqrt(dirX * dirX + dirY * dirY)
+            if mag > 0 then
+                dirX, dirY = dirX / mag, dirY / mag
+                endPos = center + Vector2.new(dirX, dirY) * math.min(mag, math.min(viewportSize.X, viewportSize.Y) / 2 - 50)
+            end
+        end
+        duelistTargetTracerOutline.From = center
+        duelistTargetTracerOutline.To = endPos
+        duelistTargetTracerOutline.Visible = true
+        duelistTargetTracer.From = center
+        duelistTargetTracer.To = endPos
+        duelistTargetTracer.Color = cfg.TargetTracerColor
+        duelistTargetTracer.Visible = true
+    else
+        if duelistTargetTracer then duelistTargetTracer.Visible = false end
+        if duelistTargetTracerOutline then duelistTargetTracerOutline.Visible = false end
+    end
+end))
 
 -- Auto-apply cosmetics and force them back if the server resets them.
 local lastSkinTool = nil
