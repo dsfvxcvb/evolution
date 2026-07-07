@@ -105,22 +105,23 @@ local Window = Arcane:Window({
 })
 
 -- Pages
-local Combat = Window:Page({ Name = "Combat", Icon = "swords" })
-local Player = Window:Page({ Name = "Player", Icon = "user" })
+local Main = Window:Page({ Name = "Main", Icon = "home" })
 local Settings = Window:Page({ Name = "Settings", Icon = "settings" })
 
 -- Subpages
-local Home = Combat:SubPage({ Name = "Home", Icon = "home" })
-local PlayerMain = Player:SubPage({ Name = "Main", Icon = "user" })
+local Home = Main:SubPage({ Name = "Home", Icon = "home" })
+local Visuals = Main:SubPage({ Name = "Visuals", Icon = "eye" })
+local Player = Main:SubPage({ Name = "Player", Icon = "user" })
 local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
 
 -- Sections
 local HomeLeft = Home:Section({ Name = "Aimbot", Side = 1 })
-local HomeRight = Home:Section({ Name = "FOV Circle", Side = 2 })
-local HomeLeft2 = Home:Section({ Name = "ESP", Side = 1 })
 
-local PlayerLeft = PlayerMain:Section({ Name = "Gun Skins", Side = 1 })
-local PlayerRight = PlayerMain:Section({ Name = "Player Card", Side = 2 })
+local VisualsLeft = Visuals:Section({ Name = "FOV Circle", Side = 1 })
+local VisualsRight = Visuals:Section({ Name = "ESP", Side = 2 })
+
+local PlayerLeft = Player:Section({ Name = "Gun Skins", Side = 1 })
+local PlayerRight = Player:Section({ Name = "Player Card", Side = 2 })
 
 -- Silent Aim
 HomeLeft:Toggle({
@@ -172,14 +173,14 @@ HomeLeft:Dropdown({
 })
 
 -- FOV Circle
-HomeRight:Toggle({
+VisualsLeft:Toggle({
     Name = "Visible",
     Default = cfg.ShowFOV,
     Flag = "Duelist_ShowFOV",
     Callback = function(State) cfg.ShowFOV = State end
 })
 
-HomeRight:Slider({
+VisualsLeft:Slider({
     Name = "Radius",
     Min = 10,
     Max = 1000,
@@ -188,7 +189,7 @@ HomeRight:Slider({
     Callback = function(Value) cfg.FOVRadius = Value end
 })
 
-HomeRight:Slider({
+VisualsLeft:Slider({
     Name = "Fill Transparency",
     Min = 0,
     Max = 100,
@@ -197,14 +198,14 @@ HomeRight:Slider({
     Callback = function(Value) cfg.FOVFillTransparency = Value / 100 end
 })
 
-HomeRight:Toggle({
+VisualsLeft:Toggle({
     Name = "Outline",
     Default = cfg.FOVOutline,
     Flag = "Duelist_FOVOutline",
     Callback = function(State) cfg.FOVOutline = State end
 })
 
-HomeRight:Slider({
+VisualsLeft:Slider({
     Name = "Outline Thickness",
     Min = 0,
     Max = 10,
@@ -213,35 +214,35 @@ HomeRight:Slider({
     Callback = function(Value) cfg.FOVOutlineThickness = Value end
 })
 
-HomeRight:Toggle({
+VisualsLeft:Toggle({
     Name = "Gradient",
     Default = cfg.FOVGradient,
     Flag = "Duelist_FOVGradient",
     Callback = function(State) cfg.FOVGradient = State end
 })
 
-HomeRight:Colorpicker({
+VisualsLeft:Colorpicker({
     Name = "Gradient Top",
     Default = cfg.FOVGradientTop,
     Flag = "Duelist_FOVGradientTop",
     Callback = function(Value) cfg.FOVGradientTop = Value end
 })
 
-HomeRight:Colorpicker({
+VisualsLeft:Colorpicker({
     Name = "Gradient Bottom",
     Default = cfg.FOVGradientBottom,
     Flag = "Duelist_FOVGradientBottom",
     Callback = function(Value) cfg.FOVGradientBottom = Value end
 })
 
-HomeRight:Toggle({
+VisualsLeft:Toggle({
     Name = "Gradient Spin",
     Default = cfg.FOVGradientSpin,
     Flag = "Duelist_FOVGradientSpin",
     Callback = function(State) cfg.FOVGradientSpin = State end
 })
 
-HomeRight:Slider({
+VisualsLeft:Slider({
     Name = "Gradient Spin Speed",
     Min = 0,
     Max = 500,
@@ -251,70 +252,70 @@ HomeRight:Slider({
 })
 
 -- ESP
-HomeLeft2:Toggle({
+VisualsRight:Toggle({
     Name = "Enabled",
     Default = cfg.EspEnabled,
     Flag = "Duelist_EspEnabled",
     Callback = function(State) cfg.EspEnabled = State end
 })
 
-HomeLeft2:Toggle({
+VisualsRight:Toggle({
     Name = "Boxes",
     Default = cfg.EspBoxes,
     Flag = "Duelist_EspBoxes",
     Callback = function(State) cfg.EspBoxes = State end
 })
 
-HomeLeft2:Colorpicker({
+VisualsRight:Colorpicker({
     Name = "Box Color",
     Default = cfg.EspBoxColor,
     Flag = "Duelist_EspBoxColor",
     Callback = function(Value) cfg.EspBoxColor = Value end
 })
 
-HomeLeft2:Toggle({
+VisualsRight:Toggle({
     Name = "Names",
     Default = cfg.EspNames,
     Flag = "Duelist_EspNames",
     Callback = function(State) cfg.EspNames = State end
 })
 
-HomeLeft2:Colorpicker({
+VisualsRight:Colorpicker({
     Name = "Name Color",
     Default = cfg.EspNameColor,
     Flag = "Duelist_EspNameColor",
     Callback = function(Value) cfg.EspNameColor = Value end
 })
 
-HomeLeft2:Toggle({
+VisualsRight:Toggle({
     Name = "Health",
     Default = cfg.EspHealth,
     Flag = "Duelist_EspHealth",
     Callback = function(State) cfg.EspHealth = State end
 })
 
-HomeLeft2:Colorpicker({
+VisualsRight:Colorpicker({
     Name = "Health Color",
     Default = cfg.EspHealthColor,
     Flag = "Duelist_EspHealthColor",
     Callback = function(Value) cfg.EspHealthColor = Value end
 })
 
-HomeLeft2:Toggle({
+VisualsRight:Toggle({
     Name = "Distance",
     Default = cfg.EspDistance,
     Flag = "Duelist_EspDistance",
     Callback = function(State) cfg.EspDistance = State end
 })
 
-HomeLeft2:Colorpicker({
+VisualsRight:Colorpicker({
     Name = "Distance Color",
     Default = cfg.EspDistanceColor,
     Flag = "Duelist_EspDistanceColor",
     Callback = function(Value) cfg.EspDistanceColor = Value end
 })
 
-HomeLeft2:Slider({
+VisualsRight:Slider({
     Name = "Max Distance",
     Min = 100,
     Max = 10000,
