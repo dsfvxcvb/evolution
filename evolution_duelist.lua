@@ -174,12 +174,15 @@ local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
 
 -- Sections
 local CombatLeft = Combat:Section({ Name = "Aimbot", Side = 1 })
-local CombatTargetUI = Combat:Section({ Name = "Target UI", Side = 2 })
-local CombatHighlight = Combat:Section({ Name = "Highlight", Side = 2 })
-local CombatTracer = Combat:Section({ Name = "Tracer", Side = 2 })
+local CombatAimAssist = Combat:Section({ Name = "Aim Assist", Side = 2 })
 
 local VisualsLeft = Visuals:Section({ Name = "FOV Circle", Side = 1 })
-local VisualsRight = Visuals:Section({ Name = "ESP", Side = 2 })
+local VisualsTargetUI = Visuals:Section({ Name = "Target UI", Side = 2 })
+local VisualsHighlight = Visuals:Section({ Name = "Highlight", Side = 2 })
+local VisualsTracer = Visuals:Section({ Name = "Tracer", Side = 2 })
+
+local World = Main:SubPage({ Name = "World", Icon = "globe" })
+local WorldRight = World:Section({ Name = "ESP", Side = 2 })
 
 local PlayerLeft = Player:Section({ Name = "Gun Skins", Side = 1 })
 local PlayerRight = Player:Section({ Name = "Player Card", Side = 2 })
@@ -207,7 +210,7 @@ CombatLeft:Toggle({
 })
 
 CombatLeft:Toggle({
-    Name = "Target Reward TargetShoot",
+    Name = "Orb Target",
     Default = cfg.TargetShootEnabled,
     Flag = "Duelist_TargetShoot",
     Callback = function(State) cfg.TargetShootEnabled = State end
@@ -248,8 +251,6 @@ CombatLeft:Dropdown({
 })
 
 -- Aim Assist
-local CombatAimAssist = Combat:Section({ Name = "Aim Assist", Side = 1 })
-
 local AimAssistToggle = CombatAimAssist:Toggle({
     Name = "Aim Assist",
     Default = cfg.AimAssistEnabled,
@@ -295,7 +296,7 @@ CombatAimAssist:Dropdown({
 })
 
 -- Target UI
-local TargetUIToggle = CombatTargetUI:Toggle({
+local TargetUIToggle = VisualsTargetUI:Toggle({
     Name = "Target UI",
     Default = cfg.TargetUIEnabled,
     Flag = "Duelist_TargetUI",
@@ -310,7 +311,7 @@ local targetUIColorChained = pcall(function()
     })
 end)
 if not targetUIColorChained then
-    CombatTargetUI:Colorpicker({
+    VisualsTargetUI:Colorpicker({
         Name = "UI Color",
         Default = cfg.TargetUIColor,
         Flag = "Duelist_TargetUIColor",
@@ -318,7 +319,7 @@ if not targetUIColorChained then
     })
 end
 
-local UseGlowToggle = CombatTargetUI:Toggle({
+local UseGlowToggle = VisualsTargetUI:Toggle({
     Name = "Use Glow",
     Default = cfg.TargetUIUseGlow,
     Flag = "Duelist_TargetUIUseGlow",
@@ -333,7 +334,7 @@ local glowColorChained = pcall(function()
     })
 end)
 if not glowColorChained then
-    CombatTargetUI:Colorpicker({
+    VisualsTargetUI:Colorpicker({
         Name = "Glow Color",
         Default = cfg.TargetUIGlowColor,
         Flag = "Duelist_TargetUIGlowColor",
@@ -341,7 +342,7 @@ if not glowColorChained then
     })
 end
 
-CombatTargetUI:Dropdown({
+VisualsTargetUI:Dropdown({
     Name = "Style",
     Items = { "Old", "Modern" },
     Default = cfg.TargetUIStyle,
@@ -359,7 +360,7 @@ CombatTargetUI:Dropdown({
     end
 })
 
-CombatTargetUI:Dropdown({
+VisualsTargetUI:Dropdown({
     Name = "Position",
     Items = { "Free", "Follow Target" },
     Default = cfg.TargetUIPosition,
@@ -368,7 +369,7 @@ CombatTargetUI:Dropdown({
 })
 
 -- Highlight
-local HighlightToggle = CombatHighlight:Toggle({
+local HighlightToggle = VisualsHighlight:Toggle({
     Name = "Highlight",
     Default = cfg.TargetHighlightEnabled,
     Flag = "Duelist_TargetHighlight",
@@ -389,13 +390,13 @@ local highlightChained = pcall(function()
     })
 end)
 if not highlightChained then
-    CombatHighlight:Colorpicker({
+    VisualsHighlight:Colorpicker({
         Name = "Fill Color",
         Default = cfg.TargetHighlightFill,
         Flag = "Duelist_TargetHighlightFill",
         Callback = function(Value) cfg.TargetHighlightFill = Value end
     })
-    CombatHighlight:Colorpicker({
+    VisualsHighlight:Colorpicker({
         Name = "Outline Color",
         Default = cfg.TargetHighlightOutline,
         Flag = "Duelist_TargetHighlightOutline",
@@ -404,7 +405,7 @@ if not highlightChained then
 end
 
 -- Tracer
-local TracerToggle = CombatTracer:Toggle({
+local TracerToggle = VisualsTracer:Toggle({
     Name = "Tracer",
     Default = cfg.TargetTracerEnabled,
     Flag = "Duelist_TargetTracer",
@@ -425,13 +426,13 @@ local tracerColorChained = pcall(function()
     })
 end)
 if not tracerColorChained then
-    CombatTracer:Colorpicker({
+    VisualsTracer:Colorpicker({
         Name = "Tracer Color",
         Default = cfg.TargetTracerColor,
         Flag = "Duelist_TargetTracerColor",
         Callback = function(Value) cfg.TargetTracerColor = Value end
     })
-    CombatTracer:Colorpicker({
+    VisualsTracer:Colorpicker({
         Name = "Outline Color",
         Default = cfg.TargetTracerOutlineColor,
         Flag = "Duelist_TargetTracerOutlineColor",
@@ -439,7 +440,7 @@ if not tracerColorChained then
     })
 end
 
-CombatTracer:Slider({
+VisualsTracer:Slider({
     Name = "Thickness",
     Min = 1,
     Max = 10,
@@ -448,7 +449,7 @@ CombatTracer:Slider({
     Callback = function(Value) cfg.TargetTracerThickness = Value end
 })
 
-CombatTracer:Slider({
+VisualsTracer:Slider({
     Name = "Outline Thickness",
     Min = 1,
     Max = 15,
@@ -553,70 +554,70 @@ VisualsLeft:Slider({
 })
 
 -- ESP
-VisualsRight:Toggle({
+WorldRight:Toggle({
     Name = "ESP",
     Default = cfg.EspEnabled,
     Flag = "Duelist_EspEnabled",
     Callback = function(State) cfg.EspEnabled = State end
 })
 
-VisualsRight:Toggle({
+WorldRight:Toggle({
     Name = "Boxes",
     Default = cfg.EspBoxes,
     Flag = "Duelist_EspBoxes",
     Callback = function(State) cfg.EspBoxes = State end
 })
 
-VisualsRight:Colorpicker({
+WorldRight:Colorpicker({
     Name = "Box Color",
     Default = cfg.EspBoxColor,
     Flag = "Duelist_EspBoxColor",
     Callback = function(Value) cfg.EspBoxColor = Value end
 })
 
-VisualsRight:Toggle({
+WorldRight:Toggle({
     Name = "Names",
     Default = cfg.EspNames,
     Flag = "Duelist_EspNames",
     Callback = function(State) cfg.EspNames = State end
 })
 
-VisualsRight:Colorpicker({
+WorldRight:Colorpicker({
     Name = "Name Color",
     Default = cfg.EspNameColor,
     Flag = "Duelist_EspNameColor",
     Callback = function(Value) cfg.EspNameColor = Value end
 })
 
-VisualsRight:Toggle({
+WorldRight:Toggle({
     Name = "Health",
     Default = cfg.EspHealth,
     Flag = "Duelist_EspHealth",
     Callback = function(State) cfg.EspHealth = State end
 })
 
-VisualsRight:Colorpicker({
+WorldRight:Colorpicker({
     Name = "Health Color",
     Default = cfg.EspHealthColor,
     Flag = "Duelist_EspHealthColor",
     Callback = function(Value) cfg.EspHealthColor = Value end
 })
 
-VisualsRight:Toggle({
+WorldRight:Toggle({
     Name = "Distance",
     Default = cfg.EspDistance,
     Flag = "Duelist_EspDistance",
     Callback = function(State) cfg.EspDistance = State end
 })
 
-VisualsRight:Colorpicker({
+WorldRight:Colorpicker({
     Name = "Distance Color",
     Default = cfg.EspDistanceColor,
     Flag = "Duelist_EspDistanceColor",
     Callback = function(Value) cfg.EspDistanceColor = Value end
 })
 
-VisualsRight:Slider({
+WorldRight:Slider({
     Name = "Max Distance",
     Min = 100,
     Max = 10000,
