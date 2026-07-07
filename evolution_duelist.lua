@@ -61,6 +61,16 @@ getgenv().EvolutionDuelistCleanup = function()
         duelistTargetTracerOutline = nil
     end
     pcall(function() RunService:UnbindFromRenderStep("EvolutionAimAssist") end)
+    local rfOrigs = getgenv().EvolutionDuelistRapidFireOriginals
+    if rfOrigs then
+        for tool, orig in pairs(rfOrigs) do
+            pcall(function()
+                tool:SetAttribute("FireRate", orig.FireRate)
+                tool:SetAttribute("Automatic", orig.Automatic)
+            end)
+        end
+        table.clear(rfOrigs)
+    end
 end
 local function trackConnection(c)
     table.insert(EvolutionConnections, c)
@@ -77,6 +87,7 @@ end
 getgenv().EvolutionDuelist = {
     SilentAimEnabled = false,
     AutoFire = false,
+    RapidFire = false,
     TargetShootEnabled = false,
     TeamCheck = true,
     Hitchance = 100,
@@ -186,6 +197,13 @@ CombatLeft:Toggle({
     Default = cfg.AutoFire,
     Flag = "Duelist_AutoFire",
     Callback = function(State) cfg.AutoFire = State end
+})
+
+CombatLeft:Toggle({
+    Name = "Rapid Fire",
+    Default = cfg.RapidFire,
+    Flag = "Duelist_RapidFire",
+    Callback = function(State) cfg.RapidFire = State end
 })
 
 CombatLeft:Toggle({
@@ -1262,17 +1280,59 @@ trackConnection(RunService.RenderStepped:Connect(function()
         end
     else
         -- Tap for semi-auto (pistol).
-        if tick() - lastSemiTrigger >= 0.15 then
+        local cooldown = cfg.RapidFire and 0.01 or 0.15
+        if tick() - lastSemiTrigger >= cooldown then
             setShootBind(true)
             autoFireHeld = true
             lastSemiTrigger = tick()
-            task.delay(0.05, function()
+            task.delay(cfg.RapidFire and 0.01 or 0.05, function()
                 setShootBind(false)
                 autoFireHeld = false
             end)
         end
     end
 end))
+
+-- Rapid Fire attribute spoofing (client-side FireRate + force Automatic)
+local rapidFireOriginals = {}
+local function restoreRapidFire(tool)
+    local orig = rapidFireOriginals[tool]
+    if not orig then return end
+    pcall(function()
+        tool:SetAttribute("FireRate", orig.FireRate)
+        tool:SetAttribute("Automatic", orig.Automatic)
+    end)
+    rapidFireOriginals[tool] = nil
+end
+
+trackConnection(RunService.Heartbeat:Connect(function()
+    if not cfg.RapidFire then
+        for tool, _ in pairs(rapidFireOriginals) do
+            restoreRapidFire(tool)
+        end
+        return
+    end
+
+    local char = LocalPlayer.Character
+    if not char then return end
+
+    local tool = char:FindFirstChildOfClass("Tool")
+    if not tool or not tool:HasTag("Gun") then return end
+
+    if not rapidFireOriginals[tool] then
+        rapidFireOriginals[tool] = {
+            FireRate = tool:GetAttribute("FireRate"),
+            Automatic = tool:GetAttribute("Automatic"),
+        }
+    end
+
+    pcall(function()
+        tool:SetAttribute("FireRate", 9999)
+        tool:SetAttribute("Automatic", true)
+    end)
+end))
+
+getgenv().EvolutionDuelistRapidFireOriginals = rapidFireOriginals
 
 -- ============================================================
 -- ESP LOGIC
