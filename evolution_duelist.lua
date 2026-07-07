@@ -115,7 +115,7 @@ local PlayerMain = Player:SubPage({ Name = "Main", Icon = "user" })
 local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
 
 -- Sections
-local HomeLeft = Home:Section({ Name = "Silent Aim", Side = 1 })
+local HomeLeft = Home:Section({ Name = "Aimbot", Side = 1 })
 local HomeRight = Home:Section({ Name = "FOV Circle", Side = 2 })
 local HomeLeft2 = Home:Section({ Name = "ESP", Side = 1 })
 
