@@ -23,6 +23,25 @@ local UserInputService = cloneref(game:GetService("UserInputService"))
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
 
+-- Cleanup any previous evolution_duelist instance (connections, old UI, etc.)
+if getgenv().EvolutionDuelistCleanup then
+    pcall(getgenv().EvolutionDuelistCleanup)
+end
+local EvolutionConnections = {}
+getgenv().EvolutionDuelistCleanup = function()
+    for _, c in ipairs(EvolutionConnections) do
+        pcall(function() c:Disconnect() end)
+    end
+    table.clear(EvolutionConnections)
+    if typeof(getgenv().Library) == "table" and typeof(getgenv().Library.Unload) == "function" then
+        pcall(function() getgenv().Library:Unload() end)
+    end
+end
+local function trackConnection(c)
+    table.insert(EvolutionConnections, c)
+    return c
+end
+
 local Window = Library:CreateWindow({
     Title = 'evolution',
     Center = true,
@@ -295,7 +314,15 @@ SkinBox:AddToggle('DT_SkinChanger', {
     Default = cfg.SkinChangerEnabled,
     Callback = function(v)
         cfg.SkinChangerEnabled = v
-        if v then applySelectedSkin() end
+        if v then
+            applySelectedSkin()
+        else
+            local tool = getEquippedGun()
+            if tool then
+                local old = tool:FindFirstChild("Skin")
+                if old then old:Destroy() end
+            end
+        end
     end
 })
 
@@ -312,7 +339,17 @@ local SkinDropdown = SkinBox:AddDropdown('DT_SelectedSkin', {
     AllowNull = false,
     Callback = function(v)
         cfg.SelectedSkinKey = (v ~= 'None' and v or nil)
-        if cfg.SkinChangerEnabled then applySelectedSkin() end
+        if cfg.SkinChangerEnabled then
+            if cfg.SelectedSkinKey then
+                applySelectedSkin()
+            else
+                local tool = getEquippedGun()
+                if tool then
+                    local old = tool:FindFirstChild("Skin")
+                    if old then old:Destroy() end
+                end
+            end
+        end
     end
 })
 
@@ -401,7 +438,7 @@ local function createFov()
     fovGradient.Parent = fovFrame
 end
 
-RunService.RenderStepped:Connect(function()
+trackConnection(RunService.RenderStepped:Connect(function()
     local shouldShow = cfg.SilentAimEnabled and cfg.ShowFOV
     if not shouldShow then
         if fovFrame then fovFrame.Visible = false end
@@ -433,7 +470,7 @@ RunService.RenderStepped:Connect(function()
             fovGradient.Color = gradientColor(cfg.FOVColor, cfg.FOVColor)
         end
     end
-end)
+end))
 
 -- ============================================================
 -- SILENT AIM / BULLET MANIPULATION LOGIC
@@ -735,7 +772,7 @@ local function setShootBind(down)
     pcall(function() GameG:FireBind("Shoot", down, false) end)
 end
 
-RunService.RenderStepped:Connect(function()
+trackConnection(RunService.RenderStepped:Connect(function()
     local shouldFire = cfg.SilentAimEnabled and cfg.AutoFire
     local target = shouldFire and getTarget() or nil
 
@@ -766,7 +803,7 @@ RunService.RenderStepped:Connect(function()
             end)
         end
     end
-end)
+end))
 
 -- ============================================================
 -- ESP LOGIC
@@ -814,7 +851,7 @@ local function removeEsp(model)
     end
 end
 
-RunService.RenderStepped:Connect(function()
+trackConnection(RunService.RenderStepped:Connect(function()
     if not cfg.EspEnabled or not CharactersFolder then
         for model, _ in pairs(espDrawings) do removeEsp(model) end
         return
@@ -888,7 +925,7 @@ RunService.RenderStepped:Connect(function()
     for model, _ in pairs(espDrawings) do
         if not seen[model] then removeEsp(model) end
     end
-end)
+end))
 
 -- ============================================================
 -- COSMETICS LOGIC
@@ -1011,140 +1048,190 @@ function refreshCardList()
     end
 end
 
-local skinApplyInProgress = false
 function applySelectedSkin()
-    if skinApplyInProgress then return end
     if not cfg.SkinChangerEnabled then return end
-    local skinObj = cfg.SelectedSkinKey and skinRegistry[cfg.SelectedSkinKey]
-    if not skinObj or not skinObj:IsA("Model") then return end
     local tool = getEquippedGun()
     if not tool then return end
 
-    skinApplyInProgress = true
-    task.defer(function()
-        pcall(function()
-            local toolHandle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
-            if not toolHandle then return end
+    local skinObj = cfg.SelectedSkinKey and skinRegistry[cfg.SelectedSkinKey]
+    if not skinObj or not skinObj:IsA("Model") then
+        -- No skin selected; strip any applied skin so the server/owned skin shows.
+        local oldSkin = tool:FindFirstChild("Skin")
+        if oldSkin then oldSkin:Destroy() end
+        return
+    end
 
-            -- Remove any previously-applied skin.
-            local oldSkin = tool:FindFirstChild("Skin")
-            if oldSkin then oldSkin:Destroy() end
+    -- Snapshot the requested skin so rapid dropdown changes don't apply stale skins.
+    local requestedKey = cfg.SelectedSkinKey
+    local ok, err = pcall(function()
+        if cfg.SelectedSkinKey ~= requestedKey then return end
 
-            local newSkin = skinObj:Clone()
-            newSkin.Name = "Skin"
+        local toolHandle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
+        if not toolHandle then return end
 
-            for _, d in ipairs(newSkin:GetDescendants()) do
-                if d:IsA("BasePart") then
-                    d.Anchored = false
-                    d.CanCollide = false
-                    d.Massless = true
-                elseif d:IsA("LocalScript") or d:IsA("Script") then
-                    d:Destroy()
-                end
+        -- Remove any previously-applied skin first.
+        local oldSkin = tool:FindFirstChild("Skin")
+        if oldSkin then oldSkin:Destroy() end
+
+        local newSkin = skinObj:Clone()
+        newSkin.Name = "Skin"
+
+        for _, d in ipairs(newSkin:GetDescendants()) do
+            if d:IsA("BasePart") then
+                d.Anchored = false
+                d.CanCollide = false
+                d.Massless = true
+            elseif d:IsA("LocalScript") or d:IsA("Script") then
+                d:Destroy()
             end
+        end
 
-            local function pickHandle(skin, preferredName)
-                if preferredName then
-                    local p = skin:FindFirstChild(preferredName)
-                    if p and p:IsA("BasePart") then return p end
-                end
-                local h1 = skin:FindFirstChild("Handle1")
-                if h1 and h1:IsA("BasePart") then return h1 end
-                local h = skin:FindFirstChild("Handle")
-                if h and h:IsA("BasePart") then return h end
-                local largest, maxSize = nil, 0
-                for _, part in ipairs(skin:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        local sz = part.Size.Magnitude
-                        if sz > maxSize then
-                            maxSize = sz
-                            largest = part
-                        end
+        local function pickHandle(skin, preferredName)
+            if preferredName then
+                local p = skin:FindFirstChild(preferredName)
+                if p and p:IsA("BasePart") then return p end
+            end
+            local h1 = skin:FindFirstChild("Handle1")
+            if h1 and h1:IsA("BasePart") then return h1 end
+            local h = skin:FindFirstChild("Handle")
+            if h and h:IsA("BasePart") then return h end
+            local largest, maxSize = nil, 0
+            for _, part in ipairs(skin:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    local sz = part.Size.Magnitude
+                    if sz > maxSize then
+                        maxSize = sz
+                        largest = part
                     end
                 end
-                return largest
             end
+            return largest
+        end
 
-            -- Find the skin's authored grip attachment and its parent part.
-            local toolGrip = toolHandle:FindFirstChild("GripPosition")
-            local skinGrip, skinGripPart = nil, nil
-            for _, a in ipairs(newSkin:GetDescendants()) do
-                if a:IsA("Attachment") and a.Name == "GripPosition" and a.Parent:IsA("BasePart") then
-                    skinGrip = a
-                    skinGripPart = a.Parent
-                    break
+        -- Find the skin's authored grip attachment and its parent part.
+        local toolGrip = toolHandle:FindFirstChild("GripPosition")
+        local skinGrip, skinGripPart = nil, nil
+        for _, a in ipairs(newSkin:GetDescendants()) do
+            if a:IsA("Attachment") and a.Name == "GripPosition" and a.Parent:IsA("BasePart") then
+                skinGrip = a
+                skinGripPart = a.Parent
+                break
+            end
+        end
+
+        local skinHandle = skinGripPart or pickHandle(newSkin)
+        if not skinHandle then
+            newSkin:Destroy()
+            return
+        end
+
+        -- Align the whole skin rigidly so its GripPosition matches the tool's GripPosition.
+        -- The old server weld always flipped the skin 180° around Y, so apply that rotation
+        -- relative to the grip; without it the gun is held backwards/sideways.
+        if toolGrip and skinGrip then
+            local targetCF = toolGrip.WorldCFrame * CFrame.Angles(0, math.pi, 0)
+            local newHandleCF = targetCF * skinGrip.CFrame:Inverse()
+            local transform = newHandleCF * skinHandle.CFrame:Inverse()
+            for _, part in ipairs(newSkin:GetDescendants()) do
+                if part:IsA("BasePart") then
+                    part.CFrame = transform * part.CFrame
                 end
             end
+        else
+            skinHandle.CFrame = toolHandle.CFrame
+        end
 
-            local skinHandle = skinGripPart or pickHandle(newSkin)
-            if not skinHandle then
-                newSkin:Destroy()
-                return
+        -- Mark the skin BEFORE parenting so ChildAdded hooks know it's ours.
+        newSkin:SetAttribute("EvolutionSkinKey", requestedKey)
+        newSkin.Parent = tool
+        newSkin.PrimaryPart = skinHandle
+
+        -- Preserve original internal welds if the skin uses them; otherwise weld loose parts.
+        local hasInternalWeld = false
+        for _, d in ipairs(newSkin:GetDescendants()) do
+            if d:IsA("Weld") or d:IsA("Motor6D") or d:IsA("ManualWeld") then
+                hasInternalWeld = true
+                break
             end
+        end
 
-            -- Align the whole skin rigidly so its GripPosition matches the tool's GripPosition.
-            -- The old server weld always flipped the skin 180° around Y, so apply that rotation
-            -- relative to the grip; without it the gun is held backwards/sideways.
-            if toolGrip and skinGrip then
-                local targetCF = toolGrip.WorldCFrame * CFrame.Angles(0, math.pi, 0)
-                local newHandleCF = targetCF * skinGrip.CFrame:Inverse()
-                local transform = newHandleCF * skinHandle.CFrame:Inverse()
-                for _, part in ipairs(newSkin:GetDescendants()) do
-                    if part:IsA("BasePart") then
-                        part.CFrame = transform * part.CFrame
-                    end
+        if not hasInternalWeld then
+            for _, part in ipairs(newSkin:GetDescendants()) do
+                if part:IsA("BasePart") and part ~= skinHandle then
+                    local weld = Instance.new("Weld")
+                    weld.Part0 = skinHandle
+                    weld.Part1 = part
+                    weld.C0 = skinHandle.CFrame:Inverse() * part.CFrame
+                    weld.Parent = skinHandle
                 end
-            else
-                skinHandle.CFrame = toolHandle.CFrame
             end
-
-            newSkin.Parent = tool
-            newSkin.PrimaryPart = skinHandle
-
-            -- Preserve original internal welds if the skin uses them; otherwise weld loose parts.
-            local hasInternalWeld = false
+        else
             for _, d in ipairs(newSkin:GetDescendants()) do
                 if d:IsA("Weld") or d:IsA("Motor6D") or d:IsA("ManualWeld") then
-                    hasInternalWeld = true
-                    break
-                end
-            end
-
-            if not hasInternalWeld then
-                for _, part in ipairs(newSkin:GetDescendants()) do
-                    if part:IsA("BasePart") and part ~= skinHandle then
-                        local weld = Instance.new("Weld")
-                        weld.Part0 = skinHandle
-                        weld.Part1 = part
-                        weld.C0 = skinHandle.CFrame:Inverse() * part.CFrame
-                        weld.Parent = skinHandle
+                    if d.Part0 and not d.Part0:IsDescendantOf(newSkin) then
+                        d.Part0 = skinHandle
                     end
-                end
-            else
-                for _, d in ipairs(newSkin:GetDescendants()) do
-                    if d:IsA("Weld") or d:IsA("Motor6D") or d:IsA("ManualWeld") then
-                        if d.Part0 and not d.Part0:IsDescendantOf(newSkin) then
-                            d.Part0 = skinHandle
-                        end
-                        if d.Part1 and not d.Part1:IsDescendantOf(newSkin) then
-                            d.Part1 = skinHandle
-                        end
+                    if d.Part1 and not d.Part1:IsDescendantOf(newSkin) then
+                        d.Part1 = skinHandle
                     end
                 end
             end
+        end
 
-            local mainWeld = Instance.new("Weld")
-            mainWeld.Part0 = toolHandle
-            mainWeld.Part1 = skinHandle
-            mainWeld.C0 = toolHandle.CFrame:Inverse() * skinHandle.CFrame
-            mainWeld.C1 = CFrame.new()
-            mainWeld.Parent = skinHandle
-
-            newSkin:SetAttribute("EvolutionSkinKey", cfg.SelectedSkinKey)
-        end)
-        skinApplyInProgress = false
+        local mainWeld = Instance.new("Weld")
+        mainWeld.Part0 = toolHandle
+        mainWeld.Part1 = skinHandle
+        mainWeld.C0 = toolHandle.CFrame:Inverse() * skinHandle.CFrame
+        mainWeld.C1 = CFrame.new()
+        mainWeld.Parent = skinHandle
     end)
+    if not ok then warn("[evolution] applySelectedSkin error:", err) end
 end
+
+-- Hook a tool so the selected skin is applied the instant it is equipped
+-- or the instant the server tries to put its own skin back on.
+local function hookTool(tool)
+    if not tool:IsA("Tool") then return end
+    if tool:GetAttribute("EvolutionToolHooked") then return end
+    tool:SetAttribute("EvolutionToolHooked", true)
+
+    trackConnection(tool.Equipped:Connect(function()
+        if not cfg.SkinChangerEnabled then return end
+        if cfg.AutoApplySkin and cfg.SelectedSkinKey then
+            applySelectedSkin()
+        elseif not cfg.SelectedSkinKey then
+            local old = tool:FindFirstChild("Skin")
+            if old then old:Destroy() end
+        end
+    end))
+
+    trackConnection(tool.ChildAdded:Connect(function(child)
+        if child.Name ~= "Skin" then return end
+        local key = cfg.SelectedSkinKey
+        if not cfg.SkinChangerEnabled then return end
+        if cfg.AutoApplySkin and key and child:GetAttribute("EvolutionSkinKey") ~= key then
+            applySelectedSkin()
+        elseif not key then
+            child:Destroy()
+        end
+    end))
+end
+
+local function hookToolsIn(parent)
+    for _, t in ipairs(parent:GetChildren()) do
+        hookTool(t)
+    end
+    trackConnection(parent.ChildAdded:Connect(hookTool))
+end
+
+-- Hook tools already in backpack/character and any future ones.
+hookToolsIn(LocalPlayer.Backpack)
+if LocalPlayer.Character then
+    hookToolsIn(LocalPlayer.Character)
+end
+trackConnection(LocalPlayer.CharacterAdded:Connect(function(char)
+    hookToolsIn(char)
+end))
 
 local cardApplyInProgress = false
 function applySelectedCard()
@@ -1277,13 +1364,19 @@ end
 
 -- Auto-apply cosmetics and force them back if the server resets them.
 local lastSkinTool = nil
+local lastSkinApply = 0
 local lastCardApply = 0
-RunService.RenderStepped:Connect(function()
-    if cfg.SkinChangerEnabled and cfg.AutoApplySkin and cfg.SelectedSkinKey then
+trackConnection(RunService.RenderStepped:Connect(function()
+    if cfg.SkinChangerEnabled and cfg.AutoApplySkin then
         local tool = getEquippedGun()
         if tool then
             local skin = tool:FindFirstChild("Skin")
-            if not skin or skin:GetAttribute("EvolutionSkinKey") ~= cfg.SelectedSkinKey then
+            local key = cfg.SelectedSkinKey
+            local wrongSkin = skin and skin:GetAttribute("EvolutionSkinKey") ~= key
+            local shouldApply = key and (not skin or wrongSkin)
+            local shouldRemove = not key and skin
+            if (shouldApply or shouldRemove) and tick() - lastSkinApply >= 0.05 then
+                lastSkinApply = tick()
                 applySelectedSkin()
             end
         end
@@ -1299,18 +1392,18 @@ RunService.RenderStepped:Connect(function()
             end
         end
     end
-end)
+end))
 
-LocalPlayer.CharacterAdded:Connect(function(char)
+trackConnection(LocalPlayer.CharacterAdded:Connect(function(char)
     lastSkinTool = nil
     task.wait(0.2)
-    if cfg.SkinChangerEnabled and cfg.AutoApplySkin and cfg.SelectedSkinKey then
+    if cfg.SkinChangerEnabled and cfg.AutoApplySkin then
         applySelectedSkin()
     end
     if cfg.CardChangerEnabled and cfg.AutoApplyCard and cfg.SelectedCardKey then
         applySelectedCard()
     end
-end)
+end))
 
 task.delay(2, function()
     refreshSkinList()
