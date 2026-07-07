@@ -10,8 +10,6 @@ local RunService = cloneref(game:GetService("RunService"))
 local Workspace = cloneref(game:GetService("Workspace"))
 local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
 local UserInputService = cloneref(game:GetService("UserInputService"))
-local ContextActionService = cloneref(game:GetService("ContextActionService"))
-local VirtualInputManager = cloneref(game:GetService("VirtualInputManager"))
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -1279,11 +1277,6 @@ getgenv().EvolutionDuelistHooks = {
 -- Auto Fire
 local lastSemiTrigger = 0
 local autoFireHeld = false
-local manualShootHeld = false
-local manualVIMHeld = false
-local sendingVIM = false
-local shootBoundCache = nil
-local shootBoundCacheTime = 0
 
 local function getEquippedGun()
     local char = LocalPlayer.Character
@@ -1311,132 +1304,81 @@ local function setShootBind(down)
     pcall(function() GameG:FireBind("Shoot", down, false) end)
 end
 
--- Detect whether the game's native Shoot bind is active (disabled in lobby/safe-zones).
-local function isShootBound()
-    local info
-    pcall(function()
-        info = ContextActionService:GetBoundActionInfo("Shoot")
-    end)
-    if type(info) ~= "table" then return false end
-    local inputTypes = info.inputTypes
-    return inputTypes and #inputTypes > 0
-end
-
-local function isShootBoundCached()
-    if tick() - shootBoundCacheTime < 0.5 then return shootBoundCache end
-    shootBoundCacheTime = tick()
-    shootBoundCache = isShootBound()
-    return shootBoundCache
-end
-
--- VirtualInputManager click fallback for when the native Shoot bind is not active.
-local function sendVIMMouse(down)
-    if sendingVIM then return end
-    sendingVIM = true
-    pcall(function()
-        local vs = Camera.ViewportSize
-        local x = math.floor(vs.X / 2)
-        local y = math.floor(vs.Y / 2)
-        VirtualInputManager:SendMouseButtonEvent(x, y, 0, down, game, 0)
-    end)
-    sendingVIM = false
-end
-
--- Track manual mouse/touch input so we can fire in lobby with Shoot In Lobby enabled.
-trackConnection(UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if gameProcessed or sendingVIM then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        manualShootHeld = true
-    end
-end))
-
-trackConnection(UserInputService.InputEnded:Connect(function(input, gameProcessed)
-    if sendingVIM then return end
-    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
-        manualShootHeld = false
-        if manualVIMHeld then
-            sendVIMMouse(false)
-            manualVIMHeld = false
-        end
-    end
-end))
-
 trackConnection(RunService.RenderStepped:Connect(function()
-    local bound = isShootBoundCached()
-    local gun = getEquippedGun()
-
-    -- Manual fire in lobby when the native Shoot bind is unbound.
-    if cfg.ShootInLobby and not bound and manualShootHeld then
-        if isAutomaticGun(gun) then
-            if not manualVIMHeld then
-                sendVIMMouse(true)
-                manualVIMHeld = true
-            end
-        else
-            local cooldown = cfg.RapidFire and 0.01 or 0.15
-            if tick() - lastSemiTrigger >= cooldown then
-                sendVIMMouse(true)
-                lastSemiTrigger = tick()
-                task.delay(cfg.RapidFire and 0.01 or 0.05, function()
-                    sendVIMMouse(false)
-                end)
-            end
-        end
-    elseif manualVIMHeld then
-        sendVIMMouse(false)
-        manualVIMHeld = false
-    end
-
     local shouldFire = cfg.SilentAimEnabled and cfg.AutoFire
     local target = shouldFire and getTarget() or nil
 
     if not target then
         if autoFireHeld then
-            if bound then
-                setShootBind(false)
-            else
-                sendVIMMouse(false)
-            end
+            setShootBind(false)
             autoFireHeld = false
         end
         return
     end
 
+    local gun = getEquippedGun()
     if isAutomaticGun(gun) then
-        -- Hold the bind/click so automatic weapons spray.
+        -- Hold the bind so automatic weapons spray.
         if not autoFireHeld then
-            if bound then
-                setShootBind(true)
-            elseif cfg.ShootInLobby then
-                sendVIMMouse(true)
-            else
-                return
-            end
+            setShootBind(true)
             autoFireHeld = true
         end
     else
         -- Tap for semi-auto (pistol).
         local cooldown = cfg.RapidFire and 0.01 or 0.15
         if tick() - lastSemiTrigger >= cooldown then
-            if bound then
-                setShootBind(true)
-            elseif cfg.ShootInLobby then
-                sendVIMMouse(true)
-            else
-                return
-            end
+            setShootBind(true)
             autoFireHeld = true
             lastSemiTrigger = tick()
             task.delay(cfg.RapidFire and 0.01 or 0.05, function()
-                if bound then
-                    setShootBind(false)
-                else
-                    sendVIMMouse(false)
-                end
+                setShootBind(false)
                 autoFireHeld = false
             end)
         end
     end
+end))
+
+-- Shoot In Lobby (manual fire only)
+-- The client blocks firing anywhere except duels unless LocalPlayer has CanShoot=true.
+-- We spoof that attribute only while the user is manually pressing fire, so auto-fire
+-- still obeys the normal lobby restriction.
+local lobbyCanShootSet = false
+local function setLobbyCanShoot(enabled)
+    if enabled then
+        if not LocalPlayer:GetAttribute("CanShoot") then
+            LocalPlayer:SetAttribute("CanShoot", true)
+            lobbyCanShootSet = true
+        end
+    elseif lobbyCanShootSet then
+        LocalPlayer:SetAttribute("CanShoot", nil)
+        lobbyCanShootSet = false
+    end
+end
+
+local function inLobby()
+    return LocalPlayer:GetAttribute("InDuels") ~= true
+end
+
+trackConnection(UserInputService.InputBegan:Connect(function(input, gameProcessed)
+    if gameProcessed then return end
+    if not cfg.ShootInLobby then return end
+    if not inLobby() then return end
+    if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+
+    setLobbyCanShoot(true)
+    if GameG and typeof(GameG.FireBind) == "function" then
+        GameG:FireBind("Shoot", true, false)
+    end
+end))
+
+trackConnection(UserInputService.InputEnded:Connect(function(input, gameProcessed)
+    if input.UserInputType ~= Enum.UserInputType.MouseButton1 and input.UserInputType ~= Enum.UserInputType.Touch then return end
+    if not lobbyCanShootSet then return end
+
+    if GameG and typeof(GameG.FireBind) == "function" then
+        GameG:FireBind("Shoot", false, false)
+    end
+    setLobbyCanShoot(false)
 end))
 
 -- Gun Mods attribute spoofing (Rapid Fire + No Recoil)
