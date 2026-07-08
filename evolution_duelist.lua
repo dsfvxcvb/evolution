@@ -66,6 +66,7 @@ getgenv().EvolutionDuelistCleanup = function()
         duelistTargetTracerOutline = nil
     end
     pcall(function() RunService:UnbindFromRenderStep("EvolutionAimAssist") end)
+    pcall(function() RunService:UnbindFromRenderStep("EvolutionSilentAimCamera") end)
     pcall(cleanupWeather)
     local rfOrigs = getgenv().EvolutionDuelistRapidFireOriginals
     if rfOrigs then
@@ -1649,6 +1650,20 @@ if previousHooks then
             end
         end)
     end
+    if previousHooks.castBulletFunc and previousHooks.castBulletOriginal then
+        pcall(function()
+            if typeof(hookfunction) == "function" then
+                hookfunction(previousHooks.castBulletFunc, previousHooks.castBulletOriginal)
+            end
+        end)
+    end
+    if previousHooks.tryFireFunc and previousHooks.tryFireOriginal then
+        pcall(function()
+            if typeof(hookfunction) == "function" then
+                hookfunction(previousHooks.tryFireFunc, previousHooks.tryFireOriginal)
+            end
+        end)
+    end
     getgenv().EvolutionDuelistHooks = nil
 end
 
@@ -2037,15 +2052,26 @@ local function hookedFireServer(self, cmd, ...)
         localTracerActiveUntil = tick() + 0.25
     end
 
+    if cmd == "Process" or cmd == "DamageRequest" then
+        print("[Evolution SA] FireServer cmd:", cmd, "| SilentAim:", cfg.SilentAimEnabled)
+    end
+
     if not cfg.SilentAimEnabled then
         return oldFireServer(self, cmd, ...)
     end
 
     if cmd == "Process" then
         local target = getTarget()
+        print("[Evolution SA] Process target:", target and (target:FindFirstAncestorOfClass("Model") and target:FindFirstAncestorOfClass("Model").Name or target.Name) or "nil")
         if target then
             shotActiveUntil = tick() + 0.25
         end
+    end
+
+    if cmd == "DamageRequest" then
+        local hum, _, _, hitPart, pos = ...
+        local model = hum and hum:FindFirstAncestorOfClass("Model")
+        print("[Evolution SA] DamageRequest:", model and model.Name or tostring(hum), "| part:", hitPart and hitPart.Name or "nil", "| pos:", pos)
     end
 
     return oldFireServer(self, cmd, ...)
@@ -2060,13 +2086,185 @@ if WeaponsRemote then
     end
 end
 
--- Remember hooks so a reload can restore them instead of stacking hooks.
-getgenv().EvolutionDuelistHooks = {
-    mt = mt,
-    oldNamecall = oldNamecall,
-    weaponsRemote = WeaponsRemote,
-    oldFireServer = oldFireServer,
-}
+do
+    local castBulletOriginal = nil
+    local castBulletFunc = nil
+    local tryFireOriginal = nil
+    local tryFireFunc = nil
+    local hookedFuncs = getgenv().EvolutionSilentAimCastHookedFuncs
+    if not hookedFuncs then
+        hookedFuncs = setmetatable({}, { __mode = "k" })
+        getgenv().EvolutionSilentAimCastHookedFuncs = hookedFuncs
+    end
+
+    local function hookSilentAimFunction(name, wrapperMaker)
+        local foundAny = false
+        for _, obj in ipairs(getgc()) do
+            if typeof(obj) == "function" then
+                local info = debug.getinfo(obj)
+                if info and info.name == name and not hookedFuncs[obj] then
+                    local orig
+                    local function callOrig(...)
+                        return orig(...)
+                    end
+                    local wrapper = wrapperMaker(callOrig)
+                    local ok, gotOrig = pcall(function()
+                        return hookfunction(obj, wrapper)
+                    end)
+                    if ok and typeof(gotOrig) == "function" then
+                        foundAny = true
+                        orig = gotOrig
+                        hookedFuncs[obj] = true
+                        hookedFuncs[orig] = true
+                        if name == "castBullet" then
+                            castBulletOriginal = orig
+                            castBulletFunc = obj
+                        elseif name == "tryFire" then
+                            tryFireOriginal = orig
+                            tryFireFunc = obj
+                        end
+                    end
+                end
+            end
+        end
+        if foundAny then
+            getgenv().EvolutionSilentAimCastHooked = true
+            local hooks = getgenv().EvolutionDuelistHooks
+            if hooks then
+                hooks.castBulletFunc = castBulletFunc
+                hooks.castBulletOriginal = castBulletOriginal
+                hooks.tryFireFunc = tryFireFunc
+                hooks.tryFireOriginal = tryFireOriginal
+            end
+        end
+    end
+
+    local silentAimOldCF = nil
+    local silentAimActive = false
+    local silentAimTarget = nil
+    local lastSilentAimShot = 0
+    local silentAimCameraPriority = Enum.RenderPriority.Last.Value
+
+    local function silentAimCameraOverride()
+        if not cfg.SilentAimEnabled or not silentAimTarget or not silentAimTarget.Parent then return end
+        local firing = silentAimActive or autoFireHeld
+        if not firing then
+            pcall(function()
+                firing = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+            end)
+        end
+        if firing then
+            Camera.CFrame = CFrame.new(Camera.CFrame.Position, silentAimTarget.Position)
+        end
+    end
+
+    pcall(function() RunService:UnbindFromRenderStep("EvolutionSilentAimCamera") end)
+    RunService:BindToRenderStep("EvolutionSilentAimCamera", silentAimCameraPriority, silentAimCameraOverride)
+
+    trackConnection(RunService.Heartbeat:Connect(function()
+        if not silentAimActive then return end
+        local firing = autoFireHeld
+        if not firing then
+            pcall(function()
+                firing = UserInputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+            end)
+        end
+        if not firing and tick() - lastSilentAimShot > 0.15 then
+            silentAimActive = false
+            silentAimTarget = nil
+            if silentAimOldCF then
+                Camera.CFrame = silentAimOldCF
+                silentAimOldCF = nil
+            end
+        end
+    end))
+
+    local function hookSilentAimCastBullet()
+        hookSilentAimFunction("castBullet", function(callOrig)
+            return function(p1, p2)
+                if not cfg.SilentAimEnabled or computingTarget then
+                    return callOrig(p1, p2)
+                end
+                local target = getTarget()
+                if target and target.Parent then
+                    local model = target:FindFirstAncestorOfClass("Model")
+                    print("[Evolution SA] castBullet redirect ->", model and model.Name or target.Name)
+                    local pos = target.Position
+                    local normal = (Camera.CFrame.Position - pos).Unit
+                    return {
+                        Instance = target,
+                        Position = pos,
+                        Normal = normal,
+                        Material = Enum.Material.Plastic,
+                        Distance = (p2 - pos).Magnitude,
+                    }
+                end
+                return callOrig(p1, p2)
+            end
+        end)
+    end
+
+    local function hookSilentAimTryFire()
+        hookSilentAimFunction("tryFire", function(callOrig)
+            return function(...)
+                if not cfg.SilentAimEnabled or computingTarget then
+                    if silentAimActive then
+                        silentAimActive = false
+                        silentAimTarget = nil
+                        if silentAimOldCF then
+                            Camera.CFrame = silentAimOldCF
+                            silentAimOldCF = nil
+                        end
+                    end
+                    return callOrig(...)
+                end
+                local target = getTarget()
+                if target and target.Parent then
+                    if not silentAimActive then
+                        silentAimOldCF = Camera.CFrame
+                        silentAimActive = true
+                    end
+                    silentAimTarget = target
+                    lastSilentAimShot = tick()
+                end
+                if silentAimActive and silentAimTarget and silentAimTarget.Parent then
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, silentAimTarget.Position)
+                end
+                return callOrig(...)
+            end
+        end)
+    end
+
+    local function hookSilentAimAll()
+        hookSilentAimCastBullet()
+        hookSilentAimTryFire()
+    end
+
+    task.defer(function()
+        for i = 1, 30 do
+            hookSilentAimAll()
+            if getgenv().EvolutionSilentAimCastHooked then break end
+            task.wait(0.5)
+        end
+    end)
+
+    trackConnection(LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(1.5)
+        hookSilentAimAll()
+    end))
+
+    -- Remember hooks so a reload can restore them instead of stacking hooks.
+    getgenv().EvolutionDuelistHooks = {
+        mt = mt,
+        oldNamecall = oldNamecall,
+        weaponsRemote = WeaponsRemote,
+        oldFireServer = oldFireServer,
+        castBulletFunc = castBulletFunc,
+        castBulletOriginal = castBulletOriginal,
+        tryFireFunc = tryFireFunc,
+        tryFireOriginal = tryFireOriginal,
+    }
+end
 
 -- Auto Fire
 local lastSemiTrigger = 0
@@ -2094,8 +2292,18 @@ local function isAutomaticGun(tool)
 end
 
 local function setShootBind(down)
-    if not (GameG and typeof(GameG.FireBind) == "function") then return end
-    pcall(function() GameG:FireBind("Shoot", down, false) end)
+    local sent = false
+    if UserInputService.MouseEnabled and VirtualInputManager then
+        local x = math.floor(Camera.ViewportSize.X / 2)
+        local y = math.floor(Camera.ViewportSize.Y / 2)
+        pcall(function()
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, down, game, 0)
+            sent = true
+        end)
+    end
+    if not sent and GameG and typeof(GameG.FireBind) == "function" then
+        pcall(function() GameG:FireBind("Shoot", down, false) end)
+    end
 end
 
 trackConnection(RunService.RenderStepped:Connect(function()
