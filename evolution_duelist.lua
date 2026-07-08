@@ -8,8 +8,12 @@
 local Players = cloneref(game:GetService("Players"))
 local RunService = cloneref(game:GetService("RunService"))
 local Workspace = cloneref(game:GetService("Workspace"))
+local Lighting = cloneref(game:GetService("Lighting"))
 local ReplicatedStorage = cloneref(game:GetService("ReplicatedStorage"))
 local UserInputService = cloneref(game:GetService("UserInputService"))
+local VirtualInputManager = cloneref(game:GetService("VirtualInputManager"))
+local Debris = cloneref(game:GetService("Debris"))
+local TweenService = cloneref(game:GetService("TweenService"))
 
 local LocalPlayer = Players.LocalPlayer
 local Camera = Workspace.CurrentCamera
@@ -24,6 +28,7 @@ for _, sg in ipairs(game:GetService("CoreGui"):GetChildren()) do
         pcall(function() sg:Destroy() end)
     end
 end
+
 local EvolutionConnections = {}
 local EvolutionTasks = {}
 local duelistTargetScreen, duelistTargetMain, duelistTargetElements, duelistTargetHighlight, duelistTargetTracer, duelistTargetTracerOutline, lastDuelistTargetPlayer, currentTargetUIStyle
@@ -61,6 +66,7 @@ getgenv().EvolutionDuelistCleanup = function()
         duelistTargetTracerOutline = nil
     end
     pcall(function() RunService:UnbindFromRenderStep("EvolutionAimAssist") end)
+    pcall(cleanupWeather)
     local rfOrigs = getgenv().EvolutionDuelistRapidFireOriginals
     if rfOrigs then
         for tool, orig in pairs(rfOrigs) do
@@ -104,6 +110,36 @@ getgenv().EvolutionDuelist = {
     AimAssistSmoothing = 0.1,
     AimAssistPrediction = 0.1,
     AimAssistHitPart = 'Head',
+    AimAssistKey = Enum.KeyCode.Q,
+    AimAssistUseFOV = true,
+    AimAssistPauseOnTool = true,
+
+    SkyboxChangerEnabled = false,
+    SelectedSkybox = "Galaxy",
+
+    LightingChangerEnabled = false,
+    LightingTimeOfDay = Lighting.ClockTime,
+    LightingBrightness = Lighting.Brightness,
+    LightingAmbient = Lighting.Ambient,
+    LightingOutdoorAmbient = Lighting.OutdoorAmbient,
+    LightingColorCorrectionEnabled = false,
+    LightingColorCorrectionTint = Color3.fromRGB(255, 255, 255),
+    LightingColorCorrectionSaturation = 0,
+    LightingColorCorrectionContrast = 0,
+    LightingAtmosphereDensity = 0.32,
+    LightingAtmosphereHaze = 2.03,
+    LightingAtmosphereColor = Color3.fromRGB(198, 198, 198),
+
+    WeatherEnabled = false,
+    WeatherType = "rain",
+    WeatherColor = Color3.fromRGB(255, 255, 255),
+    WeatherRate = 100,
+
+    TriggerbotEnabled = false,
+    TriggerbotDelay = 0.05,
+    TriggerbotCooldown = 0.2,
+    TriggerbotTeamCheck = true,
+    TriggerbotTargetOrb = false,
 
     ShowFOV = true,
     FOVRadius = 150,
@@ -119,14 +155,37 @@ getgenv().EvolutionDuelist = {
     FOVGradientSpeed = 120,
 
     EspEnabled = false,
-    EspBoxes = true,
-    EspNames = true,
-    EspHealth = true,
-    EspDistance = true,
+    EspTeamCheck = true,
     EspMaxDistance = 2000,
+    EspTextSize = 13,
+
+    EspBoxStyle = "Box",
     EspBoxColor = Color3.fromRGB(255, 255, 255),
-    EspNameColor = Color3.fromRGB(255, 255, 255),
+    EspBoxOutline = true,
+    EspBoxOutlineColor = Color3.fromRGB(0, 0, 0),
+    EspBoxFilled = false,
+    EspBoxFillTransparency = 0.5,
+    EspBoxThickness = 1,
+
+    EspSkeleton = false,
+    EspSkeletonColor = Color3.fromRGB(255, 255, 255),
+    EspSkeletonThickness = 1,
+
+    EspHealthBar = true,
+    EspHealthText = true,
     EspHealthColor = Color3.fromRGB(0, 255, 0),
+
+    EspHeadDot = false,
+    EspHeadDotColor = Color3.fromRGB(255, 255, 255),
+    EspHeadDotSize = 4,
+
+    EspSnaplines = false,
+    EspSnaplineColor = Color3.fromRGB(255, 255, 255),
+    EspSnaplineThickness = 1,
+
+    EspNames = true,
+    EspNameColor = Color3.fromRGB(255, 255, 255),
+    EspDistance = true,
     EspDistanceColor = Color3.fromRGB(255, 255, 255),
 
     SkinChangerEnabled = false,
@@ -137,7 +196,22 @@ getgenv().EvolutionDuelist = {
     AutoApplyCard = true,
     SelectedCardKey = nil,
 
-    TargetUIEnabled = false,
+    BackpackChangerEnabled = false,
+    SelectedBackpack = "Black",
+
+    KillFXChangerEnabled = false,
+    SelectedKillFX = "None",
+
+    LocalBulletTracerEnabled = false,
+    LocalBulletTracerColor = Color3.fromRGB(255, 0, 0),
+    LocalBulletTracerLifetime = 1,
+    LocalBulletTracerFadeOut = false,
+
+    OtherBulletTracerEnabled = false,
+    OtherBulletTracerColor = Color3.fromRGB(255, 0, 0),
+    OtherBulletTracerLifetime = 1,
+    OtherBulletTracerFadeOut = false,
+
     TargetUIColor = Color3.fromRGB(0, 170, 255),
     TargetUIGlowColor = Color3.fromRGB(0, 170, 255),
     TargetUIUseGlow = true,
@@ -153,6 +227,15 @@ getgenv().EvolutionDuelist = {
     TargetTracerOutlineThickness = 4,
 }
 local cfg = getgenv().EvolutionDuelist
+
+-- Bullet tracer source tracking
+local localTracerActiveUntil = 0
+
+-- Aim assist lock state
+local aimAssistLockedModel = nil
+local aimAssistLockedPart = nil
+local aimAssistCurrentCF = nil
+local aimAssistLockOnce = false
 
 -- ============================================================
 -- ARCANE UI
@@ -174,14 +257,15 @@ local Settings = Window:Page({ Name = "Settings", Icon = "settings" })
 
 -- Subpages
 local Combat = Main:SubPage({ Name = "Combat", Icon = "swords" })
-local Visuals = Main:SubPage({ Name = "Visuals", Icon = "eye" })
-local Player = Main:SubPage({ Name = "Player", Icon = "user" })
+local Visuals = Main:SubPage({ Name = "Combat Visuals", Icon = "eye" })
+local Cosmetic = Main:SubPage({ Name = "Cosmetic", Icon = "shirt" })
 local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
 
 -- Sections
 local CombatLeft = Combat:Section({ Name = "Aimbot", Side = 1 })
 local CombatChecks = Combat:Section({ Name = "Checks", Side = 1 })
 local CombatAimAssist = Combat:Section({ Name = "Aim Assist", Side = 2 })
+local CombatTriggerbot = Combat:Section({ Name = "Triggerbot", Side = 2 })
 local CombatGunMods = Combat:Section({ Name = "Gun Mods", Side = 2 })
 
 local VisualsLeft = Visuals:Section({ Name = "FOV Circle", Side = 1 })
@@ -190,10 +274,179 @@ local VisualsHighlight = Visuals:Section({ Name = "Highlight", Side = 2 })
 local VisualsTracer = Visuals:Section({ Name = "Tracer", Side = 2 })
 
 local World = Main:SubPage({ Name = "World", Icon = "globe" })
+local WorldLighting = World:Section({ Name = "Lighting", Side = 1 })
+local WorldLeft = World:Section({ Name = "Skyboxes", Side = 1 })
 local WorldRight = World:Section({ Name = "ESP", Side = 2 })
 
-local PlayerLeft = Player:Section({ Name = "Gun Skins", Side = 1 })
-local PlayerRight = Player:Section({ Name = "Player Card", Side = 2 })
+-- Build skybox list from the game's assets.
+local SkyboxFolder = ReplicatedStorage:FindFirstChild("Assets") and ReplicatedStorage.Assets:FindFirstChild("Skies")
+local SkyboxOptions = {}
+if SkyboxFolder then
+    for _, sky in ipairs(SkyboxFolder:GetChildren()) do
+        if sky:IsA("Sky") then
+            table.insert(SkyboxOptions, sky.Name)
+        end
+    end
+end
+table.sort(SkyboxOptions)
+
+WorldLighting:Toggle({
+    Name = "Lighting Changer",
+    Default = cfg.LightingChangerEnabled,
+    Flag = "Duelist_LightingChangerEnabled",
+    Callback = function(State) cfg.LightingChangerEnabled = State end
+})
+
+WorldLighting:Slider({
+    Name = "Time of Day",
+    Min = 0,
+    Max = 24,
+    Default = cfg.LightingTimeOfDay,
+    Decimals = 0.01,
+    Flag = "Duelist_LightingTimeOfDay",
+    Callback = function(Value) cfg.LightingTimeOfDay = Value end
+})
+
+WorldLighting:Slider({
+    Name = "Brightness",
+    Min = 0,
+    Max = 10,
+    Default = cfg.LightingBrightness,
+    Decimals = 0.01,
+    Flag = "Duelist_LightingBrightness",
+    Callback = function(Value) cfg.LightingBrightness = Value end
+})
+
+WorldLighting:Colorpicker({
+    Name = "Ambient",
+    Default = cfg.LightingAmbient,
+    Flag = "Duelist_LightingAmbient",
+    Callback = function(Value) cfg.LightingAmbient = Value end
+})
+
+WorldLighting:Colorpicker({
+    Name = "Outdoor Ambient",
+    Default = cfg.LightingOutdoorAmbient,
+    Flag = "Duelist_LightingOutdoorAmbient",
+    Callback = function(Value) cfg.LightingOutdoorAmbient = Value end
+})
+
+WorldLighting:Toggle({
+    Name = "Color Correction",
+    Default = cfg.LightingColorCorrectionEnabled,
+    Flag = "Duelist_LightingColorCorrectionEnabled",
+    Callback = function(State) cfg.LightingColorCorrectionEnabled = State end
+})
+
+WorldLighting:Colorpicker({
+    Name = "CC Tint",
+    Default = cfg.LightingColorCorrectionTint,
+    Flag = "Duelist_LightingColorCorrectionTint",
+    Callback = function(Value) cfg.LightingColorCorrectionTint = Value end
+})
+
+WorldLighting:Slider({
+    Name = "CC Saturation",
+    Min = -1,
+    Max = 1,
+    Default = cfg.LightingColorCorrectionSaturation,
+    Decimals = 0.01,
+    Flag = "Duelist_LightingColorCorrectionSaturation",
+    Callback = function(Value) cfg.LightingColorCorrectionSaturation = Value end
+})
+
+WorldLighting:Slider({
+    Name = "CC Contrast",
+    Min = -1,
+    Max = 1,
+    Default = cfg.LightingColorCorrectionContrast,
+    Decimals = 0.01,
+    Flag = "Duelist_LightingColorCorrectionContrast",
+    Callback = function(Value) cfg.LightingColorCorrectionContrast = Value end
+})
+
+WorldLighting:Slider({
+    Name = "Atmosphere Density",
+    Min = 0,
+    Max = 1,
+    Default = cfg.LightingAtmosphereDensity,
+    Decimals = 0.01,
+    Flag = "Duelist_LightingAtmosphereDensity",
+    Callback = function(Value) cfg.LightingAtmosphereDensity = Value end
+})
+
+WorldLighting:Slider({
+    Name = "Atmosphere Haze",
+    Min = 0,
+    Max = 10,
+    Default = cfg.LightingAtmosphereHaze,
+    Decimals = 0.01,
+    Flag = "Duelist_LightingAtmosphereHaze",
+    Callback = function(Value) cfg.LightingAtmosphereHaze = Value end
+})
+
+WorldLighting:Colorpicker({
+    Name = "Atmosphere Color",
+    Default = cfg.LightingAtmosphereColor,
+    Flag = "Duelist_LightingAtmosphereColor",
+    Callback = function(Value) cfg.LightingAtmosphereColor = Value end
+})
+
+WorldLeft:Toggle({
+    Name = "Skybox Changer",
+    Default = cfg.SkyboxChangerEnabled,
+    Flag = "Duelist_SkyboxChangerEnabled",
+    Callback = function(State) cfg.SkyboxChangerEnabled = State end
+})
+
+WorldLeft:Dropdown({
+    Name = "Skybox",
+    Items = SkyboxOptions,
+    Default = cfg.SelectedSkybox,
+    Flag = "Duelist_SelectedSkybox",
+    Callback = function(Value) cfg.SelectedSkybox = Value end
+})
+
+local WorldWeather = World:Section({ Name = "Weather", Side = 1 })
+
+WorldWeather:Toggle({
+    Name = "Weather",
+    Default = cfg.WeatherEnabled,
+    Flag = "Duelist_WeatherEnabled",
+    Callback = function(State) cfg.WeatherEnabled = State end
+})
+
+WorldWeather:Colorpicker({
+    Name = "Weather Color",
+    Default = cfg.WeatherColor,
+    Flag = "Duelist_WeatherColor",
+    Callback = function(Value) cfg.WeatherColor = Value end
+})
+
+WorldWeather:Dropdown({
+    Name = "Weather Type",
+    Items = {"light rain", "rain", "snow"},
+    Default = cfg.WeatherType,
+    Flag = "Duelist_WeatherType",
+    Callback = function(Value) cfg.WeatherType = Value end
+})
+
+WorldWeather:Slider({
+    Name = "Weather Rate",
+    Min = 1,
+    Max = 100,
+    Default = cfg.WeatherRate,
+    Decimals = 1,
+    Flag = "Duelist_WeatherRate",
+    Callback = function(Value) cfg.WeatherRate = math.floor(Value + 0.5) end
+})
+
+local PlayerLeft = Cosmetic:Section({ Name = "Gun Skins", Side = 1 })
+local PlayerLocalTracers = Cosmetic:Section({ Name = "Local Bullet Tracers", Side = 1 })
+local PlayerOtherTracers = Cosmetic:Section({ Name = "Other Bullet Tracers", Side = 1 })
+local PlayerRight = Cosmetic:Section({ Name = "Player Card", Side = 2 })
+local PlayerKillFX = Cosmetic:Section({ Name = "KillFX Changer", Side = 2 })
+local PlayerBackpack = Cosmetic:Section({ Name = "Backpack Changer", Side = 2 })
 
 -- Silent Aim
 CombatLeft:Toggle({
@@ -277,9 +530,14 @@ local AimAssistToggle = CombatAimAssist:Toggle({
 pcall(function()
     AimAssistToggle:Keybind({
         Name = "Aim Assist Key",
-        Default = Enum.KeyCode.Q,
+        Default = cfg.AimAssistKey or Enum.KeyCode.Q,
         Mode = "Toggle",
-        Flag = "Duelist_AimAssistKey"
+        Flag = "Duelist_AimAssistKey",
+        Callback = function(Value)
+            if typeof(Value) == "EnumItem" then
+                cfg.AimAssistKey = Value
+            end
+        end
     })
 end)
 
@@ -309,6 +567,64 @@ CombatAimAssist:Dropdown({
     Default = cfg.AimAssistHitPart,
     Flag = "Duelist_AimAssistHitPart",
     Callback = function(Value) cfg.AimAssistHitPart = Value end
+})
+
+CombatAimAssist:Toggle({
+    Name = "Use FOV",
+    Default = cfg.AimAssistUseFOV,
+    Flag = "Duelist_AimAssistUseFOV",
+    Callback = function(State) cfg.AimAssistUseFOV = State end
+})
+
+CombatAimAssist:Toggle({
+    Name = "Pause on Gun",
+    Default = cfg.AimAssistPauseOnTool,
+    Flag = "Duelist_AimAssistPauseOnTool",
+    Callback = function(State) cfg.AimAssistPauseOnTool = State end
+})
+
+-- Triggerbot
+CombatTriggerbot:Toggle({
+    Name = "Triggerbot",
+    Default = cfg.TriggerbotEnabled,
+    Flag = "Duelist_TriggerbotEnabled",
+    Callback = function(State) cfg.TriggerbotEnabled = State end
+})
+
+CombatTriggerbot:Toggle({
+    Name = "Team Check",
+    Default = cfg.TriggerbotTeamCheck,
+    Flag = "Duelist_TriggerbotTeamCheck",
+    Callback = function(State) cfg.TriggerbotTeamCheck = State end
+})
+
+CombatTriggerbot:Toggle({
+    Name = "Target Orb",
+    Default = cfg.TriggerbotTargetOrb,
+    Flag = "Duelist_TriggerbotTargetOrb",
+    Callback = function(State) cfg.TriggerbotTargetOrb = State end
+})
+
+CombatTriggerbot:Slider({
+    Name = "Delay",
+    Min = 0,
+    Max = 0.5,
+    Default = cfg.TriggerbotDelay,
+    Decimals = 0.01,
+    Suffix = "s",
+    Flag = "Duelist_TriggerbotDelay",
+    Callback = function(Value) cfg.TriggerbotDelay = Value end
+})
+
+CombatTriggerbot:Slider({
+    Name = "Cooldown",
+    Min = 0,
+    Max = 1,
+    Default = cfg.TriggerbotCooldown,
+    Decimals = 0.01,
+    Suffix = "s",
+    Flag = "Duelist_TriggerbotCooldown",
+    Callback = function(Value) cfg.TriggerbotCooldown = Value end
 })
 
 -- Gun Mods
@@ -600,10 +916,36 @@ WorldRight:Toggle({
 })
 
 WorldRight:Toggle({
-    Name = "Boxes",
-    Default = cfg.EspBoxes,
-    Flag = "Duelist_EspBoxes",
-    Callback = function(State) cfg.EspBoxes = State end
+    Name = "ESP Team Check",
+    Default = cfg.EspTeamCheck,
+    Flag = "Duelist_EspTeamCheck",
+    Callback = function(State) cfg.EspTeamCheck = State end
+})
+
+WorldRight:Slider({
+    Name = "Max Distance",
+    Min = 100,
+    Max = 10000,
+    Default = cfg.EspMaxDistance,
+    Flag = "Duelist_EspMaxDistance",
+    Callback = function(Value) cfg.EspMaxDistance = Value end
+})
+
+WorldRight:Slider({
+    Name = "Text Size",
+    Min = 8,
+    Max = 24,
+    Default = cfg.EspTextSize,
+    Flag = "Duelist_EspTextSize",
+    Callback = function(Value) cfg.EspTextSize = Value end
+})
+
+WorldRight:Dropdown({
+    Name = "Box Style",
+    Items = {"Off", "Box", "Corner"},
+    Default = cfg.EspBoxStyle,
+    Flag = "Duelist_EspBoxStyle",
+    Callback = function(Value) cfg.EspBoxStyle = Value end
 })
 
 WorldRight:Colorpicker({
@@ -611,6 +953,126 @@ WorldRight:Colorpicker({
     Default = cfg.EspBoxColor,
     Flag = "Duelist_EspBoxColor",
     Callback = function(Value) cfg.EspBoxColor = Value end
+})
+
+WorldRight:Toggle({
+    Name = "Box Outline",
+    Default = cfg.EspBoxOutline,
+    Flag = "Duelist_EspBoxOutline",
+    Callback = function(State) cfg.EspBoxOutline = State end
+})
+
+WorldRight:Colorpicker({
+    Name = "Box Outline Color",
+    Default = cfg.EspBoxOutlineColor,
+    Flag = "Duelist_EspBoxOutlineColor",
+    Callback = function(Value) cfg.EspBoxOutlineColor = Value end
+})
+
+WorldRight:Toggle({
+    Name = "Box Filled",
+    Default = cfg.EspBoxFilled,
+    Flag = "Duelist_EspBoxFilled",
+    Callback = function(State) cfg.EspBoxFilled = State end
+})
+
+WorldRight:Slider({
+    Name = "Box Thickness",
+    Min = 1,
+    Max = 5,
+    Default = cfg.EspBoxThickness,
+    Flag = "Duelist_EspBoxThickness",
+    Callback = function(Value) cfg.EspBoxThickness = Value end
+})
+
+WorldRight:Toggle({
+    Name = "Skeleton",
+    Default = cfg.EspSkeleton,
+    Flag = "Duelist_EspSkeleton",
+    Callback = function(State) cfg.EspSkeleton = State end
+})
+
+WorldRight:Colorpicker({
+    Name = "Skeleton Color",
+    Default = cfg.EspSkeletonColor,
+    Flag = "Duelist_EspSkeletonColor",
+    Callback = function(Value) cfg.EspSkeletonColor = Value end
+})
+
+WorldRight:Slider({
+    Name = "Skeleton Thickness",
+    Min = 1,
+    Max = 5,
+    Default = cfg.EspSkeletonThickness,
+    Flag = "Duelist_EspSkeletonThickness",
+    Callback = function(Value) cfg.EspSkeletonThickness = Value end
+})
+
+WorldRight:Toggle({
+    Name = "Health Bar",
+    Default = cfg.EspHealthBar,
+    Flag = "Duelist_EspHealthBar",
+    Callback = function(State) cfg.EspHealthBar = State end
+})
+
+WorldRight:Toggle({
+    Name = "Health Text",
+    Default = cfg.EspHealthText,
+    Flag = "Duelist_EspHealthText",
+    Callback = function(State) cfg.EspHealthText = State end
+})
+
+WorldRight:Colorpicker({
+    Name = "Health Color",
+    Default = cfg.EspHealthColor,
+    Flag = "Duelist_EspHealthColor",
+    Callback = function(Value) cfg.EspHealthColor = Value end
+})
+
+WorldRight:Toggle({
+    Name = "Head Dot",
+    Default = cfg.EspHeadDot,
+    Flag = "Duelist_EspHeadDot",
+    Callback = function(State) cfg.EspHeadDot = State end
+})
+
+WorldRight:Colorpicker({
+    Name = "Head Dot Color",
+    Default = cfg.EspHeadDotColor,
+    Flag = "Duelist_EspHeadDotColor",
+    Callback = function(Value) cfg.EspHeadDotColor = Value end
+})
+
+WorldRight:Slider({
+    Name = "Head Dot Size",
+    Min = 1,
+    Max = 15,
+    Default = cfg.EspHeadDotSize,
+    Flag = "Duelist_EspHeadDotSize",
+    Callback = function(Value) cfg.EspHeadDotSize = Value end
+})
+
+WorldRight:Toggle({
+    Name = "Snaplines",
+    Default = cfg.EspSnaplines,
+    Flag = "Duelist_EspSnaplines",
+    Callback = function(State) cfg.EspSnaplines = State end
+})
+
+WorldRight:Colorpicker({
+    Name = "Snapline Color",
+    Default = cfg.EspSnaplineColor,
+    Flag = "Duelist_EspSnaplineColor",
+    Callback = function(Value) cfg.EspSnaplineColor = Value end
+})
+
+WorldRight:Slider({
+    Name = "Snapline Thickness",
+    Min = 1,
+    Max = 5,
+    Default = cfg.EspSnaplineThickness,
+    Flag = "Duelist_EspSnaplineThickness",
+    Callback = function(Value) cfg.EspSnaplineThickness = Value end
 })
 
 WorldRight:Toggle({
@@ -628,20 +1090,6 @@ WorldRight:Colorpicker({
 })
 
 WorldRight:Toggle({
-    Name = "Health",
-    Default = cfg.EspHealth,
-    Flag = "Duelist_EspHealth",
-    Callback = function(State) cfg.EspHealth = State end
-})
-
-WorldRight:Colorpicker({
-    Name = "Health Color",
-    Default = cfg.EspHealthColor,
-    Flag = "Duelist_EspHealthColor",
-    Callback = function(Value) cfg.EspHealthColor = Value end
-})
-
-WorldRight:Toggle({
     Name = "Distance",
     Default = cfg.EspDistance,
     Flag = "Duelist_EspDistance",
@@ -653,15 +1101,6 @@ WorldRight:Colorpicker({
     Default = cfg.EspDistanceColor,
     Flag = "Duelist_EspDistanceColor",
     Callback = function(Value) cfg.EspDistanceColor = Value end
-})
-
-WorldRight:Slider({
-    Name = "Max Distance",
-    Min = 100,
-    Max = 10000,
-    Default = cfg.EspMaxDistance,
-    Flag = "Duelist_EspMaxDistance",
-    Callback = function(Value) cfg.EspMaxDistance = Value end
 })
 
 -- Gun skins
@@ -752,6 +1191,72 @@ PlayerLeft:Button({
     end
 })
 
+-- Local Bullet Tracers
+PlayerLocalTracers:Toggle({
+    Name = "Local Tracers",
+    Default = cfg.LocalBulletTracerEnabled,
+    Flag = "Duelist_LocalBulletTracerEnabled",
+    Callback = function(State) cfg.LocalBulletTracerEnabled = State end
+})
+
+PlayerLocalTracers:Toggle({
+    Name = "Fade Out",
+    Default = cfg.LocalBulletTracerFadeOut,
+    Flag = "Duelist_LocalBulletTracerFadeOut",
+    Callback = function(State) cfg.LocalBulletTracerFadeOut = State end
+})
+
+PlayerLocalTracers:Colorpicker({
+    Name = "Tracer Color",
+    Default = cfg.LocalBulletTracerColor,
+    Flag = "Duelist_LocalBulletTracerColor",
+    Callback = function(Value) cfg.LocalBulletTracerColor = Value end
+})
+
+PlayerLocalTracers:Slider({
+    Name = "Tracer Lifetime",
+    Min = 0.1,
+    Max = 5,
+    Default = cfg.LocalBulletTracerLifetime,
+    Decimals = 0.1,
+    Suffix = "s",
+    Flag = "Duelist_LocalBulletTracerLifetime",
+    Callback = function(Value) cfg.LocalBulletTracerLifetime = Value end
+})
+
+-- Other Bullet Tracers
+PlayerOtherTracers:Toggle({
+    Name = "Other Tracers",
+    Default = cfg.OtherBulletTracerEnabled,
+    Flag = "Duelist_OtherBulletTracerEnabled",
+    Callback = function(State) cfg.OtherBulletTracerEnabled = State end
+})
+
+PlayerOtherTracers:Toggle({
+    Name = "Fade Out",
+    Default = cfg.OtherBulletTracerFadeOut,
+    Flag = "Duelist_OtherBulletTracerFadeOut",
+    Callback = function(State) cfg.OtherBulletTracerFadeOut = State end
+})
+
+PlayerOtherTracers:Colorpicker({
+    Name = "Tracer Color",
+    Default = cfg.OtherBulletTracerColor,
+    Flag = "Duelist_OtherBulletTracerColor",
+    Callback = function(Value) cfg.OtherBulletTracerColor = Value end
+})
+
+PlayerOtherTracers:Slider({
+    Name = "Tracer Lifetime",
+    Min = 0.1,
+    Max = 5,
+    Default = cfg.OtherBulletTracerLifetime,
+    Decimals = 0.1,
+    Suffix = "s",
+    Flag = "Duelist_OtherBulletTracerLifetime",
+    Callback = function(Value) cfg.OtherBulletTracerLifetime = Value end
+})
+
 -- Player Card
 PlayerRight:Toggle({
     Name = "Card Changer",
@@ -793,8 +1298,232 @@ PlayerRight:Button({
 PlayerRight:Button({
     Name = "Apply Card Now",
     Callback = function()
-        if typeof(applySelectedCard) == "function" then applySelectedCard() end
+        if typeof(applySelectedCard) == "function" then applySelectedCard(true) end
     end
+})
+
+-- KillFX list: all assets in the game, with owned GUIDs for official equip.
+local KF = {
+    Folder = ReplicatedStorage:FindFirstChild("Assets") and ReplicatedStorage.Assets:FindFirstChild("KillFX"),
+    Options = {},
+    NameToGuid = {},
+    OriginalName = nil,
+    OriginalGuid = nil,
+    CurrentName = nil,
+    Dropdown = nil,
+}
+
+local function getInventoryRemote()
+    return ReplicatedStorage:WaitForChild("Events"):WaitForChild("HUD"):WaitForChild("Inventory")
+end
+
+local function getEquippedKillFX()
+    local pd = LocalPlayer:FindFirstChild("PlayerData")
+    local kf = pd and pd:FindFirstChild("Items") and pd.Items:FindFirstChild("KillFX")
+    local equipped = kf and kf:FindFirstChild("Equipped")
+    if equipped and equipped:IsA("StringValue") then
+        return equipped
+    end
+    return nil
+end
+
+local function refreshKillFXList()
+    local pd = LocalPlayer:FindFirstChild("PlayerData")
+    local kf = pd and pd:FindFirstChild("Items") and pd.Items:FindFirstChild("KillFX")
+    if not kf then return end
+    local owned = kf:FindFirstChild("Owned")
+    local equipped = kf:FindFirstChild("Equipped")
+
+    table.clear(KF.Options)
+    table.clear(KF.NameToGuid)
+
+    if KF.Folder then
+        for _, asset in ipairs(KF.Folder:GetChildren()) do
+            if asset:IsA("ModuleScript") and asset.Name ~= "KillFX" then
+                table.insert(KF.Options, asset.Name)
+            end
+        end
+    end
+
+    if owned then
+        for _, item in ipairs(owned:GetChildren()) do
+            local nameObj = item:FindFirstChild("ItemName")
+            if nameObj and nameObj:IsA("StringValue") then
+                local name = nameObj.Value
+                if name and name ~= "" then
+                    KF.NameToGuid[name] = item.Name
+                end
+            end
+        end
+    end
+
+    table.sort(KF.Options)
+
+    if equipped and equipped:IsA("StringValue") and KF.OriginalName == nil then
+        KF.OriginalName = equipped.Value
+        KF.OriginalGuid = KF.NameToGuid[KF.OriginalName]
+        KF.CurrentName = KF.OriginalName
+
+        if cfg.SelectedKillFX == "None" and KF.Dropdown then
+            cfg.SelectedKillFX = KF.OriginalName
+            pcall(function() KF.Dropdown:Set(KF.OriginalName) end)
+        end
+    end
+
+    if KF.Dropdown then
+        pcall(function() KF.Dropdown:SetItems(KF.Options) end)
+        pcall(function() KF.Dropdown:Refresh(KF.Options) end)
+    end
+end
+
+local function equipKillFXByName(name)
+    if name == nil or name == "" then return end
+    local equipped = getEquippedKillFX()
+    if equipped then
+        equipped.Value = name
+    end
+    local guid = KF.NameToGuid[name]
+    if guid then
+        getInventoryRemote():FireServer("Equip", "KillFX", guid)
+    end
+    KF.CurrentName = name
+end
+
+local function restoreOriginalKillFX()
+    if not KF.OriginalName then return end
+    local equipped = getEquippedKillFX()
+    if equipped then
+        equipped.Value = KF.OriginalName
+    end
+    if KF.OriginalGuid then
+        getInventoryRemote():FireServer("Equip", "KillFX", KF.OriginalGuid)
+    end
+    KF.CurrentName = KF.OriginalName
+end
+
+PlayerKillFX:Toggle({
+    Name = "KillFX Changer",
+    Default = cfg.KillFXChangerEnabled,
+    Flag = "Duelist_KillFXChangerEnabled",
+    Callback = function(State)
+        cfg.KillFXChangerEnabled = State
+        if State then
+            equipKillFXByName(cfg.SelectedKillFX)
+        else
+            restoreOriginalKillFX()
+        end
+    end
+})
+
+KF.Dropdown = PlayerKillFX:Dropdown({
+    Name = "KillFX",
+    Items = KF.Options,
+    Default = cfg.SelectedKillFX,
+    Flag = "Duelist_SelectedKillFX",
+    Callback = function(Value)
+        cfg.SelectedKillFX = Value
+        if cfg.KillFXChangerEnabled then
+            equipKillFXByName(Value)
+        end
+    end
+})
+
+task.defer(function()
+    local pd = LocalPlayer:WaitForChild("PlayerData")
+    pd:WaitForChild("Loaded")
+    local kfItems = pd:WaitForChild("Items")
+    kfItems:WaitForChild("KillFX")
+    task.wait(0.2)
+    refreshKillFXList()
+    if cfg.KillFXChangerEnabled and cfg.SelectedKillFX then
+        equipKillFXByName(cfg.SelectedKillFX)
+    end
+end)
+
+-- Client-side visual override for KillFX (only the local player sees it).
+local function isLocalKiller(killer)
+    if killer == nil then return false end
+    if killer == LocalPlayer then return true end
+    local t = typeof(killer)
+    if t == "Instance" then
+        if killer:IsA("Player") then return killer == LocalPlayer end
+        if killer:IsA("Model") then
+            if killer == LocalPlayer.Character then return true end
+            local p = Players:GetPlayerFromCharacter(killer)
+            return p == LocalPlayer
+        end
+    elseif t == "number" then
+        return killer == LocalPlayer.UserId
+    elseif t == "string" then
+        return killer == LocalPlayer.Name or killer == LocalPlayer.DisplayName
+    end
+    return false
+end
+
+local function hookKillFXVisual()
+    if getgenv().EvolutionKillFXHooked then return end
+    local ok, Weapons = pcall(function()
+        return ReplicatedStorage:WaitForChild("Events"):WaitForChild("Weapons")
+    end)
+    if not ok or not Weapons then return end
+    local ok2, cons = pcall(getconnections, Weapons.OnClientEvent)
+    if not ok2 or not cons or #cons == 0 then return end
+    for _, con in ipairs(cons) do
+        local mt = getrawmetatable(con)
+        if not mt then continue end
+        local idx = mt.__index
+        if typeof(idx) ~= "function" then continue end
+        local orig = idx(con, "Function")
+        if typeof(orig) ~= "function" then continue end
+        idx(con, "Function", function(...)
+            local args = {...}
+            if args[1] == "KillFX" and cfg.KillFXChangerEnabled then
+                if isLocalKiller(args[2]) then
+                    print("[Evolution] KillFX override -> " .. tostring(cfg.SelectedKillFX) .. " (was " .. tostring(args[3]) .. ")")
+                    args[3] = cfg.SelectedKillFX
+                end
+            end
+            return orig(unpack(args))
+        end)
+    end
+    getgenv().EvolutionKillFXHooked = true
+end
+
+task.defer(function()
+    for i = 1, 20 do
+        hookKillFXVisual()
+        if getgenv().EvolutionKillFXHooked then break end
+        task.wait(0.5)
+    end
+end)
+
+-- Backpack list from game assets.
+local BackpackFolder = ReplicatedStorage:FindFirstChild("Assets") and ReplicatedStorage.Assets:FindFirstChild("Backpack")
+local BackpackOptions = {}
+local backpackNameSet = {}
+if BackpackFolder then
+    for _, acc in ipairs(BackpackFolder:GetChildren()) do
+        if acc:IsA("Accessory") then
+            table.insert(BackpackOptions, acc.Name)
+            backpackNameSet[acc.Name] = true
+        end
+    end
+end
+table.sort(BackpackOptions)
+
+PlayerBackpack:Toggle({
+    Name = "Backpack Changer",
+    Default = cfg.BackpackChangerEnabled,
+    Flag = "Duelist_BackpackChangerEnabled",
+    Callback = function(State) cfg.BackpackChangerEnabled = State end
+})
+
+PlayerBackpack:Dropdown({
+    Name = "Backpack",
+    Items = BackpackOptions,
+    Default = cfg.SelectedBackpack,
+    Flag = "Duelist_SelectedBackpack",
+    Callback = function(Value) cfg.SelectedBackpack = Value end
 })
 
 -- Configs
@@ -942,7 +1671,16 @@ end
 local function isEnemy(model)
     if not cfg.TeamCheck then return true end
     local plr = Players:GetPlayerFromCharacter(model)
-    if not plr then return true end
+    if not plr or plr == LocalPlayer then return false end
+    if not plr.Team or not LocalPlayer.Team then return true end
+    return plr.Team ~= LocalPlayer.Team
+end
+
+local function isEspEnemy(model)
+    if not cfg.EspTeamCheck then return true end
+    local plr = Players:GetPlayerFromCharacter(model)
+    if not plr or plr == LocalPlayer then return false end
+    if not plr.Team or not LocalPlayer.Team then return true end
     return plr.Team ~= LocalPlayer.Team
 end
 
@@ -1040,7 +1778,9 @@ local function rawFindTarget(targetHitPart, useHitchance, useMouse)
 
         local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
         if not onScreen then continue end
-        if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude > cfg.FOVRadius then continue end
+        if cfg.AimAssistUseFOV or not useMouse then
+            if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude > cfg.FOVRadius then continue end
+        end
 
         if cfg.WallCheck then
             local rp = RaycastParams.new()
@@ -1058,8 +1798,69 @@ local function rawFindTarget(targetHitPart, useHitchance, useMouse)
     return bestPart
 end
 
+local function validateAimAssistTarget(model)
+    if not (model and model.Parent) then return nil end
+    if not isAlive(model) then return nil end
+    if not isEnemy(model) then return nil end
+    if cfg.KOCheck then
+        local ko = model:GetAttribute("KO") or model:GetAttribute("Knocked") or model:GetAttribute("Downed")
+        if ko then return nil end
+    end
+
+    local part = model:FindFirstChild(cfg.AimAssistHitPart) or model:FindFirstChild("Head") or model:FindFirstChild("HumanoidRootPart")
+    if not part then return nil end
+
+    local myChar = LocalPlayer.Character
+    local myHead = myChar and myChar:FindFirstChild("Head")
+    if not myHead then return nil end
+
+    local origin = myHead.Position
+    local dist = (part.Position - origin).Magnitude
+    if dist > cfg.MaxDistance then return nil end
+
+    local center = UserInputService:GetMouseLocation()
+    local screenPos, onScreen = Camera:WorldToViewportPoint(part.Position)
+    if not onScreen then return nil end
+    if cfg.AimAssistUseFOV then
+        if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude > cfg.FOVRadius then return nil end
+    end
+
+    if cfg.WallCheck then
+        local rp = RaycastParams.new()
+        rp.FilterType = Enum.RaycastFilterType.Blacklist
+        rp.FilterDescendantsInstances = {myChar, Camera, model}
+        if Workspace:Raycast(origin, (part.Position - origin).Unit * dist, rp) then return nil end
+    end
+
+    return part
+end
+
 local function rawAimAssistTarget()
-    return rawFindTarget(cfg.AimAssistHitPart, false, true)
+    if aimAssistLockedModel then
+        local part = validateAimAssistTarget(aimAssistLockedModel)
+        if part then
+            aimAssistLockedPart = part
+            return part
+        end
+        -- Lost the locked target; don't auto-switch until aim assist is toggled again.
+        aimAssistLockedModel = nil
+        aimAssistLockedPart = nil
+        aimAssistCurrentCF = nil
+        return nil
+    end
+
+    if aimAssistLockOnce then
+        return aimAssistLockedPart
+    end
+
+    local part = rawFindTarget(cfg.AimAssistHitPart, false, true)
+    if part then
+        aimAssistLockedModel = part:FindFirstAncestorOfClass("Model")
+        aimAssistLockedPart = part
+        aimAssistLockOnce = true
+        aimAssistCurrentCF = nil
+    end
+    return part
 end
 
 local function rawSilentAimTarget()
@@ -1232,6 +2033,10 @@ local function hookedFireServer(self, cmd, ...)
         return oldFireServer(self, cmd, ...)
     end
 
+    if cmd == "ReplicateTracer" or cmd == "Process" then
+        localTracerActiveUntil = tick() + 0.25
+    end
+
     if not cfg.SilentAimEnabled then
         return oldFireServer(self, cmd, ...)
     end
@@ -1240,17 +2045,6 @@ local function hookedFireServer(self, cmd, ...)
         local target = getTarget()
         if target then
             shotActiveUntil = tick() + 0.25
-        end
-    elseif cmd == "ReplicateTracer" then
-        local style, startPos, _, hitInfo = ...
-        local target = getTarget()
-        if target then
-            return oldFireServer(self, "ReplicateTracer", style, startPos, target.Position, {
-                Instance = target,
-                CFrame = target.CFrame,
-                Damaged = true,
-                BonusHit = false
-            })
         end
     end
 
@@ -1336,6 +2130,80 @@ trackConnection(RunService.RenderStepped:Connect(function()
             end)
         end
     end
+end))
+
+-- Triggerbot
+local lastTriggerbotFire = 0
+local pendingTriggerbotTask = nil
+
+local function getTriggerbotTarget()
+    local cam = Workspace.CurrentCamera
+    if not cam then return nil end
+    local mousePos = UserInputService:GetMouseLocation()
+    local ray = cam:ViewportPointToRay(mousePos.X, mousePos.Y)
+    local origin = ray.Origin
+    local direction = ray.Direction * 5000
+    local myChar = LocalPlayer.Character
+    local rp = RaycastParams.new()
+    rp.FilterType = Enum.RaycastFilterType.Blacklist
+    rp.FilterDescendantsInstances = {myChar}
+    local result = Workspace:Raycast(origin, direction, rp)
+    if not result then return nil end
+    local hit = result.Instance
+    if cfg.TriggerbotTargetOrb then
+        local targetShoots = Workspace:FindFirstChild("TargetShoots")
+        if targetShoots and hit and hit:IsDescendantOf(targetShoots) then
+            return hit, targetShoots, hit
+        end
+    end
+    local model = hit and hit:FindFirstAncestorOfClass("Model")
+    if not model or model == myChar then return nil end
+    local plr = Players:GetPlayerFromCharacter(model)
+    if not plr or plr == LocalPlayer then return nil end
+    if cfg.TriggerbotTeamCheck and plr.Team == LocalPlayer.Team then return nil end
+    return plr, model, hit
+end
+
+trackConnection(RunService.RenderStepped:Connect(function()
+    if not cfg.TriggerbotEnabled then
+        if pendingTriggerbotTask then
+            pcall(task.cancel, pendingTriggerbotTask)
+            pendingTriggerbotTask = nil
+        end
+        return
+    end
+
+    local target = getTriggerbotTarget()
+    local tool = getEquippedGun()
+    if not target or not tool then
+        if pendingTriggerbotTask then
+            pcall(task.cancel, pendingTriggerbotTask)
+            pendingTriggerbotTask = nil
+        end
+        return
+    end
+
+    if pendingTriggerbotTask then return end
+    if tick() - lastTriggerbotFire < cfg.TriggerbotCooldown then return end
+
+    local mousePos = UserInputService:GetMouseLocation()
+    pendingTriggerbotTask = task.delay(cfg.TriggerbotDelay, function()
+        pendingTriggerbotTask = nil
+        if not cfg.TriggerbotEnabled then return end
+        if not getTriggerbotTarget() then return end
+        if not getEquippedGun() then return end
+        if tick() - lastTriggerbotFire < cfg.TriggerbotCooldown then return end
+
+        local pos = UserInputService:GetMouseLocation()
+        local x = math.floor(pos.X)
+        local y = math.floor(pos.Y)
+        pcall(function()
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, true, game.CoreGui, 1)
+            task.wait()
+            VirtualInputManager:SendMouseButtonEvent(x, y, 0, false, game.CoreGui, 1)
+        end)
+        lastTriggerbotFire = tick()
+    end)
 end))
 
 -- Shoot In Lobby (manual fire only)
@@ -1435,54 +2303,247 @@ getgenv().EvolutionDuelistRapidFireOriginals = gunModOriginals
 -- ============================================================
 local espDrawings = {}
 
-local function ensureEsp(model)
-    if not espDrawings[model] then
-        local t = {}
-        t.Box = Drawing.new("Square")
-        t.Box.Thickness = 1
-        t.Box.Filled = false
-        t.Box.Visible = false
+local skeletonConnections = {
+    {{"Head"}, {"UpperTorso", "Torso"}},
+    {{"UpperTorso", "Torso"}, {"LowerTorso"}},
+    {{"UpperTorso", "Torso"}, {"LeftUpperArm", "Left Arm"}},
+    {{"LeftUpperArm", "Left Arm"}, {"LeftLowerArm"}},
+    {{"LeftLowerArm"}, {"LeftHand"}},
+    {{"UpperTorso", "Torso"}, {"RightUpperArm", "Right Arm"}},
+    {{"RightUpperArm", "Right Arm"}, {"RightLowerArm"}},
+    {{"RightLowerArm"}, {"RightHand"}},
+    {{"LowerTorso"}, {"LeftUpperLeg", "Left Leg"}},
+    {{"LeftUpperLeg", "Left Leg"}, {"LeftLowerLeg"}},
+    {{"LeftLowerLeg"}, {"LeftFoot"}},
+    {{"LowerTorso"}, {"RightUpperLeg", "Right Leg"}},
+    {{"RightUpperLeg", "Right Leg"}, {"RightLowerLeg"}},
+    {{"RightLowerLeg"}, {"RightFoot"}},
+}
 
-        t.Name = Drawing.new("Text")
-        t.Name.Size = 13
-        t.Name.Center = true
-        t.Name.Outline = true
-        t.Name.Visible = false
+local function getCamera()
+    return Workspace.CurrentCamera
+end
 
-        t.Health = Drawing.new("Text")
-        t.Health.Size = 12
-        t.Health.Center = true
-        t.Health.Outline = true
-        t.Health.Visible = false
-
-        t.Distance = Drawing.new("Text")
-        t.Distance.Size = 12
-        t.Distance.Center = true
-        t.Distance.Outline = true
-        t.Distance.Visible = false
-
-        espDrawings[model] = t
+local function findPart(model, names)
+    for _, name in ipairs(names) do
+        local part = model:FindFirstChild(name)
+        if part and part:IsA("BasePart") then return part end
     end
-    return espDrawings[model]
+    return nil
+end
+
+local function ensureEsp(model)
+    if espDrawings[model] then return espDrawings[model] end
+    local t = {}
+
+    t.BoxOutline = Drawing.new("Square")
+    t.BoxOutline.Filled = false
+    t.BoxOutline.Visible = false
+
+    t.Box = Drawing.new("Square")
+    t.Box.Filled = false
+    t.Box.Visible = false
+
+    t.BoxFill = Drawing.new("Square")
+    t.BoxFill.Filled = true
+    t.BoxFill.Visible = false
+
+    t.CornerLines = {}
+    for i = 1, 8 do
+        local line = Drawing.new("Line")
+        line.Visible = false
+        t.CornerLines[i] = line
+    end
+
+    t.HealthBarOutline = Drawing.new("Square")
+    t.HealthBarOutline.Filled = false
+    t.HealthBarOutline.Visible = false
+
+    t.HealthBar = Drawing.new("Square")
+    t.HealthBar.Filled = true
+    t.HealthBar.Visible = false
+
+    t.Name = Drawing.new("Text")
+    t.Name.Center = true
+    t.Name.Outline = true
+    t.Name.Visible = false
+
+    t.HealthText = Drawing.new("Text")
+    t.HealthText.Center = true
+    t.HealthText.Outline = true
+    t.HealthText.Visible = false
+
+    t.Distance = Drawing.new("Text")
+    t.Distance.Center = true
+    t.Distance.Outline = true
+    t.Distance.Visible = false
+
+    t.HeadDot = Drawing.new("Circle")
+    t.HeadDot.Filled = true
+    t.HeadDot.Visible = false
+
+    t.Snapline = Drawing.new("Line")
+    t.Snapline.Visible = false
+
+    t.SkeletonLines = {}
+    for i = 1, #skeletonConnections do
+        local line = Drawing.new("Line")
+        line.Visible = false
+        t.SkeletonLines[i] = line
+    end
+
+    espDrawings[model] = t
+    return t
 end
 
 local function removeEsp(model)
     local t = espDrawings[model]
-    if t then
-        for _, d in pairs(t) do
-            pcall(function() d:Remove() end)
-        end
-        espDrawings[model] = nil
+    if not t then return end
+    local objects = {
+        t.BoxOutline, t.Box, t.BoxFill,
+        t.HealthBarOutline, t.HealthBar,
+        t.Name, t.HealthText, t.Distance,
+        t.HeadDot, t.Snapline
+    }
+    for _, obj in ipairs(objects) do
+        pcall(function() obj:Remove() end)
     end
+    for _, line in ipairs(t.CornerLines) do
+        pcall(function() line:Remove() end)
+    end
+    for _, line in ipairs(t.SkeletonLines) do
+        pcall(function() line:Remove() end)
+    end
+    espDrawings[model] = nil
 end
 
-local function hideAllEsp()
-    for _, t in pairs(espDrawings) do
-        pcall(function() t.Box.Visible = false end)
-        pcall(function() t.Name.Visible = false end)
-        pcall(function() t.Health.Visible = false end)
-        pcall(function() t.Distance.Visible = false end)
+local function hideEspDrawings(t)
+    local ok = pcall
+    ok(function() t.BoxOutline.Visible = false end)
+    ok(function() t.Box.Visible = false end)
+    ok(function() t.BoxFill.Visible = false end)
+    for _, line in ipairs(t.CornerLines) do ok(function() line.Visible = false end) end
+    ok(function() t.HealthBarOutline.Visible = false end)
+    ok(function() t.HealthBar.Visible = false end)
+    ok(function() t.Name.Visible = false end)
+    ok(function() t.HealthText.Visible = false end)
+    ok(function() t.Distance.Visible = false end)
+    ok(function() t.HeadDot.Visible = false end)
+    ok(function() t.Snapline.Visible = false end)
+    for _, line in ipairs(t.SkeletonLines) do ok(function() line.Visible = false end) end
+end
+
+local function getMenuRect()
+    local rect = nil
+    pcall(function()
+        local function isMenuFrame(frame)
+            if not frame:IsA("GuiObject") or not frame.Visible then return false end
+            local size = frame.AbsoluteSize
+            if size.X < 400 or size.Y < 400 then return false end
+            for _, d in ipairs(frame:GetDescendants()) do
+                if d:IsA("TextLabel") then
+                    local txt = tostring(d.Text)
+                    if string.find(txt, "Evolution") or string.find(txt, "Combat Visuals") then
+                        return true
+                    end
+                end
+            end
+            return false
+        end
+        local hui = gethui and gethui()
+        if hui then
+            for _, sg in ipairs(hui:GetChildren()) do
+                if sg:IsA("ScreenGui") and sg.Enabled then
+                    for _, c in ipairs(sg:GetChildren()) do
+                        if isMenuFrame(c) then
+                            local pos = c.AbsolutePosition
+                            local size = c.AbsoluteSize
+                            rect = {X1 = pos.X, Y1 = pos.Y, X2 = pos.X + size.X, Y2 = pos.Y + size.Y}
+                            return
+                        end
+                    end
+                end
+            end
+        end
+        local core = game:GetService("CoreGui")
+        local cgSg = core:FindFirstChild("Evolution")
+        if cgSg and cgSg:IsA("ScreenGui") and cgSg.Enabled then
+            for _, c in ipairs(cgSg:GetChildren()) do
+                if isMenuFrame(c) then
+                    local pos = c.AbsolutePosition
+                    local size = c.AbsoluteSize
+                    rect = {X1 = pos.X, Y1 = pos.Y, X2 = pos.X + size.X, Y2 = pos.Y + size.Y}
+                    return
+                end
+            end
+        end
+    end)
+    return rect
+end
+
+local function getCharacterBounds(model)
+    local cam = getCamera()
+    if not cam then return nil end
+    local minX, minY = math.huge, math.huge
+    local maxX, maxY = -math.huge, -math.huge
+    local found = false
+    local camPos = cam.CFrame.Position
+    local scale = cam.ViewportSize.Y / (2 * math.tan(math.rad(cam.FieldOfView) / 2))
+    for _, part in ipairs(model:GetDescendants()) do
+        if part:IsA("BasePart") then
+            local pos, onScreen = cam:WorldToViewportPoint(part.Position)
+            if onScreen then
+                found = true
+                local d = math.max((part.Position - camPos).Magnitude, 1)
+                local radius = math.max(part.Size.X, part.Size.Y, part.Size.Z) * 0.6
+                local px = radius / d * scale
+                minX = math.min(minX, pos.X - px)
+                maxX = math.max(maxX, pos.X + px)
+                minY = math.min(minY, pos.Y - px)
+                maxY = math.max(maxY, pos.Y + px)
+            end
+        end
     end
+    if not found then return nil end
+    local size = Vector2.new(maxX - minX, maxY - minY)
+    if size.X < 10 then size = Vector2.new(10, size.Y) end
+    if size.Y < 10 then size = Vector2.new(size.X, 10) end
+    return Vector2.new(minX, minY), size
+end
+
+local function drawCorners(t, topLeft, size, color, thickness)
+    local cornerLength = math.min(size.X, size.Y) * 0.25
+    local lines = t.CornerLines
+    local function setLine(idx, from, to)
+        local line = lines[idx]
+        line.Visible = true
+        line.From = from
+        line.To = to
+        line.Color = color
+        line.Thickness = thickness
+    end
+
+    local tl = topLeft
+    local tr = topLeft + Vector2.new(size.X, 0)
+    local bl = topLeft + Vector2.new(0, size.Y)
+    local br = topLeft + size
+
+    -- Top-left
+    setLine(1, tl, tl + Vector2.new(cornerLength, 0))
+    setLine(2, tl, tl + Vector2.new(0, cornerLength))
+    -- Top-right
+    setLine(3, tr, tr - Vector2.new(cornerLength, 0))
+    setLine(4, tr, tr + Vector2.new(0, cornerLength))
+    -- Bottom-left
+    setLine(5, bl, bl + Vector2.new(cornerLength, 0))
+    setLine(6, bl, bl - Vector2.new(0, cornerLength))
+    -- Bottom-right
+    setLine(7, br, br - Vector2.new(cornerLength, 0))
+    setLine(8, br, br - Vector2.new(0, cornerLength))
+end
+
+local function getHealthColor(percent)
+    return Color3.fromRGB(255 * (1 - percent), 255 * percent, 0)
 end
 
 trackConnection(RunService.RenderStepped:Connect(function()
@@ -1491,29 +2552,26 @@ trackConnection(RunService.RenderStepped:Connect(function()
         return
     end
 
-    -- Hide ESP while the Evolution menu is open so it doesn't cover the UI
-    local menuOpen = false
-    pcall(function()
-        local sg = game:GetService("CoreGui"):FindFirstChild("Evolution")
-        if sg and sg:IsA("ScreenGui") then
-            menuOpen = sg.Enabled
-        end
-    end)
-    if menuOpen then
-        hideAllEsp()
-        return
+    local menuRect = getMenuRect()
+    local function boxOverlapsMenu(min, max)
+        if not menuRect then return false end
+        return not (max.X < menuRect.X1 or min.X > menuRect.X2 or max.Y < menuRect.Y1 or min.Y > menuRect.Y2)
     end
+
+    local cam = getCamera()
+    if not cam then return end
 
     local myChar = LocalPlayer.Character
     local myRoot = myChar and (myChar:FindFirstChild("HumanoidRootPart") or myChar:FindFirstChild("Head"))
     local myPos = myRoot and myRoot.Position
+    local viewport = cam.ViewportSize
 
     local seen = {}
     for _, model in ipairs(CharactersFolder:GetChildren()) do
         seen[model] = true
         if model == myChar then continue end
         if not isAlive(model) then removeEsp(model); continue end
-        if not isEnemy(model) then continue end
+        if not isEspEnemy(model) then continue end
 
         local root = model:FindFirstChild("HumanoidRootPart") or model:FindFirstChild("Head") or model.PrimaryPart
         if not root then removeEsp(model); continue end
@@ -1521,24 +2579,97 @@ trackConnection(RunService.RenderStepped:Connect(function()
         local dist = myPos and (root.Position - myPos).Magnitude or 0
         if dist > cfg.EspMaxDistance then removeEsp(model); continue end
 
-        local screenPos, onScreen = Camera:WorldToViewportPoint(root.Position)
+        local rootPos, onScreen = cam:WorldToViewportPoint(root.Position)
         if not onScreen then removeEsp(model); continue end
 
         local t = ensureEsp(model)
-        local center = Vector2.new(screenPos.X, screenPos.Y)
-        local baseHeight = math.clamp(2500 / math.max(dist, 1), 20, 200)
-        local boxSize = Vector2.new(baseHeight * 0.55, baseHeight)
-        local topLeft = center - boxSize / 2
+        local topLeft, boxSize = getCharacterBounds(model)
+        if not topLeft then removeEsp(model); continue end
+        local center = topLeft + boxSize / 2
+        local bottomRight = topLeft + boxSize
 
-        if cfg.EspBoxes then
+        if boxOverlapsMenu(topLeft, bottomRight) then
+            removeEsp(model)
+            continue
+        end
+
+        local textSize = cfg.EspTextSize
+        t.Name.Size = textSize
+        t.HealthText.Size = textSize - 1
+        t.Distance.Size = textSize - 1
+
+        -- Box
+        local boxStyle = cfg.EspBoxStyle
+        if boxStyle == "Box" then
+            for _, line in ipairs(t.CornerLines) do line.Visible = false end
+            if cfg.EspBoxOutline then
+                t.BoxOutline.Visible = true
+                t.BoxOutline.Position = topLeft
+                t.BoxOutline.Size = boxSize
+                t.BoxOutline.Color = cfg.EspBoxOutlineColor
+                t.BoxOutline.Thickness = cfg.EspBoxThickness + 2
+            else
+                t.BoxOutline.Visible = false
+            end
             t.Box.Visible = true
             t.Box.Position = topLeft
             t.Box.Size = boxSize
             t.Box.Color = cfg.EspBoxColor
-        else
+            t.Box.Thickness = cfg.EspBoxThickness
+            if cfg.EspBoxFilled then
+                t.BoxFill.Visible = true
+                t.BoxFill.Position = topLeft
+                t.BoxFill.Size = boxSize
+                t.BoxFill.Color = cfg.EspBoxColor
+                t.BoxFill.Transparency = cfg.EspBoxFillTransparency
+            else
+                t.BoxFill.Visible = false
+            end
+        elseif boxStyle == "Corner" then
+            t.BoxOutline.Visible = false
             t.Box.Visible = false
+            t.BoxFill.Visible = false
+            drawCorners(t, topLeft, boxSize, cfg.EspBoxColor, cfg.EspBoxThickness)
+        else
+            t.BoxOutline.Visible = false
+            t.Box.Visible = false
+            t.BoxFill.Visible = false
+            for _, line in ipairs(t.CornerLines) do line.Visible = false end
         end
 
+        -- Health bar
+        local hum = model:FindFirstChildOfClass("Humanoid")
+        if cfg.EspHealthBar and hum then
+            local barWidth = 4
+            local barHeight = boxSize.Y
+            local healthPercent = math.clamp(hum.Health / hum.MaxHealth, 0, 1)
+            local barPos = topLeft - Vector2.new(barWidth + 4, 0)
+
+            t.HealthBarOutline.Visible = true
+            t.HealthBarOutline.Position = barPos
+            t.HealthBarOutline.Size = Vector2.new(barWidth, barHeight)
+            t.HealthBarOutline.Color = Color3.fromRGB(0, 0, 0)
+            t.HealthBarOutline.Thickness = 1
+
+            t.HealthBar.Visible = true
+            t.HealthBar.Position = barPos + Vector2.new(0, barHeight * (1 - healthPercent))
+            t.HealthBar.Size = Vector2.new(barWidth, barHeight * healthPercent)
+            t.HealthBar.Color = cfg.EspHealthColor
+        else
+            t.HealthBarOutline.Visible = false
+            t.HealthBar.Visible = false
+        end
+
+        if cfg.EspHealthText and hum then
+            t.HealthText.Visible = true
+            t.HealthText.Position = topLeft - Vector2.new(0, 26)
+            t.HealthText.Text = math.floor(hum.Health) .. " HP"
+            t.HealthText.Color = cfg.EspHealthColor
+        else
+            t.HealthText.Visible = false
+        end
+
+        -- Name / Distance
         if cfg.EspNames then
             local plr = Players:GetPlayerFromCharacter(model)
             t.Name.Visible = true
@@ -1549,16 +2680,6 @@ trackConnection(RunService.RenderStepped:Connect(function()
             t.Name.Visible = false
         end
 
-        local hum = model:FindFirstChildOfClass("Humanoid")
-        if cfg.EspHealth and hum then
-            t.Health.Visible = true
-            t.Health.Position = topLeft - Vector2.new(0, 28)
-            t.Health.Text = math.floor(hum.Health) .. "/" .. math.floor(hum.MaxHealth)
-            t.Health.Color = cfg.EspHealthColor
-        else
-            t.Health.Visible = false
-        end
-
         if cfg.EspDistance and myPos then
             t.Distance.Visible = true
             t.Distance.Position = Vector2.new(center.X, topLeft.Y + boxSize.Y + 2)
@@ -1566,6 +2687,59 @@ trackConnection(RunService.RenderStepped:Connect(function()
             t.Distance.Color = cfg.EspDistanceColor
         else
             t.Distance.Visible = false
+        end
+
+        -- Head dot
+        local head = model:FindFirstChild("Head")
+        if cfg.EspHeadDot and head then
+            local headPos, headOnScreen = cam:WorldToViewportPoint(head.Position)
+            if headOnScreen then
+                t.HeadDot.Visible = true
+                t.HeadDot.Position = Vector2.new(headPos.X, headPos.Y)
+                t.HeadDot.Radius = cfg.EspHeadDotSize
+                t.HeadDot.Color = cfg.EspHeadDotColor
+            else
+                t.HeadDot.Visible = false
+            end
+        else
+            t.HeadDot.Visible = false
+        end
+
+        -- Snapline
+        if cfg.EspSnaplines then
+            t.Snapline.Visible = true
+            t.Snapline.From = Vector2.new(viewport.X / 2, viewport.Y)
+            t.Snapline.To = Vector2.new(center.X, topLeft.Y + boxSize.Y)
+            t.Snapline.Color = cfg.EspSnaplineColor
+            t.Snapline.Thickness = cfg.EspSnaplineThickness
+        else
+            t.Snapline.Visible = false
+        end
+
+        -- Skeleton
+        if cfg.EspSkeleton then
+            for i, conn in ipairs(skeletonConnections) do
+                local line = t.SkeletonLines[i]
+                local partA = findPart(model, conn[1])
+                local partB = findPart(model, conn[2])
+                if partA and partB then
+                    local posA, onA = cam:WorldToViewportPoint(partA.Position)
+                    local posB, onB = cam:WorldToViewportPoint(partB.Position)
+                    if onA and onB then
+                        line.Visible = true
+                        line.From = Vector2.new(posA.X, posA.Y)
+                        line.To = Vector2.new(posB.X, posB.Y)
+                        line.Color = cfg.EspSkeletonColor
+                        line.Thickness = cfg.EspSkeletonThickness
+                    else
+                        line.Visible = false
+                    end
+                else
+                    line.Visible = false
+                end
+            end
+        else
+            for _, line in ipairs(t.SkeletonLines) do line.Visible = false end
         end
     end
 
@@ -1706,20 +2880,36 @@ function refreshCardList()
     end
 end
 
-function applySelectedSkin()
+local function isGunInstance(inst)
+    if not (inst:IsA("Tool") or inst:IsA("Model")) then return false end
+    local n = inst.Name:lower()
+    local nameMatches = n:find("pistol") or n:find("carabine") or n:find("rifle")
+    if not nameMatches then return false end
+    if inst:IsA("Tool") then
+        return inst:HasTag("Gun")
+    end
+    -- Holstered waist models have a Handle and no Tool tag.
+    return inst:FindFirstChild("Handle") ~= nil
+end
+
+function applySkinToTool(tool)
     if not cfg.SkinChangerEnabled then return end
-    local tool = getEquippedGun()
-    if not tool then return end
+    if not isGunInstance(tool) then return end
 
     local isRifle = tool.Name:lower():find("carabine") or tool.Name:lower():find("rifle")
     local selectedKey = isRifle and cfg.SelectedRifleSkinKey or cfg.SelectedPistolSkinKey
     local registry = isRifle and rifleSkinRegistry or pistolSkinRegistry
     local skinObj = selectedKey and registry[selectedKey]
 
+    -- Strip every existing Skin model before applying/removing so old skins don't stack.
+    for _, child in ipairs(tool:GetChildren()) do
+        if child.Name == "Skin" and child:IsA("Model") then
+            child:Destroy()
+        end
+    end
+
     if not skinObj or not skinObj:IsA("Model") then
-        -- No skin selected for this weapon type; strip any applied skin so the server/owned skin shows.
-        local oldSkin = tool:FindFirstChild("Skin")
-        if oldSkin then oldSkin:Destroy() end
+        -- No skin selected for this weapon type; leave it clean so the server/owned skin shows.
         return
     end
 
@@ -1732,10 +2922,6 @@ function applySelectedSkin()
 
         local toolHandle = tool:FindFirstChild("Handle") or tool:FindFirstChildWhichIsA("BasePart")
         if not toolHandle then return end
-
-        -- Remove any previously-applied skin first.
-        local oldSkin = tool:FindFirstChild("Skin")
-        if oldSkin then oldSkin:Destroy() end
 
         local newSkin = skinObj:Clone()
         newSkin.Name = "Skin"
@@ -1773,7 +2959,6 @@ function applySelectedSkin()
         end
 
         -- Find the skin's authored grip attachment and its parent part.
-        local toolGrip = toolHandle:FindFirstChild("GripPosition")
         local skinGrip, skinGripPart = nil, nil
         for _, a in ipairs(newSkin:GetDescendants()) do
             if a:IsA("Attachment") and a.Name == "GripPosition" and a.Parent:IsA("BasePart") then
@@ -1789,11 +2974,11 @@ function applySelectedSkin()
             return
         end
 
-        -- Align the whole skin rigidly so its GripPosition matches the tool's GripPosition.
-        -- The old server weld always flipped the skin 180° around Y, so apply that rotation
-        -- relative to the grip; without it the gun is held backwards/sideways.
-        if toolGrip and skinGrip then
-            local targetCF = toolGrip.WorldCFrame * CFrame.Angles(0, math.pi, 0)
+        -- Align the whole skin rigidly so its GripPosition lands on the tool handle pivot.
+        -- This mirrors the server's own skin weld: Weld.Part0=Handle, Weld.Part1=SkinHandle,
+        -- C0=identity, C1=Skin.GripPosition.
+        if skinGrip then
+            local targetCF = toolHandle.CFrame
             local newHandleCF = targetCF * skinGrip.CFrame:Inverse()
             local transform = newHandleCF * skinHandle.CFrame:Inverse()
             for _, part in ipairs(newSkin:GetDescendants()) do
@@ -1845,64 +3030,117 @@ function applySelectedSkin()
         local mainWeld = Instance.new("Weld")
         mainWeld.Part0 = toolHandle
         mainWeld.Part1 = skinHandle
-        mainWeld.C0 = toolHandle.CFrame:Inverse() * skinHandle.CFrame
-        mainWeld.C1 = CFrame.new()
+        mainWeld.C0 = CFrame.new()
+        mainWeld.C1 = skinGrip and skinGrip.CFrame or CFrame.new()
         mainWeld.Parent = skinHandle
     end)
-    if not ok then warn("[evolution] applySelectedSkin error:", err) end
+    if not ok then warn("[evolution] applySkinToTool error:", err) end
 end
 
--- Hook a tool so the selected skin is applied the instant it is equipped
--- or the instant the server tries to put its own skin back on.
-local function hookTool(tool)
-    if not tool:IsA("Tool") then return end
-    if tool:GetAttribute("EvolutionToolHooked") then return end
-    tool:SetAttribute("EvolutionToolHooked", true)
+function applySelectedSkin()
+    if not cfg.SkinChangerEnabled then return end
+    local tool = getEquippedGun()
+    if tool then
+        applySkinToTool(tool)
+    end
+end
 
-    trackConnection(tool.Equipped:Connect(function()
-        if not cfg.SkinChangerEnabled then return end
-        local isRifle = tool.Name:lower():find("carabine") or tool.Name:lower():find("rifle")
-        local key = isRifle and cfg.SelectedRifleSkinKey or cfg.SelectedPistolSkinKey
-        if cfg.AutoApplySkin and key then
-            applySelectedSkin()
-        elseif not key then
-            local old = tool:FindFirstChild("Skin")
-            if old then old:Destroy() end
-        end
-    end))
+-- Hook a gun instance (Tool or waist Model) so the selected skin is applied the
+-- instant it appears or the server tries to put its own skin back on.
+local function hookGunInstance(gun)
+    if not isGunInstance(gun) then return end
+    if gun:GetAttribute("EvolutionGunHooked") then return end
+    gun:SetAttribute("EvolutionGunHooked", true)
 
-    trackConnection(tool.ChildAdded:Connect(function(child)
+    -- Only Tools fire Equipped; waist Models are simply parented to the character.
+    if gun:IsA("Tool") then
+        trackConnection(gun.Equipped:Connect(function()
+            if not cfg.SkinChangerEnabled then return end
+            local isRifle = gun.Name:lower():find("carabine") or gun.Name:lower():find("rifle")
+            local key = isRifle and cfg.SelectedRifleSkinKey or cfg.SelectedPistolSkinKey
+            local tag = key and ((isRifle and "Carabine" or "Pistol") .. " / " .. key) or nil
+
+            -- Destroy any skin that isn't our selected one before the server skin can render.
+            for _, child in ipairs(gun:GetChildren()) do
+                if child.Name == "Skin" and child:IsA("Model") then
+                    if key and child:GetAttribute("EvolutionSkinKey") == tag then
+                        -- keep our custom skin
+                    else
+                        child:Destroy()
+                    end
+                end
+            end
+
+            if cfg.AutoApplySkin and key then
+                applySkinToTool(gun)
+            end
+        end))
+    end
+
+    trackConnection(gun.ChildAdded:Connect(function(child)
         if child.Name ~= "Skin" then return end
         if not cfg.SkinChangerEnabled then return end
-        local isRifle = tool.Name:lower():find("carabine") or tool.Name:lower():find("rifle")
+        local isRifle = gun.Name:lower():find("carabine") or gun.Name:lower():find("rifle")
         local key = isRifle and cfg.SelectedRifleSkinKey or cfg.SelectedPistolSkinKey
         local tag = key and ((isRifle and "Carabine" or "Pistol") .. " / " .. key) or nil
-        if cfg.AutoApplySkin and key and child:GetAttribute("EvolutionSkinKey") ~= tag then
-            applySelectedSkin()
-        elseif not key then
+
+        -- If the server adds its own skin (or no skin is selected), remove it immediately.
+        -- The render-step loop will make sure our custom skin is applied if it's missing.
+        if not key or child:GetAttribute("EvolutionSkinKey") ~= tag then
             child:Destroy()
         end
     end))
 end
 
-local function hookToolsIn(parent)
+local function hookGunsIn(parent)
     for _, t in ipairs(parent:GetChildren()) do
-        hookTool(t)
+        hookGunInstance(t)
     end
-    trackConnection(parent.ChildAdded:Connect(hookTool))
+    trackConnection(parent.ChildAdded:Connect(hookGunInstance))
+end
+
+-- Clear hook markers so a re-execution updates connections on existing tools.
+for _, parent in ipairs({LocalPlayer.Backpack, LocalPlayer.Character}) do
+    if parent then
+        for _, t in ipairs(parent:GetChildren()) do
+            if t:IsA("Tool") then
+                t:SetAttribute("EvolutionToolHooked", nil)
+            end
+        end
+    end
 end
 
 -- Hook tools already in backpack/character and any future ones.
-hookToolsIn(LocalPlayer.Backpack)
+hookGunsIn(LocalPlayer.Backpack)
 if LocalPlayer.Character then
-    hookToolsIn(LocalPlayer.Character)
+    hookGunsIn(LocalPlayer.Character)
 end
 trackConnection(LocalPlayer.CharacterAdded:Connect(function(char)
-    hookToolsIn(char)
+    hookGunsIn(char)
 end))
 
 local cardApplyInProgress = false
-function applySelectedCard()
+local defaultHeadMeshId, defaultHeadTextureId
+local function cacheDefaultHead(char)
+    local head = char and char:FindFirstChild("Head")
+    -- Only cache from an unmodified (default) character so face preservation works correctly.
+    if head and head:IsA("BasePart") and not char:GetAttribute("EvolutionCardKey") then
+        if not defaultHeadMeshId then
+            defaultHeadMeshId = head:IsA("MeshPart") and head.MeshId or ""
+        end
+        if not defaultHeadTextureId then
+            defaultHeadTextureId = head:IsA("MeshPart") and head.TextureID or ""
+        end
+    end
+end
+if LocalPlayer.Character then
+    cacheDefaultHead(LocalPlayer.Character)
+end
+trackConnection(LocalPlayer.CharacterAdded:Connect(function(char)
+    cacheDefaultHead(char)
+end))
+
+function applySelectedCard(force)
     if cardApplyInProgress then return end
     if not cfg.CardChangerEnabled then return end
     local cardObj = cfg.SelectedCardKey and cardRegistry[cfg.SelectedCardKey]
@@ -1912,9 +3150,35 @@ function applySelectedCard()
     local hum = char and char:FindFirstChildOfClass("Humanoid")
     if not hum then return end
 
+    if not force and char:GetAttribute("EvolutionCardKey") == cfg.SelectedCardKey then
+        return
+    end
+
     cardApplyInProgress = true
     task.defer(function()
         pcall(function()
+            local standardParts = {
+                Head = true, UpperTorso = true, LowerTorso = true,
+                LeftUpperArm = true, LeftLowerArm = true, LeftHand = true,
+                RightUpperArm = true, RightLowerArm = true, RightHand = true,
+                LeftUpperLeg = true, LeftLowerLeg = true, LeftFoot = true,
+                RightUpperLeg = true, RightLowerLeg = true, RightFoot = true,
+                HumanoidRootPart = true,
+                Torso = true, LeftArm = true, LeftLeg = true, RightArm = true, RightLeg = true
+            }
+
+            -- Clean up previously applied card extras.
+            for _, d in ipairs(char:GetDescendants()) do
+                if d:GetAttribute("EvolutionCardExtra") then
+                    pcall(function() d:Destroy() end)
+                elseif d:IsA("Accessory") or d:IsA("Hat") then
+                    pcall(function() hum:RemoveAccessory(d) end)
+                    pcall(function() d:Destroy() end)
+                elseif d:IsA("Attachment") and d:GetAttribute("EvolutionCardAtt") then
+                    pcall(function() d:Destroy() end)
+                end
+            end
+
             -- 1) Body colors / clothing.
             local function copyClass(class)
                 local from = cardObj:FindFirstChildOfClass(class)
@@ -1922,6 +3186,7 @@ function applySelectedCard()
                 if existing then existing:Destroy() end
                 if from then
                     local clone = from:Clone()
+                    clone:SetAttribute("EvolutionCardExtra", true)
                     clone.Parent = char
                 end
             end
@@ -1931,14 +3196,41 @@ function applySelectedCard()
             copyClass("Pants")
             copyClass("ShirtGraphic")
 
-            -- 2) Body part meshes / appearance.
+            local function cardHeadChangesFace(cardHead)
+                if not cardHead or not cardHead:IsA("BasePart") then return false end
+                if cardHead:IsA("MeshPart") then
+                    if cardHead.MeshId ~= "" and cardHead.MeshId ~= defaultHeadMeshId then
+                        return true
+                    end
+                    if cardHead.TextureID ~= "" and cardHead.TextureID ~= defaultHeadTextureId then
+                        return true
+                    end
+                end
+                for _, d in ipairs(cardHead:GetDescendants()) do
+                    if d:IsA("Decal") or d:IsA("FaceControls") or d:IsA("SpecialMesh") then
+                        return true
+                    end
+                end
+                return false
+            end
+
+            -- 2) Update standard body parts and copy their attachments / effects.
             for _, fromPart in ipairs(cardObj:GetDescendants()) do
                 if fromPart:IsA("BasePart") then
                     local myPart = char:FindFirstChild(fromPart.Name)
-                    if myPart and myPart:IsA("BasePart") then
+                    if myPart and myPart:IsA("BasePart") and standardParts[fromPart.Name] then
+
+
+                        local isHead = fromPart.Name == "Head"
+                        local changesFace = isHead and cardHeadChangesFace(fromPart)
+
                         if fromPart:IsA("MeshPart") and myPart:IsA("MeshPart") then
-                            if fromPart.MeshId ~= "" then myPart.MeshId = fromPart.MeshId end
-                            if fromPart.TextureID ~= "" then myPart.TextureID = fromPart.TextureID end
+                            if fromPart.MeshId ~= "" and (not isHead or changesFace) then
+                                myPart.MeshId = fromPart.MeshId
+                            end
+                            if fromPart.TextureID ~= "" and (not isHead or changesFace) then
+                                myPart.TextureID = fromPart.TextureID
+                            end
                         elseif fromPart:FindFirstChildOfClass("SpecialMesh") and myPart:FindFirstChildOfClass("SpecialMesh") then
                             local fromMesh = fromPart:FindFirstChildOfClass("SpecialMesh")
                             local myMesh = myPart:FindFirstChildOfClass("SpecialMesh")
@@ -1946,38 +3238,60 @@ function applySelectedCard()
                             if fromMesh.TextureId ~= "" then myMesh.TextureId = fromMesh.TextureId end
                             if fromMesh.MeshType then myMesh.MeshType = fromMesh.MeshType end
                         end
+
                         myPart.Color = fromPart.Color
                         myPart.Size = fromPart.Size
                         myPart.Transparency = fromPart.Transparency
                         myPart.Reflectance = fromPart.Reflectance
                         myPart.Material = fromPart.Material
-                    end
-                end
-            end
 
-            -- 3) Remove old accessories/hats and old evolution attachments.
-            for _, part in ipairs(char:GetDescendants()) do
-                if part:IsA("Accessory") or part:IsA("Hat") then
-                    pcall(function() hum:RemoveAccessory(part) end)
-                    part:Destroy()
-                elseif part:IsA("BasePart") then
-                    for _, att in ipairs(part:GetChildren()) do
-                        if att:IsA("Attachment") and att:GetAttribute("EvolutionCardAtt") then
-                            att:Destroy()
-                        end
-                    end
-                end
-            end
-
-            -- 4) Copy attachments first so accessories have their mount points.
-            for _, fromPart in ipairs(cardObj:GetDescendants()) do
-                if fromPart:IsA("BasePart") then
-                    local myPart = char:FindFirstChild(fromPart.Name)
-                    if myPart then
-                        for _, att in ipairs(fromPart:GetChildren()) do
-                            if att:IsA("Attachment") then
-                                local clone = att:Clone()
+                        -- Copy attachments, decals, particles, trails, lights, face controls, etc.
+                        for _, child in ipairs(fromPart:GetChildren()) do
+                            if child:IsA("Motor6D") or child:IsA("Weld") then
+                                continue
+                            end
+                            if child:IsA("Attachment") then
+                                -- Don't overwrite rig attachments; replace only mount/FX attachments.
+                                local existing = myPart:FindFirstChild(child.Name)
+                                if existing and existing:IsA("Attachment") then
+                                    if child.Name:find("RigAttachment") then
+                                        continue
+                                    end
+                                    existing:Destroy()
+                                end
+                                local clone = child:Clone()
                                 clone:SetAttribute("EvolutionCardAtt", true)
+                                clone.Parent = myPart
+                            elseif child:IsA("BasePart") then
+                                -- Extra meshpart welded to this body part (hair, horns, eye glow, etc.)
+                                local clone = child:Clone()
+                                clone.Anchored = false
+                                clone.CanCollide = false
+                                clone.Massless = true
+                                clone:SetAttribute("EvolutionCardExtra", true)
+                                for _, w in ipairs(clone:GetChildren()) do
+                                    if w:IsA("Weld") or w:IsA("Motor6D") or w:IsA("ManualWeld") then
+                                        w:Destroy()
+                                    end
+                                end
+                                clone.Parent = myPart
+
+                                local oldWeld = child:FindFirstChildWhichIsA("Weld") or child:FindFirstChildWhichIsA("Motor6D") or child:FindFirstChildWhichIsA("ManualWeld")
+                                local weld = Instance.new("Weld")
+                                weld.Part0 = myPart
+                                weld.Part1 = clone
+                                if oldWeld then
+                                    weld.C0 = oldWeld.C0
+                                    weld.C1 = oldWeld.C1
+                                end
+                                weld.Parent = clone
+                            else
+                                local existing = myPart:FindFirstChild(child.Name)
+                                if existing and existing.ClassName == child.ClassName then
+                                    existing:Destroy()
+                                end
+                                local clone = child:Clone()
+                                clone:SetAttribute("EvolutionCardExtra", true)
                                 clone.Parent = myPart
                             end
                         end
@@ -1985,40 +3299,227 @@ function applySelectedCard()
                 end
             end
 
-            -- 5) Add card accessories / hats.
-            for _, acc in ipairs(cardObj:GetDescendants()) do
-                if acc:IsA("Accessory") or acc:IsA("Hat") then
-                    local clone = acc:Clone()
-                    for _, p in ipairs(clone:GetDescendants()) do
-                        if p:IsA("BasePart") then
-                            p.Anchored = false
-                            p.CanCollide = false
-                            p.Massless = true
-                        elseif p:IsA("Weld") and p.Name == "AccessoryWeld" then
-                            p:Destroy()
+            -- 4) Clone all accessories (anywhere in the card) using a reliable manual weld.
+            local function attachAccessory(acc)
+                local handle = acc:FindFirstChild("Handle") or acc:FindFirstChildWhichIsA("BasePart")
+                if not handle then return end
+
+                -- Strip stale welds so AddAccessory / our manual weld can take over.
+                for _, w in ipairs(handle:GetChildren()) do
+                    if w:IsA("Weld") or w:IsA("Motor6D") or w:IsA("ManualWeld") then
+                        w:Destroy()
+                    end
+                end
+                handle.Anchored = false
+                handle.CanCollide = false
+                handle.Massless = true
+
+                -- Use a handle attachment that has a matching mount on the character body.
+                local candidates = {}
+                for _, att in ipairs(handle:GetChildren()) do
+                    if att:IsA("Attachment") then
+                        for _, part in ipairs(char:GetDescendants()) do
+                            if part:IsA("BasePart") and part ~= handle and not part:IsDescendantOf(acc) then
+                                local mount = part:FindFirstChild(att.Name)
+                                if mount and mount:IsA("Attachment") then
+                                    table.insert(candidates, {att = att, part = part, mount = mount})
+                                    break
+                                end
+                            end
                         end
                     end
-                    clone.Parent = char
-                    pcall(function() hum:AddAccessory(clone) end)
+                end
+
+                if #candidates > 0 then
+                    local priority = {HatAttachment = 1, HairAttachment = 2, FaceFrontAttachment = 3, FaceCenterAttachment = 4, NeckAttachment = 5}
+                    table.sort(candidates, function(a, b)
+                        local pa = priority[a.att.Name] or 99
+                        local pb = priority[b.att.Name] or 99
+                        return pa < pb
+                    end)
+                    local c = candidates[1]
+                    local weld = Instance.new("Weld")
+                    weld.Name = "AccessoryWeld"
+                    weld.Part0 = c.part
+                    weld.Part1 = handle
+                    weld.C0 = c.mount.CFrame
+                    weld.C1 = c.att.CFrame
+                    weld.Parent = handle
+                    return
+                end
+
+                pcall(function() hum:AddAccessory(acc) end)
+            end
+
+            local accessorySet = {}
+            for _, acc in ipairs(cardObj:GetDescendants()) do
+                if acc:IsA("Accessory") or acc:IsA("Hat") then
+                    accessorySet[acc] = true
                 end
             end
 
-            -- 6) Face decal.
+            for acc in pairs(accessorySet) do
+                local accHandle = acc:FindFirstChild("Handle") or acc:FindFirstChildWhichIsA("BasePart")
+                if not accHandle then continue end
+
+                local clone = acc:Clone()
+                clone:SetAttribute("EvolutionCardExtra", true)
+                for _, p in ipairs(clone:GetDescendants()) do
+                    if p:IsA("BasePart") then
+                        p.Anchored = false
+                        p.CanCollide = false
+                        p.Massless = true
+                    end
+                end
+                clone.Parent = char
+                attachAccessory(clone)
+            end
+
+            -- 5) Clone extra parts, models/folders and any other top-level items.
+            local function containsAccessory(obj)
+                for _, d in ipairs(obj:GetDescendants()) do
+                    if d:IsA("Accessory") or d:IsA("Hat") then return true end
+                end
+                return false
+            end
+
+            for _, child in ipairs(cardObj:GetChildren()) do
+                if child:IsA("Humanoid") or child:IsA("Accessory") or child:IsA("Hat") then
+                    continue
+                elseif child:IsA("BasePart") and not standardParts[child.Name] then
+                    -- Extra meshparts (custom hair, horns, eye glow, etc.) welded to a body part.
+                    local clone = child:Clone()
+                    clone.Anchored = false
+                    clone.CanCollide = false
+                    clone.Massless = true
+                    clone:SetAttribute("EvolutionCardExtra", true)
+                    for _, w in ipairs(clone:GetChildren()) do
+                        if w:IsA("Weld") or w:IsA("Motor6D") or w:IsA("ManualWeld") then
+                            w:Destroy()
+                        end
+                    end
+
+                    local parentPart, c0, c1, externalIsPart0
+                    for _, w in ipairs(cardObj:GetDescendants()) do
+                        if w:IsA("Weld") or w:IsA("Motor6D") or w:IsA("ManualWeld") then
+                            if w.Part0 == child and w.Part1 and standardParts[w.Part1.Name] then
+                                parentPart = char:FindFirstChild(w.Part1.Name)
+                                c0, c1 = w.C0, w.C1
+                                externalIsPart0 = false
+                                break
+                            elseif w.Part1 == child and w.Part0 and standardParts[w.Part0.Name] then
+                                parentPart = char:FindFirstChild(w.Part0.Name)
+                                c0, c1 = w.C0, w.C1
+                                externalIsPart0 = true
+                                break
+                            end
+                        end
+                    end
+
+                    clone.Parent = parentPart or char
+                    if parentPart and parentPart:IsA("BasePart") then
+                        local weld = Instance.new("Weld")
+                        if externalIsPart0 then
+                            weld.Part0 = parentPart
+                            weld.Part1 = clone
+                            weld.C0 = c0
+                            weld.C1 = c1
+                        else
+                            weld.Part0 = clone
+                            weld.Part1 = parentPart
+                            weld.C0 = c1
+                            weld.C1 = c0
+                        end
+                        weld.Parent = clone
+                    end
+                elseif child:IsA("Model") or child:IsA("Folder") then
+                    -- Skip folders that are just accessory containers or full rigs; they were already handled.
+                    if containsAccessory(child) then
+                        continue
+                    end
+                    local function containsStandardPart(obj)
+                        for _, d in ipairs(obj:GetDescendants()) do
+                            if d:IsA("BasePart") and standardParts[d.Name] then
+                                return true
+                            end
+                        end
+                        return false
+                    end
+                    if containsStandardPart(child) then
+                        continue
+                    end
+                    local clone = child:Clone()
+                    for _, d in ipairs(clone:GetDescendants()) do
+                        if d:IsA("BasePart") then
+                            d.Anchored = false
+                            d.CanCollide = false
+                            d.Massless = true
+                        end
+                        d:SetAttribute("EvolutionCardExtra", true)
+                    end
+                    clone:SetAttribute("EvolutionCardExtra", true)
+                    clone.Parent = char
+                elseif child.ClassName ~= "BodyColors" and child.ClassName ~= "Shirt" and child.ClassName ~= "Pants" and child.ClassName ~= "ShirtGraphic" and child.ClassName ~= "HumanoidDescription" and not child:IsA("BaseScript") and not child:IsA("BasePart") then
+                    local clone = child:Clone()
+                    clone:SetAttribute("EvolutionCardExtra", true)
+                    clone.Parent = char
+                end
+            end
+
+            -- 5) Face decals / face controls from the card head.
             local cardHead = cardObj:FindFirstChild("Head")
             local myHead = char:FindFirstChild("Head")
             if cardHead and myHead then
-                local hasCardFace = false
-                for _, d in ipairs(cardHead:GetDescendants()) do
-                    if d:IsA("Decal") then hasCardFace = true break end
-                end
-                if hasCardFace then
+                if cardHeadChangesFace(cardHead) then
                     for _, d in ipairs(myHead:GetChildren()) do
                         if d:IsA("Decal") then d:Destroy() end
                     end
                     for _, d in ipairs(cardHead:GetDescendants()) do
-                        if d:IsA("Decal") then
+                        if d:IsA("Decal") or d:IsA("FaceControls") then
                             local clone = d:Clone()
                             clone.Parent = myHead
+                        end
+                    end
+                end
+            end
+
+            -- 6) Defensive cleanup: Roblox may re-apply default BodyColors / clothing
+            -- after we clone them, and any leftover bare body-part clones would fling us.
+            local function keepCloned(class)
+                local kept = nil
+                for _, c in ipairs(char:GetChildren()) do
+                    if c.ClassName == class and c:GetAttribute("EvolutionCardExtra") then
+                        kept = c
+                        break
+                    end
+                end
+                if kept then
+                    for _, c in ipairs(char:GetChildren()) do
+                        if c ~= kept and c.ClassName == class then
+                            pcall(function() c:Destroy() end)
+                        end
+                    end
+                end
+            end
+            keepCloned("BodyColors")
+            keepCloned("Shirt")
+            keepCloned("Pants")
+            keepCloned("ShirtGraphic")
+
+            for name in pairs(standardParts) do
+                local real = nil
+                for _, c in ipairs(char:GetChildren()) do
+                    if c.Name == name and c:IsA("BasePart") then
+                        if c:FindFirstChildWhichIsA("Motor6D") or c:FindFirstChildWhichIsA("AnimationConstraint") or c:FindFirstChild(name .. "RigAttachment") then
+                            real = c
+                            break
+                        end
+                    end
+                end
+                if real then
+                    for _, c in ipairs(char:GetChildren()) do
+                        if c ~= real and c.Name == name and c:IsA("BasePart") then
+                            pcall(function() c:Destroy() end)
                         end
                     end
                 end
@@ -2035,7 +3536,6 @@ end
 -- ============================================================
 
 local function getTargetAmmo(character)
-    if not character then return 0, 0 end
     local tool = character:FindFirstChildOfClass("Tool")
     if not tool then return 0, 0 end
     local s = tool:FindFirstChild("Script")
@@ -2794,9 +4294,33 @@ trackConnection(RunService.RenderStepped:Connect(function()
 
 end))
 
+local function hasToolEquipped()
+    local char = LocalPlayer.Character
+    if not char then return false end
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Tool") then return true end
+    end
+    return false
+end
+
 -- Aim Assist camlock (runs after the camera updates so it actually sticks)
 local function runAimAssist()
-    if not cfg.AimAssistEnabled then return end
+    if not cfg.AimAssistEnabled then
+        aimAssistLockedModel = nil
+        aimAssistLockedPart = nil
+        aimAssistCurrentCF = nil
+        aimAssistLockOnce = false
+        return
+    end
+
+    if cfg.AimAssistPauseOnTool and hasToolEquipped() then
+        aimAssistLockedModel = nil
+        aimAssistLockedPart = nil
+        aimAssistCurrentCF = nil
+        aimAssistLockOnce = false
+        return
+    end
+
     local targetInfo = getTargetPlayer()
     if not (targetInfo and targetInfo.Model and targetInfo.Model.Parent) then return end
 
@@ -2811,7 +4335,14 @@ local function runAimAssist()
     local predictedPos = aimPart.Position + velocity * cfg.AimAssistPrediction
     local targetCF = CFrame.new(Camera.CFrame.Position, predictedPos)
     local smoothing = math.clamp(cfg.AimAssistSmoothing, 0.01, 1)
-    Camera.CFrame = Camera.CFrame:Lerp(targetCF, smoothing)
+
+    -- Keep our own desired camera CFrame so user mouse movement can't pull off target.
+    -- The smoothing slider controls how fast the camera converges back to the aimpart.
+    if not aimAssistCurrentCF then
+        aimAssistCurrentCF = Camera.CFrame
+    end
+    aimAssistCurrentCF = aimAssistCurrentCF:Lerp(targetCF, smoothing)
+    Camera.CFrame = aimAssistCurrentCF
 end
 
 pcall(function()
@@ -2820,26 +4351,41 @@ end)
 RunService:BindToRenderStep("EvolutionAimAssist", Enum.RenderPriority.Camera.Value + 1, runAimAssist)
 
 -- Auto-apply cosmetics and force them back if the server resets them.
-local lastSkinTool = nil
 local lastSkinApply = 0
 local lastCardApply = 0
 trackConnection(RunService.RenderStepped:Connect(function()
     if cfg.SkinChangerEnabled and cfg.AutoApplySkin then
-        local tool = getEquippedGun()
-        if tool then
-            local skin = tool:FindFirstChild("Skin")
-            local isRifle = tool.Name:lower():find("carabine") or tool.Name:lower():find("rifle")
-            local key = isRifle and cfg.SelectedRifleSkinKey or cfg.SelectedPistolSkinKey
-            local tag = key and ((isRifle and "Carabine" or "Pistol") .. " / " .. key) or nil
-            local wrongSkin = skin and skin:GetAttribute("EvolutionSkinKey") ~= tag
-            local shouldApply = key and (not skin or wrongSkin)
-            local shouldRemove = not key and skin
-            if (shouldApply or shouldRemove) and tick() - lastSkinApply >= 0.05 then
-                lastSkinApply = tick()
-                applySelectedSkin()
+        -- Enforce skins on every gun the player owns, whether it's currently equipped
+        -- or holstered on the waist/back. This way the custom skin shows up everywhere.
+        for _, parent in ipairs({LocalPlayer.Character, LocalPlayer.Backpack}) do
+            if not parent then continue end
+            for _, tool in ipairs(parent:GetChildren()) do
+                if not isGunInstance(tool) then continue end
+
+                local isRifle = tool.Name:lower():find("carabine") or tool.Name:lower():find("rifle")
+                local key = isRifle and cfg.SelectedRifleSkinKey or cfg.SelectedPistolSkinKey
+                local tag = key and ((isRifle and "Carabine" or "Pistol") .. " / " .. key) or nil
+
+                -- Purge wrong/stale skins every frame so the server-owned skin never overlaps.
+                local hasCorrect = false
+                for _, child in ipairs(tool:GetChildren()) do
+                    if child.Name == "Skin" and child:IsA("Model") then
+                        if key and child:GetAttribute("EvolutionSkinKey") == tag then
+                            hasCorrect = true
+                        else
+                            child:Destroy()
+                        end
+                    end
+                end
+
+                local shouldApply = key and not hasCorrect
+                local shouldRemoveAll = not key and hasCorrect
+                if (shouldApply or shouldRemoveAll) and tick() - lastSkinApply >= 0.05 then
+                    lastSkinApply = tick()
+                    applySkinToTool(tool)
+                end
             end
         end
-        lastSkinTool = tool
     end
 
     if cfg.CardChangerEnabled and cfg.AutoApplyCard and cfg.SelectedCardKey then
@@ -2851,16 +4397,550 @@ trackConnection(RunService.RenderStepped:Connect(function()
             end
         end
     end
+
 end))
 
 trackConnection(LocalPlayer.CharacterAdded:Connect(function(char)
-    lastSkinTool = nil
     task.wait(0.2)
     if cfg.SkinChangerEnabled and cfg.AutoApplySkin then
         applySelectedSkin()
     end
     if cfg.CardChangerEnabled and cfg.AutoApplyCard and cfg.SelectedCardKey then
         applySelectedCard()
+    end
+end))
+
+-- ============================================================
+-- BACKPACK CHANGER
+-- ============================================================
+local originalBackpack = nil
+local currentBackpackName = nil
+
+local function findEquippedBackpack(char)
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Accessory") and (backpackNameSet[child.Name] or child.Name == "EvolutionBackpack") then
+            return child
+        end
+    end
+    return nil
+end
+
+local function removeCustomBackpack(char)
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Accessory") and child.Name == "EvolutionBackpack" then
+            child:Destroy()
+        end
+    end
+end
+
+local function clearHandleWelds(handle)
+    for _, child in ipairs(handle:GetChildren()) do
+        if child:IsA("Weld") or child:IsA("ManualWeld") or child:IsA("AccessoryWeld") then
+            child:Destroy()
+        end
+    end
+end
+
+local function weldBackpackAccessory(accessory, char)
+    local handle = accessory:FindFirstChild("Handle")
+    if not handle then return end
+    local torso = char:FindFirstChild("UpperTorso") or char:FindFirstChild("Torso")
+    if not torso then return end
+
+    local handleAttach
+    for _, child in ipairs(handle:GetChildren()) do
+        if child:IsA("Attachment") then
+            handleAttach = child
+            break
+        end
+    end
+    local torsoAttach = handleAttach and torso:FindFirstChild(handleAttach.Name)
+    if not handleAttach or not torsoAttach then return end
+
+    clearHandleWelds(handle)
+    handle.Anchored = false
+    handle.CanCollide = false
+
+    handle.CFrame = torsoAttach.WorldCFrame * handleAttach.CFrame:Inverse()
+    local weld = Instance.new("Weld")
+    weld.Name = "EvolutionBackpackWeld"
+    weld.Part0 = torso
+    weld.Part1 = handle
+    weld.C0 = torso.CFrame:ToObjectSpace(handle.CFrame)
+    weld.Parent = handle
+end
+
+local function applyBackpackChanger()
+    if not cfg.BackpackChangerEnabled then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return end
+
+    if currentBackpackName == cfg.SelectedBackpack and char:FindFirstChild("EvolutionBackpack") then
+        return
+    end
+
+    if originalBackpack == nil then
+        local current = findEquippedBackpack(char)
+        originalBackpack = current and current:Clone() or false
+    end
+
+    -- Remove any backpack currently on the character.
+    for _, child in ipairs(char:GetChildren()) do
+        if child:IsA("Accessory") and (backpackNameSet[child.Name] or child.Name == "EvolutionBackpack") then
+            child:Destroy()
+        end
+    end
+
+    local selected = BackpackFolder and BackpackFolder:FindFirstChild(cfg.SelectedBackpack)
+    if selected and selected:IsA("Accessory") and selected:FindFirstChild("Handle") then
+        local clone = selected:Clone()
+        clone.Name = "EvolutionBackpack"
+        clone.Parent = char
+        weldBackpackAccessory(clone, char)
+        currentBackpackName = cfg.SelectedBackpack
+    else
+        currentBackpackName = nil
+    end
+end
+
+local function restoreOriginalBackpack()
+    local char = LocalPlayer.Character
+    if not char then return end
+    removeCustomBackpack(char)
+    if originalBackpack and originalBackpack ~= false then
+        local clone = originalBackpack:Clone()
+        clone.Parent = char
+        weldBackpackAccessory(clone, char)
+    end
+    originalBackpack = nil
+    currentBackpackName = nil
+end
+
+trackConnection(RunService.Heartbeat:Connect(function()
+    if cfg.BackpackChangerEnabled then
+        applyBackpackChanger()
+    elseif originalBackpack ~= nil or currentBackpackName ~= nil then
+        restoreOriginalBackpack()
+    end
+end))
+
+trackConnection(LocalPlayer.CharacterAdded:Connect(function()
+    originalBackpack = nil
+    currentBackpackName = nil
+end))
+
+-- ============================================================
+-- BULLET TRACERS
+-- ============================================================
+local function isTracerPart(part)
+    if not part or part.ClassName ~= "Part" then return false end
+    return part:FindFirstChild("Start") and part:FindFirstChild("End") and part:FindFirstChild("Fire") and part:FindFirstChild("Smoke")
+end
+
+local function applyColorToTracerPart(part, color)
+    part.Color = color
+    local fire = part:FindFirstChild("Fire")
+    local smoke = part:FindFirstChild("Smoke")
+    if fire then
+        fire.Color = ColorSequence.new(color)
+        fire.LightEmission = 1
+    end
+    if smoke then
+        smoke.Color = ColorSequence.new(color)
+        smoke.LightEmission = 0.5
+    end
+end
+
+local function fadeOutTracer(part, lifetime)
+    local fire = part:FindFirstChild("Fire")
+    local smoke = part:FindFirstChild("Smoke")
+    local info = TweenInfo.new(lifetime, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    if smoke then
+        pcall(function()
+            TweenService:Create(smoke, info, { Width0 = 0, Width1 = 0 }):Play()
+        end)
+    end
+    if fire then
+        pcall(function()
+            TweenService:Create(fire, info, { Width0 = 0, Width1 = 0 }):Play()
+        end)
+    end
+end
+
+local function applyTracerSettings(part, color, lifetime, fadeOut)
+    applyColorToTracerPart(part, color)
+
+    local target = part
+    if lifetime ~= 1 then
+        local clone = part:Clone()
+        if clone then
+            clone:SetAttribute("EvolutionTracerClone", true)
+            applyColorToTracerPart(clone, color)
+            clone.Parent = part.Parent
+            target = clone
+            Debris:AddItem(clone, lifetime)
+            if lifetime < 1 then
+                Debris:AddItem(part, lifetime)
+            end
+        end
+    end
+
+    if fadeOut then
+        fadeOutTracer(target, lifetime)
+    end
+end
+
+local function handleTracerPart(part)
+    if not isTracerPart(part) then return end
+    if part:GetAttribute("EvolutionTracerClone") or part:GetAttribute("EvolutionTracerHandled") then return end
+
+    part:SetAttribute("EvolutionTracerHandled", true)
+
+    local isLocal = tick() <= localTracerActiveUntil
+    if isLocal and cfg.LocalBulletTracerEnabled then
+        applyTracerSettings(part, cfg.LocalBulletTracerColor, cfg.LocalBulletTracerLifetime, cfg.LocalBulletTracerFadeOut)
+    elseif not isLocal and cfg.OtherBulletTracerEnabled then
+        applyTracerSettings(part, cfg.OtherBulletTracerColor, cfg.OtherBulletTracerLifetime, cfg.OtherBulletTracerFadeOut)
+    end
+end
+
+local function hookTracerCache(cache)
+    if not cache or cache:GetAttribute("EvolutionTracerHooked") then return end
+    cache:SetAttribute("EvolutionTracerHooked", true)
+    trackConnection(cache.ChildAdded:Connect(handleTracerPart))
+    for _, child in ipairs(cache:GetChildren()) do
+        handleTracerPart(child)
+    end
+end
+
+local existingCache = Workspace:FindFirstChild("Cache")
+if existingCache then
+    hookTracerCache(existingCache)
+end
+trackConnection(Workspace.ChildAdded:Connect(function(child)
+    if child.Name == "Cache" and child:IsA("Folder") then
+        hookTracerCache(child)
+    end
+end))
+
+-- ============================================================
+-- LIGHTING CHANGER
+-- ============================================================
+local lightingOriginal = nil
+local lightingApplied = false
+local evolutionColorCorrection = nil
+local atmosphereOriginal = nil
+
+local function getColorCorrection()
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("ColorCorrectionEffect") then return child end
+    end
+    return nil
+end
+
+local function getAtmosphere()
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("Atmosphere") then return child end
+    end
+    return nil
+end
+
+local function captureLightingOriginal()
+    if lightingOriginal then return end
+    local cc = getColorCorrection()
+    local atmo = getAtmosphere()
+    lightingOriginal = {
+        ClockTime = Lighting.ClockTime,
+        Brightness = Lighting.Brightness,
+        Ambient = Lighting.Ambient,
+        OutdoorAmbient = Lighting.OutdoorAmbient,
+    }
+    if cc then
+        lightingOriginal.ColorCorrection = {
+            Enabled = cc.Enabled,
+            TintColor = cc.TintColor,
+            Saturation = cc.Saturation,
+            Contrast = cc.Contrast,
+        }
+    end
+    if atmo then
+        lightingOriginal.Atmosphere = {
+            Density = atmo.Density,
+            Haze = atmo.Haze,
+            Color = atmo.Color,
+        }
+    end
+end
+
+local function applyLightingChanger()
+    captureLightingOriginal()
+    Lighting.ClockTime = cfg.LightingTimeOfDay
+    Lighting.Brightness = cfg.LightingBrightness
+    Lighting.Ambient = cfg.LightingAmbient
+    Lighting.OutdoorAmbient = cfg.LightingOutdoorAmbient
+
+    local cc = getColorCorrection()
+    if not cc then
+        if not evolutionColorCorrection or not evolutionColorCorrection.Parent then
+            evolutionColorCorrection = Instance.new("ColorCorrectionEffect")
+            evolutionColorCorrection.Name = "EvolutionColorCorrection"
+            evolutionColorCorrection.Parent = Lighting
+        end
+        cc = evolutionColorCorrection
+    end
+    if cc then
+        cc.Enabled = cfg.LightingColorCorrectionEnabled
+        cc.TintColor = cfg.LightingColorCorrectionTint
+        cc.Saturation = cfg.LightingColorCorrectionSaturation
+        cc.Contrast = cfg.LightingColorCorrectionContrast
+    end
+
+    local atmo = getAtmosphere()
+    if atmo then
+        atmo.Density = cfg.LightingAtmosphereDensity
+        atmo.Haze = cfg.LightingAtmosphereHaze
+        atmo.Color = cfg.LightingAtmosphereColor
+    end
+    lightingApplied = true
+end
+
+local function restoreLightingOriginal()
+    if not lightingOriginal then return end
+    Lighting.ClockTime = lightingOriginal.ClockTime
+    Lighting.Brightness = lightingOriginal.Brightness
+    Lighting.Ambient = lightingOriginal.Ambient
+    Lighting.OutdoorAmbient = lightingOriginal.OutdoorAmbient
+
+    local cc = getColorCorrection()
+    if cc then
+        if lightingOriginal.ColorCorrection then
+            cc.Enabled = lightingOriginal.ColorCorrection.Enabled
+            cc.TintColor = lightingOriginal.ColorCorrection.TintColor
+            cc.Saturation = lightingOriginal.ColorCorrection.Saturation
+            cc.Contrast = lightingOriginal.ColorCorrection.Contrast
+        elseif cc.Name == "EvolutionColorCorrection" then
+            cc:Destroy()
+        end
+    end
+
+    local atmo = getAtmosphere()
+    if atmo and lightingOriginal.Atmosphere then
+        atmo.Density = lightingOriginal.Atmosphere.Density
+        atmo.Haze = lightingOriginal.Atmosphere.Haze
+        atmo.Color = lightingOriginal.Atmosphere.Color
+    end
+    lightingApplied = false
+end
+
+trackConnection(RunService.RenderStepped:Connect(function()
+    if cfg.LightingChangerEnabled then
+        applyLightingChanger()
+    elseif lightingApplied then
+        restoreLightingOriginal()
+    end
+end))
+
+-- ============================================================
+-- WEATHER
+-- ============================================================
+local weatherPart = nil
+local weatherParticle = nil
+local weatherConnection = nil
+
+local weatherTypes = {
+    ["rain"] = {
+        Speed = NumberRange.new(60, 60),
+        LockedToPart = true,
+        Rate = 600,
+        Texture = "rbxassetid://1822883048",
+        EmissionDirection = Enum.NormalId.Bottom,
+        Transparency = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 1),
+            NumberSequenceKeypoint.new(0.25, 0.7842668294906616),
+            NumberSequenceKeypoint.new(0.75, 0.7842668294906616),
+            NumberSequenceKeypoint.new(1, 1)
+        },
+        Lifetime = NumberRange.new(0.800000011920929, 0.800000011920929),
+        LightEmission = 0.05000000074505806,
+        LightInfluence = 0.8999999761581421,
+        Orientation = Enum.ParticleOrientation.FacingCameraWorldUp,
+        Size = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 10),
+            NumberSequenceKeypoint.new(1, 10)
+        }
+    },
+    ["snow"] = {
+        Transparency = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 0.7374999523162842),
+            NumberSequenceKeypoint.new(0.973, 0.768750011920929),
+            NumberSequenceKeypoint.new(1, 1)
+        },
+        Texture = "http://www.roblox.com/asset/?id=99851851",
+        SpreadAngle = Vector2.new(50, 50),
+        Speed = NumberRange.new(30, 30),
+        LightEmission = 0.5,
+        Rate = 1000,
+        EmissionDirection = Enum.NormalId.Bottom,
+        Size = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 0.33096909523010254),
+            NumberSequenceKeypoint.new(0.551, 0.40189146995544434),
+            NumberSequenceKeypoint.new(1, 0.33096909523010254)
+        }
+    },
+    ["light rain"] = {
+        LockedToPart = true,
+        Rate = 500,
+        Squash = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 3),
+            NumberSequenceKeypoint.new(1, 3)
+        },
+        LightInfluence = 0.30000001192092896,
+        Transparency = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 0),
+            NumberSequenceKeypoint.new(0.435, 0),
+            NumberSequenceKeypoint.new(1, 0)
+        },
+        Texture = "rbxasset://textures/particles/sparkles_main.dds",
+        Speed = NumberRange.new(30, 50),
+        Lifetime = NumberRange.new(9, 9),
+        LightEmission = 0.5,
+        Brightness = 2,
+        EmissionDirection = Enum.NormalId.Bottom,
+        Orientation = Enum.ParticleOrientation.FacingCameraWorldUp,
+        Size = NumberSequence.new{
+            NumberSequenceKeypoint.new(0, 0.20000000298023224),
+            NumberSequenceKeypoint.new(1, 0.20000000298023224)
+        }
+    }
+}
+
+local weatherOffset = Vector3.new(0, 20, 0)
+
+local function cleanupWeather()
+    if weatherPart then
+        weatherPart:Destroy()
+        weatherPart = nil
+    end
+    weatherParticle = nil
+    if weatherConnection then
+        weatherConnection:Disconnect()
+        weatherConnection = nil
+    end
+end
+
+local function applyWeatherConfig()
+    if not cfg.WeatherEnabled then
+        cleanupWeather()
+        return
+    end
+
+    local data = weatherTypes[cfg.WeatherType]
+    if not data then
+        cleanupWeather()
+        return
+    end
+
+    if not weatherPart or not weatherPart.Parent then
+        cleanupWeather()
+        weatherPart = Instance.new("Part")
+        weatherPart.Size = Vector3.new(40, 40, 85)
+        weatherPart.CanCollide = false
+        weatherPart.Massless = true
+        weatherPart.CastShadow = false
+        weatherPart.Transparency = 1
+        weatherPart.Anchored = true
+        weatherPart.Name = "EvolutionWeatherPart"
+        weatherPart.Parent = Workspace
+    end
+
+    if not weatherParticle or weatherParticle.Parent ~= weatherPart then
+        if weatherParticle then weatherParticle:Destroy() end
+        weatherParticle = Instance.new("ParticleEmitter")
+        for prop, val in pairs(data) do
+            weatherParticle[prop] = val
+        end
+        weatherParticle.Parent = weatherPart
+    else
+        -- Re-apply properties in case the type changed.
+        for prop, val in pairs(data) do
+            weatherParticle[prop] = val
+        end
+    end
+
+    weatherParticle.Color = ColorSequence.new(cfg.WeatherColor)
+    weatherParticle.Rate = cfg.WeatherRate * 10
+
+    if not weatherConnection then
+        weatherConnection = RunService.Heartbeat:Connect(function()
+            local cam = Workspace.CurrentCamera
+            if weatherPart and cam then
+                weatherPart.CFrame = CFrame.new(cam.CFrame.Position) + weatherOffset
+            end
+        end)
+    end
+end
+
+trackConnection(RunService.Heartbeat:Connect(function()
+    applyWeatherConfig()
+end))
+
+-- ============================================================
+-- SKYBOX CHANGER
+-- ============================================================
+local skyboxOriginal = nil
+local skyboxCurrentName = nil
+
+local function getCurrentLightingSky()
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("Sky") then return child end
+    end
+    return nil
+end
+
+local function clearLightingSkies()
+    for _, child in ipairs(Lighting:GetChildren()) do
+        if child:IsA("Sky") then
+            child:Destroy()
+        end
+    end
+end
+
+local function applySelectedSkybox()
+    if not (SkyboxFolder and cfg.SkyboxChangerEnabled) then return end
+    local selected = SkyboxFolder:FindFirstChild(cfg.SelectedSkybox)
+    if not selected or not selected:IsA("Sky") then return end
+    if skyboxCurrentName == selected.Name and getCurrentLightingSky() then return end
+
+    if skyboxOriginal == nil then
+        local current = getCurrentLightingSky()
+        skyboxOriginal = current and current:Clone() or false
+    end
+
+    clearLightingSkies()
+    local clone = selected:Clone()
+    clone.Name = "EvolutionSkybox"
+    clone.Parent = Lighting
+    skyboxCurrentName = selected.Name
+end
+
+local function restoreOriginalSkybox()
+    clearLightingSkies()
+    if skyboxOriginal and skyboxOriginal ~= false then
+        local clone = skyboxOriginal:Clone()
+        clone.Parent = Lighting
+    end
+    skyboxCurrentName = nil
+end
+
+trackConnection(RunService.RenderStepped:Connect(function()
+    if cfg.SkyboxChangerEnabled then
+        applySelectedSkybox()
+    else
+        if skyboxCurrentName ~= nil then
+            restoreOriginalSkybox()
+        end
     end
 end))
 
