@@ -507,7 +507,9 @@ local function playFrozenEmote()
     -- Core priority + weight 1: the track is active and replicates server-side,
     -- but default idle/walk animations (Movement priority) override it locally.
     AnimGodmode.Track.Priority = Enum.AnimationPriority.Core
-    AnimGodmode.Track:Play(0, 1, 1)
+    -- Weight 0 keeps the track active/replicating (so the godmode state still works)
+    -- but produces no visible pose, so nobody sees the emote animation.
+    AnimGodmode.Track:Play(0, 0, 1)
     AnimGodmode.Heartbeat = RunService.Heartbeat:Connect(function()
         if AnimGodmode.Track and AnimGodmode.Enabled then
             AnimGodmode.Track.TimePosition = AnimGodmode.FreezeTime
