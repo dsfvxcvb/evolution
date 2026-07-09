@@ -2,10 +2,13 @@
 -- Config (set before running):
 --   getgenv().DuelBotMode     = "Winner" or "Loser"
 --   getgenv().DuelBotOpponent = "OtherAccountUsername"
+-- Optional: force both accounts to use the same pad id (use MCP to pick a free one)
+--   getgenv().DuelBotPadId    = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"
 
 local cfg = {
     Mode = getgenv().DuelBotMode or "Winner",
     OpponentName = getgenv().DuelBotOpponent or nil,
+    PadId = getgenv().DuelBotPadId or nil,
 }
 
 assert(cfg.OpponentName and cfg.OpponentName ~= "", "DuelBotOpponent must be set")
@@ -202,11 +205,25 @@ local function main()
     end
 
     local selectedPad = nil
-    for attempt = 1, 60 do
-        selectedPad = findSuitablePad(opponent)
-        if selectedPad then break end
-        log("No suitable 1vs1 pad yet, retrying... (" .. attempt .. ")")
-        task.wait(0.5)
+    if cfg.PadId then
+        for _, pad in ipairs(getAll1v1Pads()) do
+            local desc = getPadDescriptor(pad)
+            if desc and tostring(desc.padId) == tostring(cfg.PadId) then
+                selectedPad = desc
+                break
+            end
+        end
+        if not selectedPad then
+            log("ERROR: Could not find pad with id", cfg.PadId)
+            return
+        end
+    else
+        for attempt = 1, 60 do
+            selectedPad = findSuitablePad(opponent)
+            if selectedPad then break end
+            log("No suitable 1vs1 pad yet, retrying... (" .. attempt .. ")")
+            task.wait(0.5)
+        end
     end
     if not selectedPad then
         log("ERROR: No suitable 1vs1 pad found after retries")
