@@ -2068,6 +2068,119 @@ getgenv().EvolutionDuelistHooks = {
     oldFireServer = oldFireServer,
 }
 
+-- Direct castBullet / tryFire hooks (works in duels; no visible camera lock).
+do
+    local castBulletOriginal = nil
+    local castBulletFunc = nil
+    local tryFireOriginal = nil
+    local tryFireFunc = nil
+    local hookedFuncs = getgenv().EvolutionSilentAimCastHookedFuncs
+    if not hookedFuncs then
+        hookedFuncs = setmetatable({}, { __mode = "k" })
+        getgenv().EvolutionSilentAimCastHookedFuncs = hookedFuncs
+    end
+
+    local function hookSilentAimFunction(name, wrapperMaker)
+        local foundAny = false
+        for _, obj in ipairs(getgc()) do
+            if typeof(obj) == "function" then
+                local info = debug.getinfo(obj)
+                if info and info.name == name and not hookedFuncs[obj] then
+                    local orig
+                    local function callOrig(...)
+                        return orig(...)
+                    end
+                    local wrapper = wrapperMaker(callOrig)
+                    local ok, gotOrig = pcall(function()
+                        return hookfunction(obj, wrapper)
+                    end)
+                    if ok and typeof(gotOrig) == "function" then
+                        foundAny = true
+                        orig = gotOrig
+                        hookedFuncs[obj] = true
+                        hookedFuncs[orig] = true
+                        if name == "castBullet" then
+                            castBulletOriginal = orig
+                            castBulletFunc = obj
+                        elseif name == "tryFire" then
+                            tryFireOriginal = orig
+                            tryFireFunc = obj
+                        end
+                    end
+                end
+            end
+        end
+        if foundAny then
+            getgenv().EvolutionSilentAimCastHooked = true
+            local hooks = getgenv().EvolutionDuelistHooks
+            if hooks then
+                hooks.castBulletFunc = castBulletFunc
+                hooks.castBulletOriginal = castBulletOriginal
+                hooks.tryFireFunc = tryFireFunc
+                hooks.tryFireOriginal = tryFireOriginal
+            end
+        end
+    end
+
+    local function hookSilentAimCastBullet()
+        hookSilentAimFunction("castBullet", function(callOrig)
+            return function(p1, p2)
+                if not cfg.SilentAimEnabled or computingTarget then
+                    return callOrig(p1, p2)
+                end
+                local target = getTarget()
+                if target and target.Parent then
+                    local model = target:FindFirstAncestorOfClass("Model")
+                    print("[Evolution SA] castBullet redirect ->", model and model.Name or target.Name)
+                    local pos = target.Position
+                    local normal = (Camera.CFrame.Position - pos).Unit
+                    return {
+                        Instance = target,
+                        Position = pos,
+                        Normal = normal,
+                        Material = Enum.Material.Plastic,
+                        Distance = (p2 - pos).Magnitude,
+                    }
+                end
+                return callOrig(p1, p2)
+            end
+        end)
+    end
+
+    local function hookSilentAimTryFire()
+        hookSilentAimFunction("tryFire", function(callOrig)
+            return function(...)
+                if cfg.SilentAimEnabled and not computingTarget then
+                    local target = getTarget()
+                    if target then
+                        shotActiveUntil = tick() + 0.25
+                        print("[Evolution SA] tryFire rotate ->", target.Name)
+                    end
+                end
+                return callOrig(...)
+            end
+        end)
+    end
+
+    local function hookSilentAimAll()
+        hookSilentAimCastBullet()
+        hookSilentAimTryFire()
+    end
+
+    task.defer(function()
+        for i = 1, 30 do
+            hookSilentAimAll()
+            if getgenv().EvolutionSilentAimCastHooked then break end
+            task.wait(0.5)
+        end
+    end)
+
+    trackConnection(LocalPlayer.CharacterAdded:Connect(function()
+        task.wait(1.5)
+        hookSilentAimAll()
+    end))
+end
+
 -- Auto Fire
 local lastSemiTrigger = 0
 local autoFireHeld = false
