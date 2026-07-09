@@ -2,13 +2,10 @@
 -- Config (set before running):
 --   getgenv().DuelBotMode     = "Winner" or "Loser"
 --   getgenv().DuelBotOpponent = "OtherAccountUsername"
--- Optional:
---   getgenv().DuelBotPadId    = 1 (1-based index of the 1vs1 pad, sorted by TP position)
 
 local cfg = {
     Mode = getgenv().DuelBotMode or "Winner",
     OpponentName = getgenv().DuelBotOpponent or nil,
-    PadId = getgenv().DuelBotPadId or nil,
 }
 
 assert(cfg.OpponentName and cfg.OpponentName ~= "", "DuelBotOpponent must be set")
@@ -22,10 +19,8 @@ local LocalPlayer = Players.LocalPlayer
 
 local DuelsPadUI = ReplicatedStorage:WaitForChild("Events"):WaitForChild("DuelsPadUI")
 
--- Winner physically claims a pad; Loser teleports to the Winner's pad via the invite remote.
+-- Winner claims a pad physically; Loser teleports to the Winner's pad via the invite remote.
 local role = cfg.Mode == "Winner" and "Initiator" or "Joiner"
-local initiatorTeam = "Team1"
-local joinerTeam = "Team2"
 
 local function log(...)
     print("[DuelBot]", ...)
@@ -101,36 +96,20 @@ local function getOccupants(detectPart)
     return occupants
 end
 
-local function readGuiCount(pad, teamName)
-    local screen = pad:FindFirstChild("Screen")
-    local teamPart = screen and screen:FindFirstChild(teamName)
-    if not teamPart then return 0, 1 end
-    local numberLabel = nil
-    for _, d in ipairs(teamPart:GetDescendants()) do
-        if d:IsA("TextLabel") and d.Name == "Number" then
-            numberLabel = d
-            break
-        end
-    end
-    if not numberLabel then return 0, 1 end
-    local count, max = numberLabel.Text:match("(%d+)/(%d+)")
-    return tonumber(count) or 0, tonumber(max) or 1
-end
-
 local function getPadDescriptor(pad)
+    local padId = pad:GetAttribute("DuelsPadId")
+    if not padId then return nil end
     local model = pad:FindFirstChild("Model")
     if not model then return nil end
-    local teamModel = model:FindFirstChild(initiatorTeam)
-    local otherModel = model:FindFirstChild(joinerTeam)
-    if not teamModel or not otherModel then return nil end
-    local teamDetect = teamModel:FindFirstChild("Duels Detect")
-    local otherDetect = otherModel:FindFirstChild("Duels Detect")
-    if not teamDetect or not otherDetect then return nil end
+    local team1Model = model:FindFirstChild("Team1")
+    local team2Model = model:FindFirstChild("Team2")
+    if not team1Model or not team2Model then return nil end
+    local team1Detect = team1Model:FindFirstChild("Duels Detect")
+    local team2Detect = team2Model:FindFirstChild("Duels Detect")
+    if not team1Detect or not team2Detect then return nil end
 
-    local teamOcc = getOccupants(teamDetect)
-    local otherOcc = getOccupants(otherDetect)
-    local teamGuiCount, teamMax = readGuiCount(pad, initiatorTeam)
-    local otherGuiCount, otherMax = readGuiCount(pad, joinerTeam)
+    local t1Occ = getOccupants(team1Detect)
+    local t2Occ = getOccupants(team2Detect)
 
     local function countDict(dict)
         local n = 0
@@ -138,19 +117,15 @@ local function getPadDescriptor(pad)
         return n
     end
 
-    local teamCount = countDict(teamOcc)
-    local otherCount = countDict(otherOcc)
-    if teamCount == 0 then teamCount = teamGuiCount end
-    if otherCount == 0 then otherCount = otherGuiCount end
-
     return {
         pad = pad,
-        teamDetect = teamDetect,
-        otherDetect = otherDetect,
-        teamOccupants = teamOcc,
-        otherOccupants = otherOcc,
-        teamCount = teamCount,
-        otherCount = otherCount,
+        padId = padId,
+        team1Detect = team1Detect,
+        team2Detect = team2Detect,
+        team1Count = countDict(t1Occ),
+        team2Count = countDict(t2Occ),
+        team1Occupants = t1Occ,
+        team2Occupants = t2Occ,
     }
 end
 
@@ -172,28 +147,28 @@ local function getAll1v1Pads()
     return list
 end
 
-local function findSuitablePad(opponent)
+local function isPadClean(desc, opponentId)
+    opponentId = opponentId or 0
+    if desc.team1Count ~= 0 then return false end
+    if desc.team2Count ~= 0 and not desc.team2Occupants[opponentId] then return false end
+    return true
+end
+
+local function findCleanPad(opponent)
     local opponentId = opponent and opponent.UserId or 0
     local pads = getAll1v1Pads()
+    local best = nil
     for _, pad in ipairs(pads) do
         local desc = getPadDescriptor(pad)
-        if not desc then continue end
-
-        if cfg.PadId then
-            local index = tonumber(cfg.PadId)
-            if index then
-                local pos = table.find(pads, pad)
-                if pos ~= index then continue end
+        if desc and isPadClean(desc, opponentId) then
+            if not best then
+                best = desc
+            elseif (desc.team1Count + desc.team2Count) < (best.team1Count + best.team2Count) then
+                best = desc
             end
         end
-
-        -- Initiator team must be empty and no random on the joiner team.
-        if desc.teamCount ~= 0 then continue end
-        if desc.otherCount ~= 0 and not desc.otherOccupants[opponentId] then continue end
-
-        return desc
     end
-    return nil
+    return best
 end
 
 local function teleportToDetect(detect)
@@ -239,7 +214,7 @@ local function holdInitiatorPosition(targetCF)
     local started = tick()
     local sawWaitingId = false
 
-    while tick() - started < 12 do
+    while tick() - started < 15 do
         if LocalPlayer:GetAttribute("InDuels") == true then
             return true
         end
@@ -312,48 +287,50 @@ local function runInitiator()
         return false
     end
 
-    local selectedPad = nil
-    if cfg.PadId then
-        for idx, pad in ipairs(getAll1v1Pads()) do
-            if tonumber(cfg.PadId) == idx then
-                selectedPad = getPadDescriptor(pad)
-                break
-            end
-        end
-    else
-        for attempt = 1, 60 do
-            selectedPad = findSuitablePad(opponent)
-            if selectedPad then break end
-            task.wait(0.5)
-        end
+    local desc = nil
+    for i = 1, 30 do
+        desc = findCleanPad(opponent)
+        if desc then break end
+        log("Initiator: waiting for a clean 1vs1 pad...")
+        task.wait(0.5)
     end
-
-    if not selectedPad then
-        log("Initiator: no suitable pad")
+    if not desc then
+        log("Initiator: no clean pad available")
         return false
     end
 
-    log("Initiator: teleporting to", initiatorTeam)
-    local targetCF = teleportToDetect(selectedPad.teamDetect)
+    log("Initiator: claiming pad", desc.padId)
+    local targetCF = teleportToDetect(desc.team1Detect)
     if not targetCF then
         log("Initiator: teleport failed")
         return false
     end
 
-    log("Initiator: holding pad")
-    local ok = holdInitiatorPosition(targetCF)
-    unfreeze()
-
-    if not ok then
-        log("Initiator: pad was not claimed")
+    -- Make sure no random slipped onto the other team while we were moving.
+    task.wait(0.3)
+    local otherOcc = getOccupants(desc.team2Detect)
+    local dirty = false
+    for uid, name in pairs(otherOcc) do
+        if uid ~= opponent.UserId then
+            log("Initiator: random player", name, "took the other spot")
+            dirty = true
+            break
+        end
+    end
+    if dirty then
+        unfreeze()
         return false
     end
+
+    log("Initiator: holding pad", desc.padId)
+    local ok = holdInitiatorPosition(targetCF)
+    unfreeze()
 
     if verifyMatch() then
         return true
     end
 
-    log("Initiator: matched with wrong player")
+    log("Initiator: did not end up in the correct duel")
     return false
 end
 
@@ -364,12 +341,12 @@ local function runJoiner()
         return false
     end
 
-    log("Joiner: waiting for", opponent.Name, "to claim a pad")
+    log("Joiner: waiting for invite from", opponent.Name)
     local padId = nil
-    for i = 1, 150 do
-        -- Don't teleport if the opponent already started a duel with someone else.
+    for i = 1, 200 do
+        -- If the opponent already started a duel, don't interfere.
         if opponent:GetAttribute("InDuels") == true then
-            log("Joiner: opponent already in duel")
+            log("Joiner: opponent already in a duel")
             return false
         end
 
