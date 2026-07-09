@@ -225,6 +225,13 @@ getgenv().EvolutionDuelist = {
     TargetTracerOutlineColor = Color3.fromRGB(0, 0, 0),
     TargetTracerThickness = 2,
     TargetTracerOutlineThickness = 4,
+
+    DuelBotEnabled = false,
+    DuelBotMode = "Winner",
+    DuelBotOpponent = "",
+    DuelBotAutoKill = false,
+    DuelBotWalkSpeed = 64,
+    DuelBotTpWalk = 0,
 }
 local cfg = getgenv().EvolutionDuelist
 
@@ -260,6 +267,7 @@ local Combat = Main:SubPage({ Name = "Combat", Icon = "swords" })
 local Visuals = Main:SubPage({ Name = "Combat Visuals", Icon = "eye" })
 local Cosmetic = Main:SubPage({ Name = "Cosmetic", Icon = "shirt" })
 local ConfigSub = Settings:SubPage({ Name = "Configs", Icon = "save" })
+local DuelBotSub = Main:SubPage({ Name = "1v1 Bot", Icon = "users" })
 
 -- Sections
 local CombatLeft = Combat:Section({ Name = "Aimbot", Side = 1 })
@@ -267,6 +275,8 @@ local CombatChecks = Combat:Section({ Name = "Checks", Side = 1 })
 local CombatAimAssist = Combat:Section({ Name = "Aim Assist", Side = 2 })
 local CombatTriggerbot = Combat:Section({ Name = "Triggerbot", Side = 2 })
 local CombatGunMods = Combat:Section({ Name = "Gun Mods", Side = 2 })
+
+local DuelBotSection = DuelBotSub:Section({ Name = "Duel Bot", Side = 1 })
 
 local VisualsLeft = Visuals:Section({ Name = "FOV Circle", Side = 1 })
 local VisualsTargetUI = Visuals:Section({ Name = "Target UI", Side = 2 })
@@ -518,6 +528,118 @@ CombatChecks:Toggle({
     Flag = "Duelist_KOCheck",
     Callback = function(State) cfg.KOCheck = State end
 })
+
+-- 1v1 Bot UI
+local DuelBotOpponentDropdown = nil
+
+local function getDuelBotPlayerOptions()
+    local options = {}
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr ~= LocalPlayer then
+            table.insert(options, plr.Name)
+        end
+    end
+    table.sort(options)
+    return options
+end
+
+local function refreshDuelBotOpponentDropdown()
+    if not DuelBotOpponentDropdown then return end
+    local options = getDuelBotPlayerOptions()
+    pcall(function() DuelBotOpponentDropdown:SetItems(options) end)
+    pcall(function() DuelBotOpponentDropdown:Refresh(options) end)
+    if cfg.DuelBotOpponent ~= "" and not table.find(options, cfg.DuelBotOpponent) then
+        cfg.DuelBotOpponent = ""
+    end
+end
+
+DuelBotSection:Dropdown({
+    Name = "Mode",
+    Items = { "Winner", "Loser" },
+    Default = cfg.DuelBotMode,
+    Flag = "Duelist_DuelBotMode",
+    Callback = function(Value) cfg.DuelBotMode = Value end
+})
+
+DuelBotOpponentDropdown = DuelBotSection:Dropdown({
+    Name = "Opponent",
+    Items = getDuelBotPlayerOptions(),
+    Default = cfg.DuelBotOpponent,
+    Flag = "Duelist_DuelBotOpponent",
+    Callback = function(Value) cfg.DuelBotOpponent = Value end
+})
+
+DuelBotSection:Slider({
+    Name = "Walk Speed",
+    Min = 16,
+    Max = 200,
+    Default = cfg.DuelBotWalkSpeed,
+    Flag = "Duelist_DuelBotWalkSpeed",
+    Callback = function(Value) cfg.DuelBotWalkSpeed = Value end
+})
+
+DuelBotSection:Slider({
+    Name = "TP Walk Step",
+    Min = 0,
+    Max = 10,
+    Default = cfg.DuelBotTpWalk,
+    Flag = "Duelist_DuelBotTpWalk",
+    Callback = function(Value) cfg.DuelBotTpWalk = Value end
+})
+
+DuelBotSection:Toggle({
+    Name = "Auto Kill",
+    Default = cfg.DuelBotAutoKill,
+    Flag = "Duelist_DuelBotAutoKill",
+    Callback = function(State) cfg.DuelBotAutoKill = State end
+})
+
+local DuelBotURL = "https://raw.githubusercontent.com/dsfvxcvb/evolution/main/duelist_1v1_bot.lua"
+
+local function applyDuelBotAutoKill()
+    if not cfg.DuelBotAutoKill then return end
+    cfg.SilentAimEnabled = true
+    cfg.AutoFire = true
+    cfg.WallCheck = false
+    cfg.TeamCheck = false
+    cfg.HitPart = "Head"
+    cfg.Hitchance = 100
+    cfg.MaxDistance = 5000
+    cfg.RapidFire = true
+end
+
+DuelBotSection:Toggle({
+    Name = "Enable Bot",
+    Default = cfg.DuelBotEnabled,
+    Flag = "Duelist_DuelBotEnabled",
+    Callback = function(State)
+        cfg.DuelBotEnabled = State
+        if State then
+            if cfg.DuelBotOpponent == "" then
+                cfg.DuelBotEnabled = false
+                print("[Evolution] Select an opponent before enabling the 1v1 bot.")
+                return
+            end
+            applyDuelBotAutoKill()
+            getgenv().DuelBotMode = cfg.DuelBotMode
+            getgenv().DuelBotOpponent = cfg.DuelBotOpponent
+            getgenv().DuelBotWalkSpeed = cfg.DuelBotWalkSpeed
+            getgenv().DuelBotTpWalk = cfg.DuelBotTpWalk
+            getgenv().DuelBotAutoKill = cfg.DuelBotAutoKill
+            getgenv().DuelBotEnabled = true
+            getgenv().DuelBotStop = false
+            task.spawn(function()
+                loadstring(game:HttpGet(DuelBotURL))()
+            end)
+        else
+            getgenv().DuelBotEnabled = false
+            getgenv().DuelBotStop = true
+        end
+    end
+})
+
+trackConnection(Players.PlayerAdded:Connect(refreshDuelBotOpponentDropdown))
+trackConnection(Players.PlayerRemoving:Connect(refreshDuelBotOpponentDropdown))
 
 -- Aim Assist
 local AimAssistToggle = CombatAimAssist:Toggle({
