@@ -2,8 +2,8 @@
 -- Config (set before running):
 --   getgenv().DuelBotMode     = "Winner" or "Loser"
 --   getgenv().DuelBotOpponent = "OtherAccountUsername"
--- Optional: force both accounts to use the same pad id (use MCP to pick a free one)
---   getgenv().DuelBotPadId    = "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx"
+-- Optional:
+--   getgenv().DuelBotPadId    = 1 (1-based index of the 1vs1 pad, sorted by TP position)
 
 local cfg = {
     Mode = getgenv().DuelBotMode or "Winner",
@@ -46,6 +46,48 @@ local function getOpponent()
     return nil
 end
 
+local function getPlayerFromHRP(part)
+    if not part or part.Name ~= "HumanoidRootPart" then return nil end
+    local char = part.Parent
+    if not char then return nil end
+    local hum = char:FindFirstChildOfClass("Humanoid")
+    if not hum then return nil end
+    local plr = Players:GetPlayerFromCharacter(char)
+    return plr
+end
+
+local function getOccupants(detectPart)
+    local occupants = {}
+    if not detectPart then return occupants end
+    local success, parts = pcall(function()
+        return Workspace:GetPartsInPart(detectPart)
+    end)
+    if not success or not parts then return occupants end
+    for _, part in ipairs(parts) do
+        local plr = getPlayerFromHRP(part)
+        if plr then
+            occupants[plr.UserId] = plr.Name
+        end
+    end
+    return occupants
+end
+
+local function readGuiCount(pad, teamName)
+    local screen = pad:FindFirstChild("Screen")
+    local teamPart = screen and screen:FindFirstChild(teamName)
+    if not teamPart then return 0, 1 end
+    local numberLabel = nil
+    for _, d in ipairs(teamPart:GetDescendants()) do
+        if d:IsA("TextLabel") and d.Name == "Number" then
+            numberLabel = d
+            break
+        end
+    end
+    if not numberLabel then return 0, 1 end
+    local count, max = numberLabel.Text:match("(%d+)/(%d+)")
+    return tonumber(count) or 0, tonumber(max) or 1
+end
+
 local function getPadDescriptor(pad)
     local model = pad:FindFirstChild("Model")
     if not model then return nil end
@@ -56,56 +98,34 @@ local function getPadDescriptor(pad)
     local otherDetect = otherModel:FindFirstChild("Duels Detect")
     if not teamDetect or not otherDetect then return nil end
 
-    local function readCount(teamName)
-        local screen = pad:FindFirstChild("Screen")
-        local teamPart = screen and screen:FindFirstChild(teamName)
-        if not teamPart then return 0, nil end
-        local numberLabel = nil
-        for _, d in ipairs(teamPart:GetDescendants()) do
-            if d:IsA("TextLabel") and d.Name == "Number" then
-                numberLabel = d
-                break
-            end
-        end
-        if not numberLabel then return 0, nil end
-        local count, max = numberLabel.Text:match("(%d+)/(%d+)")
-        return tonumber(count) or 0, tonumber(max) or 1
+    local teamOcc = getOccupants(teamDetect)
+    local otherOcc = getOccupants(otherDetect)
+    local teamGuiCount, teamMax = readGuiCount(pad, assignedTeam)
+    local otherGuiCount, otherMax = readGuiCount(pad, otherTeam)
+
+    local function countDict(dict)
+        local n = 0
+        for _ in pairs(dict) do n = n + 1 end
+        return n
     end
 
-    local function readOccupantId(teamName)
-        local screen = pad:FindFirstChild("Screen")
-        local teamPart = screen and screen:FindFirstChild(teamName)
-        if not teamPart then return nil end
-        local pg = nil
-        for _, d in ipairs(teamPart:GetDescendants()) do
-            if d:IsA("SurfaceGui") and d.Name == "ParticipantsGui" then
-                pg = d
-                break
-            end
-        end
-        if not pg then return nil end
-        local container = pg:FindFirstChild("Container")
-        if not container then return nil end
-        for _, child in ipairs(container:GetChildren()) do
-            if child:IsA("GuiObject") then
-                local uid = tonumber(child.Name)
-                if uid and uid ~= 0 then
-                    return uid
-                end
-            end
-        end
-        return nil
-    end
+    -- Prefer physics occupancy, fall back to GUI count
+    local teamCount = countDict(teamOcc)
+    local otherCount = countDict(otherOcc)
+    if teamCount == 0 then teamCount = teamGuiCount end
+    if otherCount == 0 then otherCount = otherGuiCount end
 
     return {
         pad = pad,
         padId = pad:GetAttribute("DuelsPadId"),
         teamDetect = teamDetect,
         otherDetect = otherDetect,
-        teamCount = readCount(assignedTeam),
-        teamMax = select(2, readCount(assignedTeam)) or 1,
-        otherCount = readCount(otherTeam),
-        otherOccupantId = readOccupantId(otherTeam),
+        teamOccupants = teamOcc,
+        otherOccupants = otherOcc,
+        teamCount = teamCount,
+        teamMax = teamMax,
+        otherCount = otherCount,
+        otherMax = otherMax,
     }
 end
 
@@ -121,6 +141,7 @@ local function getAll1v1Pads()
     table.sort(list, function(a, b)
         local ap = a:FindFirstChild("TP") and a.TP.Position or Vector3.zero
         local bp = b:FindFirstChild("TP") and b.TP.Position or Vector3.zero
+        if ap.X == bp.X then return ap.Z < bp.Z end
         return ap.X < bp.X
     end)
     return list
@@ -132,11 +153,24 @@ local function findSuitablePad(opponent)
     for _, pad in ipairs(pads) do
         local desc = getPadDescriptor(pad)
         if not desc then continue end
+
+        -- If a specific pad index was requested, only consider that one
+        if cfg.PadId then
+            local index = tonumber(cfg.PadId)
+            if index then
+                local pos = table.find(pads, pad)
+                if pos ~= index then continue end
+            end
+        end
+
+        -- Our team must be empty
         if desc.teamCount ~= 0 then continue end
+
+        -- Other team must be empty or already occupied by our opponent
         if desc.otherCount == 0 then
             return desc
         end
-        if opponentId ~= 0 and desc.otherOccupantId == opponentId then
+        if opponentId ~= 0 and desc.otherOccupants[opponentId] then
             return desc
         end
     end
@@ -152,20 +186,61 @@ local function teleportToDetect(detect)
 
     LocalPlayer:SetAttribute("MovementACIgnore", true)
 
-    local targetCF = detect.CFrame * CFrame.new(0, 3, 0)
+    local targetCF = detect.CFrame * CFrame.new(0, 2.5, 0)
     local distance = (hrp.Position - targetCF.Position).Magnitude
     local duration = math.clamp(distance / 800, 1.2, 3)
 
     humanoid.PlatformStand = false
     humanoid.Sit = false
+    humanoid.AutoRotate = false
 
     local tween = TweenService:Create(hrp, TweenInfo.new(duration, Enum.EasingStyle.Linear), {CFrame = targetCF})
     tween:Play()
     tween.Completed:Wait()
 
-    hrp.Anchored = true
+    -- Keep the character inside the detection part without anchoring.
+    -- Direct CFrame writes get reverted by the anti-cheat, but TweenService updates are accepted.
+    hrp.Anchored = false
     hrp.CFrame = targetCF
-    return true
+
+    pcall(function()
+        firetouchinterest(hrp, detect, 0)
+        task.wait(0.05)
+        firetouchinterest(hrp, detect, 1)
+    end)
+
+    return targetCF
+end
+
+local function holdPositionUntilDuel(targetCF, detect)
+    local char = LocalPlayer.Character
+    if not char then return false end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not humanoid then return false end
+
+    local started = tick()
+    local inDuel = false
+
+    -- Jiggle the HRP with tiny tweens so the server keeps registering us inside the detect part.
+    while tick() - started < 12 do
+        if LocalPlayer:GetAttribute("InDuels") == true then
+            inDuel = true
+            break
+        end
+
+        local offset = CFrame.new(
+            math.random(-2, 2) / 12,
+            math.random(-2, 2) / 12,
+            math.random(-2, 2) / 12
+        )
+        local tween = TweenService:Create(hrp, TweenInfo.new(0.12), {CFrame = targetCF * offset})
+        tween:Play()
+
+        task.wait(0.18)
+    end
+
+    return inDuel
 end
 
 local function unfreeze()
@@ -173,8 +248,13 @@ local function unfreeze()
     if not char then return end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if hrp then hrp.Anchored = false end
-    if humanoid then humanoid.PlatformStand = false end
+    if hrp then
+        hrp.Anchored = false
+    end
+    if humanoid then
+        humanoid.PlatformStand = false
+        humanoid.AutoRotate = true
+    end
 end
 
 local function main()
@@ -206,15 +286,14 @@ local function main()
 
     local selectedPad = nil
     if cfg.PadId then
-        for _, pad in ipairs(getAll1v1Pads()) do
-            local desc = getPadDescriptor(pad)
-            if desc and tostring(desc.padId) == tostring(cfg.PadId) then
-                selectedPad = desc
+        for idx, pad in ipairs(getAll1v1Pads()) do
+            if tonumber(cfg.PadId) == idx then
+                selectedPad = getPadDescriptor(pad)
                 break
             end
         end
         if not selectedPad then
-            log("ERROR: Could not find pad with id", cfg.PadId)
+            log("ERROR: Could not find pad at index", cfg.PadId)
             return
         end
     else
@@ -229,25 +308,18 @@ local function main()
         log("ERROR: No suitable 1vs1 pad found after retries")
         return
     end
-    log("Selected pad", selectedPad.pad.Name, "id:", selectedPad.padId, "team:", assignedTeam)
+    log("Selected pad", selectedPad.pad.Name, "team:", assignedTeam)
 
-    local success = teleportToDetect(selectedPad.teamDetect)
-    if not success then
+    local targetCF = teleportToDetect(selectedPad.teamDetect)
+    if not targetCF then
         log("ERROR: Teleport failed")
         unfreeze()
         LocalPlayer:SetAttribute("MovementACIgnore", nil)
         return
     end
 
-    log("Anchored on pad, waiting for duel to start...")
-    local inDuel = false
-    for i = 1, 80 do
-        if LocalPlayer:GetAttribute("InDuels") == true then
-            inDuel = true
-            break
-        end
-        task.wait(0.1)
-    end
+    log("Holding position on pad, waiting for duel to start...")
+    local inDuel = holdPositionUntilDuel(targetCF, selectedPad.teamDetect)
 
     unfreeze()
 
