@@ -1,4 +1,4 @@
--- Duelist 1v1 bot: teleports two configured accounts onto the same 1vs1 pad.
+-- Duelist 1v1 bot: makes two configured accounts duel each other on a 1vs1 pad.
 -- Config (set before running):
 --   getgenv().DuelBotMode     = "Winner" or "Loser"
 --   getgenv().DuelBotOpponent = "OtherAccountUsername"
@@ -15,16 +15,29 @@ assert(cfg.OpponentName and cfg.OpponentName ~= "", "DuelBotOpponent must be set
 assert(cfg.Mode == "Winner" or cfg.Mode == "Loser", "DuelBotMode must be 'Winner' or 'Loser'")
 
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
 local TweenService = game:GetService("TweenService")
 local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local LocalPlayer = Players.LocalPlayer
 
-local assignedTeam = cfg.Mode == "Winner" and "Team1" or "Team2"
-local otherTeam = assignedTeam == "Team1" and "Team2" or "Team1"
+local DuelsPadUI = ReplicatedStorage:WaitForChild("Events"):WaitForChild("DuelsPadUI")
+
+-- Winner physically claims a pad; Loser teleports to the Winner's pad via the invite remote.
+local role = cfg.Mode == "Winner" and "Initiator" or "Joiner"
+local initiatorTeam = "Team1"
+local joinerTeam = "Team2"
 
 local function log(...)
     print("[DuelBot]", ...)
+end
+
+local function getOpponent()
+    for _, plr in ipairs(Players:GetPlayers()) do
+        if plr.Name:lower() == cfg.OpponentName:lower() then
+            return plr
+        end
+    end
+    return nil
 end
 
 local function waitForCharacter(player, timeout)
@@ -37,13 +50,30 @@ local function waitForCharacter(player, timeout)
     return player.Character
 end
 
-local function getOpponent()
-    for _, plr in ipairs(Players:GetPlayers()) do
-        if plr.Name:lower() == cfg.OpponentName:lower() then
-            return plr
-        end
+local function resetCharacter()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if humanoid then
+        pcall(function() humanoid.Health = 0 end)
+    else
+        pcall(function() char:BreakJoints() end)
     end
-    return nil
+end
+
+local function unfreeze()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    if hrp then
+        hrp.Anchored = false
+    end
+    if humanoid then
+        humanoid.PlatformStand = false
+        humanoid.AutoRotate = true
+    end
+    LocalPlayer:SetAttribute("MovementACIgnore", nil)
 end
 
 local function getPlayerFromHRP(part)
@@ -52,8 +82,7 @@ local function getPlayerFromHRP(part)
     if not char then return nil end
     local hum = char:FindFirstChildOfClass("Humanoid")
     if not hum then return nil end
-    local plr = Players:GetPlayerFromCharacter(char)
-    return plr
+    return Players:GetPlayerFromCharacter(char)
 end
 
 local function getOccupants(detectPart)
@@ -91,8 +120,8 @@ end
 local function getPadDescriptor(pad)
     local model = pad:FindFirstChild("Model")
     if not model then return nil end
-    local teamModel = model:FindFirstChild(assignedTeam)
-    local otherModel = model:FindFirstChild(otherTeam)
+    local teamModel = model:FindFirstChild(initiatorTeam)
+    local otherModel = model:FindFirstChild(joinerTeam)
     if not teamModel or not otherModel then return nil end
     local teamDetect = teamModel:FindFirstChild("Duels Detect")
     local otherDetect = otherModel:FindFirstChild("Duels Detect")
@@ -100,8 +129,8 @@ local function getPadDescriptor(pad)
 
     local teamOcc = getOccupants(teamDetect)
     local otherOcc = getOccupants(otherDetect)
-    local teamGuiCount, teamMax = readGuiCount(pad, assignedTeam)
-    local otherGuiCount, otherMax = readGuiCount(pad, otherTeam)
+    local teamGuiCount, teamMax = readGuiCount(pad, initiatorTeam)
+    local otherGuiCount, otherMax = readGuiCount(pad, joinerTeam)
 
     local function countDict(dict)
         local n = 0
@@ -109,7 +138,6 @@ local function getPadDescriptor(pad)
         return n
     end
 
-    -- Prefer physics occupancy, fall back to GUI count
     local teamCount = countDict(teamOcc)
     local otherCount = countDict(otherOcc)
     if teamCount == 0 then teamCount = teamGuiCount end
@@ -117,15 +145,12 @@ local function getPadDescriptor(pad)
 
     return {
         pad = pad,
-        padId = pad:GetAttribute("DuelsPadId"),
         teamDetect = teamDetect,
         otherDetect = otherDetect,
         teamOccupants = teamOcc,
         otherOccupants = otherOcc,
         teamCount = teamCount,
-        teamMax = teamMax,
         otherCount = otherCount,
-        otherMax = otherMax,
     }
 end
 
@@ -154,7 +179,6 @@ local function findSuitablePad(opponent)
         local desc = getPadDescriptor(pad)
         if not desc then continue end
 
-        -- If a specific pad index was requested, only consider that one
         if cfg.PadId then
             local index = tonumber(cfg.PadId)
             if index then
@@ -163,26 +187,21 @@ local function findSuitablePad(opponent)
             end
         end
 
-        -- Our team must be empty
+        -- Initiator team must be empty and no random on the joiner team.
         if desc.teamCount ~= 0 then continue end
+        if desc.otherCount ~= 0 and not desc.otherOccupants[opponentId] then continue end
 
-        -- Other team must be empty or already occupied by our opponent
-        if desc.otherCount == 0 then
-            return desc
-        end
-        if opponentId ~= 0 and desc.otherOccupants[opponentId] then
-            return desc
-        end
+        return desc
     end
     return nil
 end
 
 local function teleportToDetect(detect)
     local char = LocalPlayer.Character
-    if not char then return false end
+    if not char then return nil end
     local hrp = char:FindFirstChild("HumanoidRootPart")
     local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if not hrp or not humanoid then return false end
+    if not hrp or not humanoid then return nil end
 
     LocalPlayer:SetAttribute("MovementACIgnore", true)
 
@@ -198,8 +217,6 @@ local function teleportToDetect(detect)
     tween:Play()
     tween.Completed:Wait()
 
-    -- Keep the character inside the detection part without anchoring.
-    -- Direct CFrame writes get reverted by the anti-cheat, but TweenService updates are accepted.
     hrp.Anchored = false
     hrp.CFrame = targetCF
 
@@ -212,7 +229,7 @@ local function teleportToDetect(detect)
     return targetCF
 end
 
-local function holdPositionUntilDuel(targetCF, detect)
+local function holdInitiatorPosition(targetCF)
     local char = LocalPlayer.Character
     if not char then return false end
     local hrp = char:FindFirstChild("HumanoidRootPart")
@@ -220,13 +237,11 @@ local function holdPositionUntilDuel(targetCF, detect)
     if not hrp or not humanoid then return false end
 
     local started = tick()
-    local inDuel = false
+    local sawWaitingId = false
 
-    -- Jiggle the HRP with tiny tweens so the server keeps registering us inside the detect part.
     while tick() - started < 12 do
         if LocalPlayer:GetAttribute("InDuels") == true then
-            inDuel = true
-            break
+            return true
         end
 
         local offset = CFrame.new(
@@ -237,51 +252,64 @@ local function holdPositionUntilDuel(targetCF, detect)
         local tween = TweenService:Create(hrp, TweenInfo.new(0.12), {CFrame = targetCF * offset})
         tween:Play()
 
+        local waitingId = LocalPlayer:GetAttribute("DuelsWaitingPadId")
+        if waitingId and waitingId ~= "" then
+            sawWaitingId = true
+        end
+
         task.wait(0.18)
     end
 
-    return inDuel
+    return sawWaitingId
 end
 
-local function unfreeze()
-    local char = LocalPlayer.Character
-    if not char then return end
-    local hrp = char:FindFirstChild("HumanoidRootPart")
-    local humanoid = char:FindFirstChildOfClass("Humanoid")
-    if hrp then
-        hrp.Anchored = false
-    end
-    if humanoid then
-        humanoid.PlatformStand = false
-        humanoid.AutoRotate = true
-    end
-end
-
-local function main()
-    log("Starting as", cfg.Mode, "(team:", assignedTeam .. ")", "opponent:", cfg.OpponentName)
-
-    if LocalPlayer:GetAttribute("InDuels") == true then
-        log("Already in a duel.")
-        return
-    end
-
-    local opponent = nil
-    for i = 1, 60 do
-        opponent = getOpponent()
-        if opponent then break end
-        task.wait(0.5)
-    end
+local function verifyMatch()
+    local opponent = getOpponent()
     if not opponent then
-        log("ERROR: Could not find opponent", cfg.OpponentName)
-        return
+        log("Verify: opponent not found")
+        return false
     end
-    log("Found opponent", opponent.Name, "UserId:", opponent.UserId)
 
-    local myChar = waitForCharacter(LocalPlayer, 30)
-    local oppChar = waitForCharacter(opponent, 30)
-    if not myChar or not oppChar then
-        log("ERROR: Characters did not load in time")
-        return
+    if LocalPlayer:GetAttribute("InDuels") ~= true then
+        log("Verify: local player not in duel")
+        return false
+    end
+
+    if opponent:GetAttribute("InDuels") ~= true then
+        log("Verify: opponent not in duel")
+        return false
+    end
+
+    local myMatch = tostring(LocalPlayer:GetAttribute("DuelsMatchId") or "")
+    local oppMatch = tostring(opponent:GetAttribute("DuelsMatchId") or "")
+    if myMatch == "" or myMatch ~= oppMatch then
+        log("Verify: match id mismatch (mine:", myMatch, " theirs:", oppMatch, ")")
+        return false
+    end
+
+    local myTeam = LocalPlayer:GetAttribute("DuelsTeam")
+    local oppTeam = opponent:GetAttribute("DuelsTeam")
+    if myTeam ~= "Team1" and myTeam ~= "Team2" then
+        log("Verify: invalid team", myTeam)
+        return false
+    end
+    if oppTeam ~= "Team1" and oppTeam ~= "Team2" then
+        log("Verify: invalid opponent team", oppTeam)
+        return false
+    end
+    if myTeam == oppTeam then
+        log("Verify: both on same team")
+        return false
+    end
+
+    return true
+end
+
+local function runInitiator()
+    local opponent = getOpponent()
+    if not opponent then
+        log("Initiator: opponent not found")
+        return false
     end
 
     local selectedPad = nil
@@ -292,63 +320,129 @@ local function main()
                 break
             end
         end
-        if not selectedPad then
-            log("ERROR: Could not find pad at index", cfg.PadId)
-            return
-        end
     else
         for attempt = 1, 60 do
             selectedPad = findSuitablePad(opponent)
             if selectedPad then break end
-            log("No suitable 1vs1 pad yet, retrying... (" .. attempt .. ")")
             task.wait(0.5)
         end
     end
-    if not selectedPad then
-        log("ERROR: No suitable 1vs1 pad found after retries")
-        return
-    end
-    log("Selected pad", selectedPad.pad.Name, "team:", assignedTeam)
 
+    if not selectedPad then
+        log("Initiator: no suitable pad")
+        return false
+    end
+
+    log("Initiator: teleporting to", initiatorTeam)
     local targetCF = teleportToDetect(selectedPad.teamDetect)
     if not targetCF then
-        log("ERROR: Teleport failed")
-        unfreeze()
-        LocalPlayer:SetAttribute("MovementACIgnore", nil)
-        return
+        log("Initiator: teleport failed")
+        return false
     end
 
-    log("Holding position on pad, waiting for duel to start...")
-    local inDuel = holdPositionUntilDuel(targetCF, selectedPad.teamDetect)
+    log("Initiator: holding pad")
+    local ok = holdInitiatorPosition(targetCF)
+    unfreeze()
+
+    if not ok then
+        log("Initiator: pad was not claimed")
+        return false
+    end
+
+    if verifyMatch() then
+        return true
+    end
+
+    log("Initiator: matched with wrong player")
+    return false
+end
+
+local function runJoiner()
+    local opponent = getOpponent()
+    if not opponent then
+        log("Joiner: opponent not found")
+        return false
+    end
+
+    log("Joiner: waiting for", opponent.Name, "to claim a pad")
+    local padId = nil
+    for i = 1, 150 do
+        -- Don't teleport if the opponent already started a duel with someone else.
+        if opponent:GetAttribute("InDuels") == true then
+            log("Joiner: opponent already in duel")
+            return false
+        end
+
+        padId = opponent:GetAttribute("DuelsWaitingPadId")
+        if padId and padId ~= "" then
+            break
+        end
+        task.wait(0.05)
+    end
+
+    if not padId then
+        log("Joiner: never saw a pad invite")
+        return false
+    end
+
+    log("Joiner: teleporting to pad", padId)
+    DuelsPadUI:FireServer("TELEPORT_LOBBY_DUEL_PAD", padId)
+
+    for i = 1, 80 do
+        if LocalPlayer:GetAttribute("InDuels") == true then
+            break
+        end
+        task.wait(0.1)
+    end
 
     unfreeze()
 
-    if not inDuel then
-        log("ERROR: Duel did not start")
-        LocalPlayer:SetAttribute("MovementACIgnore", nil)
+    if verifyMatch() then
+        return true
+    end
+
+    log("Joiner: did not end up in the correct duel")
+    return false
+end
+
+local function main()
+    log("Starting as", cfg.Mode, "role:", role, "opponent:", cfg.OpponentName)
+
+    local myChar = waitForCharacter(LocalPlayer, 30)
+    if not myChar then
+        log("ERROR: Character did not load")
         return
     end
 
-    local myMatchId = LocalPlayer:GetAttribute("DuelsMatchId")
-    local oppMatchId = opponent:GetAttribute("DuelsMatchId")
-    local oppInDuels = opponent:GetAttribute("InDuels") == true
+    for attempt = 1, 10 do
+        if verifyMatch() then
+            log("SUCCESS: both accounts are in the same duel (match:", tostring(LocalPlayer:GetAttribute("DuelsMatchId")), ")")
+            return
+        end
 
-    log("InDuels = true", "MatchId:", myMatchId, "Team:", LocalPlayer:GetAttribute("DuelsTeam"))
+        log("Attempt", attempt, "...")
+        local ok = false
+        if role == "Initiator" then
+            ok = runInitiator()
+        else
+            ok = runJoiner()
+        end
 
-    if not oppInDuels then
-        log("WARNING: Opponent is not in a duel yet")
-    elseif tostring(oppMatchId) ~= tostring(myMatchId) then
-        log("WARNING: Opponent is in a different match (mine:", myMatchId, " theirs:", oppMatchId, ")")
-    else
-        log("SUCCESS: Both accounts are in the same duel (match:", myMatchId .. ")")
+        if ok and verifyMatch() then
+            log("SUCCESS: both accounts are in the same duel (match:", tostring(LocalPlayer:GetAttribute("DuelsMatchId")), ")")
+            return
+        end
+
+        log("Attempt failed, resetting...")
+        resetCharacter()
+        task.wait(3)
     end
 
-    LocalPlayer:SetAttribute("MovementACIgnore", nil)
+    log("ERROR: Could not start a 1v1 duel with", cfg.OpponentName)
 end
 
 local ok, err = pcall(main)
 if not ok then
     log("CRASH:", err)
     unfreeze()
-    LocalPlayer:SetAttribute("MovementACIgnore", nil)
 end
