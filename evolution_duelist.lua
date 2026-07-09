@@ -1721,7 +1721,12 @@ local function getTargetShoot()
         if not onScreen then continue end
         if (Vector2.new(screenPos.X, screenPos.Y) - center).Magnitude > cfg.FOVRadius then continue end
 
-        -- Orbs are allowed through walls so you can hit them from behind cover.
+        if cfg.WallCheck then
+            local rp = RaycastParams.new()
+            rp.FilterType = Enum.RaycastFilterType.Blacklist
+            rp.FilterDescendantsInstances = {myChar, Camera, part}
+            if Workspace:Raycast(origin, (part.Position - origin).Unit * dist, rp) then continue end
+        end
 
         if dist < bestDist then
             bestDist = dist
