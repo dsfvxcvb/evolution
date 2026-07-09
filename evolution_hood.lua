@@ -406,29 +406,9 @@ if not getgenv().FH_Fire then
     end
 end
 
--- Override AnimGodmode with a no-animation version.
--- The godmode effect (no ragdoll / instant heal) still works, but no animation replicates to other players.
-do
-    -- Disable any externally-loaded anim-godmode before taking over.
-    local existing = getgenv().AnimGodmode
-    if existing and typeof(existing.Set) == "function" then
-        pcall(function() existing.Set(false) end)
-    end
-
+if not getgenv().AnimGodmode then
     local animGodEnabled = false
     local animGodConn = nil
-
-    local function applyAnimGodmode(character)
-        local hum = character:FindFirstChildOfClass("Humanoid")
-        if not hum then return end
-        hum.BreakJointsOnDeath = false
-        hum.HealthChanged:Connect(function(health)
-            if animGodEnabled and health < hum.MaxHealth then
-                hum.Health = hum.MaxHealth
-            end
-        end)
-    end
-
     getgenv().AnimGodmode = {
         IsEnabled = function() return animGodEnabled end,
         Set = function(value)
@@ -439,10 +419,23 @@ do
             end
             if value then
                 local char = LocalPlayer.Character
-                if char then applyAnimGodmode(char) end
+                if char then
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum.BreakJointsOnDeath = false
+                    end
+                end
                 animGodConn = LocalPlayer.CharacterAdded:Connect(function(character)
                     task.wait(0.5)
-                    applyAnimGodmode(character)
+                    local hum = character:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum.BreakJointsOnDeath = false
+                        hum.HealthChanged:Connect(function(health)
+                            if health < hum.MaxHealth then
+                                hum.Health = hum.MaxHealth
+                            end
+                        end)
+                    end
                 end)
             end
         end
