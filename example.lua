@@ -1,5 +1,5 @@
-local library, themes = loadfile("library.lua")()
-print("[Atlanta] loaded library")
+local library, themes = loadstring(game:HttpGet("https://raw.githubusercontent.com/dsfvxcvb/evolution/main/library.lua"))()
+print("[Atlanta] loaded library from github")
 
 local dim2 = UDim2.new
 local dim = UDim.new
