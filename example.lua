@@ -737,8 +737,6 @@ end
 				end
 			end
 
-			local CUSTOM_HEAD_ID = "rbxassetid://12386274"
-
 			local function ensureBloom()
 				local Lighting = game:GetService("Lighting")
 				for _, effect in pairs(Lighting:GetChildren()) do
@@ -757,22 +755,8 @@ end
 
 			local function removeHairAndAccessories(character)
 				local hair = character:FindFirstChild("Hair")
-				if hair then hair:Destroy() end
-				local accessories = character:FindFirstChild("Accessories")
-				if accessories then
-					for _, accessory in pairs(accessories:GetChildren()) do
-						accessory:Destroy()
-					end
-				end
-				for _, descendant in pairs(character:GetDescendants()) do
-					if descendant:IsA("Accessory") or descendant.Name == "Handle" then
-						descendant:Destroy()
-					end
-				end
-				for _, part in pairs(character:GetDescendants()) do
-					if part:IsA("MeshPart") and part:FindFirstAncestorOfClass("Accessory") then
-						part:Destroy()
-					end
+				if hair and hair:IsA("BasePart") then
+					hair:Destroy()
 				end
 			end
 
@@ -802,30 +786,25 @@ end
 
 			local function applyCustomHead(character, color, material)
 				local head = character:FindFirstChild("Head")
-				if not head then return end
-				for _, child in pairs(head:GetChildren()) do
-					if child:IsA("SpecialMesh") or child:IsA("Decal") or child:IsA("Texture") or child:IsA("WrapTarget") then
-						child:Destroy()
-					end
-				end
+				if not head or not head:IsA("BasePart") then return end
 				local humanoid = character:FindFirstChild("Humanoid")
 				if humanoid then
 					local face = humanoid:FindFirstChild("Face")
 					if face then face:Destroy() end
 				end
+				for _, child in pairs(head:GetChildren()) do
+					if child:IsA("Decal") or child:IsA("Texture") or child:IsA("SurfaceAppearance") then
+						child:Destroy()
+					elseif child:IsA("SpecialMesh") or child:IsA("FileMesh") then
+						child.TextureId = ""
+					end
+				end
 				if head:IsA("MeshPart") then
-					head.MeshId = ""
-					head.Size = Vector3.new(2, 2, 2)
-				else
-					local mesh = Instance.new("SpecialMesh")
-					mesh.MeshType = Enum.MeshType.FileMesh
-					mesh.MeshId = CUSTOM_HEAD_ID
-					mesh.TextureId = ""
-					mesh.Parent = head
-					mesh.Scale = Vector3.new(1, 1, 1)
+					head.TextureID = ""
 				end
 				head.Material = material
 				head.Color = color
+				head.CastShadow = false
 			end
 
 			local function makePartCham(part, color, material)
@@ -834,9 +813,14 @@ end
 				part.Material = material
 				part.Color = color
 				part.CastShadow = false
+				if part:IsA("MeshPart") then
+					part.TextureID = ""
+				end
 				for _, child in pairs(part:GetChildren()) do
-					if child:IsA("Decal") or child:IsA("Texture") then
+					if child:IsA("Decal") or child:IsA("Texture") or child:IsA("SurfaceAppearance") then
 						child:Destroy()
+					elseif child:IsA("SpecialMesh") or child:IsA("FileMesh") then
+						child.TextureId = ""
 					end
 				end
 			end
