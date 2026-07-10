@@ -361,6 +361,14 @@ local rgbkey = ColorSequenceKeypoint.new
 		skel:colorpicker({name = "Skeleton Color", flag = "Skeleton_Color", callback = update_elements})
 		section:slider({name = "Skeleton Thickness", flag = "Skeleton_Thickness", min = 1, max = 5, default = 1, interval = 0.5, callback = update_elements})
 		section:slider({name = "Skeleton Transparency", flag = "Skeleton_Transparency", min = 0, max = 1, default = 0, interval = 0.01, callback = update_elements})
+		local headDot = section:toggle({name = "Head Dot", flag = "HeadDot", callback = update_elements})
+		headDot:colorpicker({name = "Head Dot Color", flag = "HeadDot_Color", callback = update_elements})
+		section:slider({name = "Head Dot Transparency", flag = "HeadDot_Transparency", min = 0, max = 1, default = 0, interval = 0.01, callback = update_elements})
+		section:slider({name = "Head Dot Thickness", flag = "HeadDot_Thickness", min = 1, max = 5, default = 1, interval = 0.5, callback = update_elements})
+		local chams = section:toggle({name = "Chams", flag = "Chams", callback = update_elements})
+		chams:colorpicker({name = "Chams Color", flag = "Chams_Color", callback = update_elements})
+		section:dropdown({name = "Chams Material", flag = "Chams_Material", items = {"ForceField", "Neon"}, default = "ForceField", callback = update_elements})
+		section:slider({name = "Chams Transparency", flag = "Chams_Transparency", min = 0, max = 1, default = 0.5, interval = 0.01, callback = update_elements})
 		esp = window.esp_section:esp_preview({})
 		task.defer(function() if esp and esp.refresh_elements then esp.refresh_elements() end end)
 
@@ -505,6 +513,15 @@ local rgbkey = ColorSequenceKeypoint.new
 					drawings.skeletonLines[i] = line
 				end
 			
+				drawings.headDot = Drawing.new("Circle")
+					drawings.headDot.Radius = 4
+					drawings.headDot.Filled = false
+					drawings.headDot.NumSides = 12
+					drawings.headDot.Visible = false
+		
+				drawings.chamsFolder = nil
+					drawings.chamsParts = {}
+		
 				drawings.boxOutline.Thickness = 1
 				drawings.boxOutline.Filled = false
 				drawings.boxOutline.Visible = false
@@ -691,8 +708,88 @@ local rgbkey = ColorSequenceKeypoint.new
 						line.Visible = false
 					end
 				end
-			end
+end
 			
+			local function updateHeadDot(drawings, character, color, visible)
+				if not visible then
+					drawings.headDot.Visible = false
+					return
+				end
+				local head = character:FindFirstChild("Head")
+				if not head then
+					drawings.headDot.Visible = false
+					return
+				end
+				local pos, onScreen = Workspace.CurrentCamera:WorldToViewportPoint(head.Position)
+				if onScreen then
+					drawings.headDot.Position = Vector2.new(pos.X, pos.Y)
+					drawings.headDot.Thickness = espFlags["HeadDot_Thickness"] or 1
+					drawings.headDot.Transparency = espFlags["HeadDot_Transparency"] or 0
+					drawings.headDot.Color = color
+					drawings.headDot.Visible = true
+				else
+					drawings.headDot.Visible = false
+				end
+			end
+
+			local materialMap = {
+				ForceField = Enum.Material.ForceField,
+				Neon = Enum.Material.Neon,
+			}
+
+			local function clearChams(drawings)
+				if drawings.chamsFolder then
+					drawings.chamsFolder:Destroy()
+					drawings.chamsFolder = nil
+					drawings.chamsParts = {}
+				end
+			end
+
+			local function updateChams(drawings, character, color, visible)
+				if not visible then
+					clearChams(drawings)
+					return
+				end
+				if not drawings.chamsFolder then
+					drawings.chamsFolder = Instance.new("Folder")
+					drawings.chamsFolder.Name = ""
+					drawings.chamsFolder.Parent = Workspace
+					drawings.chamsParts = {}
+				end
+				local materialName = espFlags["Chams_Material"] or "ForceField"
+				local material = materialMap[materialName] or Enum.Material.ForceField
+				local transparency = espFlags["Chams_Transparency"] or 0.5
+				for part, chamPart in pairs(drawings.chamsParts) do
+					if not part:IsDescendantOf(character) then
+						chamPart:Destroy()
+						drawings.chamsParts[part] = nil
+					end
+				end
+				for _, part in ipairs(character:GetDescendants()) do
+					if part:IsA("BasePart") then
+						local chamPart = drawings.chamsParts[part]
+						if not chamPart then
+							chamPart = Instance.new("Part")
+							chamPart.Name = ""
+							chamPart.Anchored = true
+							chamPart.CanCollide = false
+							chamPart.CanTouch = false
+							chamPart.CanQuery = false
+							chamPart.CastShadow = false
+							chamPart.Size = part.Size
+							chamPart.Shape = Enum.PartType.Block
+							chamPart.Parent = drawings.chamsFolder
+							drawings.chamsParts[part] = chamPart
+						end
+						chamPart.CFrame = part.CFrame
+						chamPart.Size = part.Size * 1.02
+						chamPart.Material = material
+						chamPart.Color = color
+						chamPart.Transparency = transparency
+					end
+				end
+			end
+
 			local function updateEsp(player)
 				local drawings = espObjects[player]
 				if not drawings then return end
@@ -707,6 +804,7 @@ local rgbkey = ColorSequenceKeypoint.new
 							pcall(function() d.Visible = false end)
 						end
 					end
+					clearChams(drawings)
 				end
 			
 				if not espFlags["Enabled"] then
@@ -820,6 +918,8 @@ local rgbkey = ColorSequenceKeypoint.new
 				end
 			
 				updateSkeleton(drawings, character, getColor("Skeleton_Color"), espFlags["Skeletons"])
+				updateHeadDot(drawings, character, getColor("HeadDot_Color"), espFlags["HeadDot"])
+				updateChams(drawings, character, getColor("Chams_Color"), espFlags["Chams"])
 			end
 			
 			local function safeCreateEsp(player)
