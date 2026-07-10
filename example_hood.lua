@@ -2248,6 +2248,21 @@ end
 end
 
 
+local desync = {
+	enabled = false,
+	mode = "Void",
+	teleportPosition = Vector3.new(0, 0, 0),
+	old_position = nil,
+	voidSpamActive = false,
+	toggleEnabled = false,
+	Offsetposx = 10,
+	OffsetposY = 10,
+	Offsetposz = 10,
+	WalkableEnabled = false,
+	WalkableDelay = 800,
+	WalkableInterval = 6
+}
+
 -- ============================================
 do
 -- ANTI-AIM (DESYNC)
@@ -2260,19 +2275,6 @@ desync_setback.CanCollide = false
 desync_setback.Anchored = true
 desync_setback.Transparency = 1
 
-local desync = {
-	enabled = false,
-	mode = "Void",
-	teleportPosition = Vector3.new(0, 0, 0),
-	old_position = nil,
-	voidSpamActive = false,
-	toggleEnabled = false
-}
-
-local Offsetposx = 10
-local OffsetposY = 10
-local Offsetposz = 10
-
 local function resetCamera()
 	if LocalPlayer.Character then
 		local humanoid = LocalPlayer.Character:FindFirstChild("Humanoid")
@@ -2282,7 +2284,7 @@ local function resetCamera()
 	end
 end
 
-local function toggleDesync(state)
+desync.toggleDesync = function(state)
 	desync.enabled = state
 	if desync.enabled then
 		workspace.CurrentCamera.CameraSubject = desync_setback
@@ -2305,7 +2307,7 @@ RunService.Heartbeat:Connect(function()
 			elseif desync.mode == "UnderGroundV2" then
 				desync.teleportPosition = rootPart.Position - Vector3.new(0, 11, 0)
 			elseif desync.mode == "Custom" then
-				desync.teleportPosition = rootPart.Position - Vector3.new(Offsetposx, OffsetposY, Offsetposz)
+				desync.teleportPosition = rootPart.Position - Vector3.new(desync.Offsetposx, desync.OffsetposY, desync.Offsetposz)
 			elseif desync.mode == "Void Spam" then
 				desync.teleportPosition = math.random(1, 2) == 1 and desync.old_position.Position or Vector3.new(
 					math.random(10000, 50000),
@@ -2363,35 +2365,32 @@ end)
 -- ============================================
 -- WALKABLE DESYNC + GODMODE
 -- ============================================
-local WalkableEnabled = false
-local WalkableDelay = 800
-local WalkableInterval = 6
 local VProEn = true
 
 function DesyncWalkable()
 	task.spawn(function()
-		while WalkableEnabled do
+		while desync.WalkableEnabled do
 			task.wait()
 			if LocalPlayer.Character then
 				local loop = RunService.Heartbeat:Connect(function()
 					pcall(function()
 						sethiddenproperty(LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
 					end)
-					task.wait(WalkableDelay / 100000)
+					task.wait(desync.WalkableDelay / 100000)
 					pcall(function()
 						sethiddenproperty(LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
 					end)
 				end)
-				task.wait(WalkableInterval / 100)
+				task.wait(desync.WalkableInterval / 100)
 				if loop then loop:Disconnect() end
 			end
 		end
 	end)
 end
 
-local function toggleWalkableDesync(v)
-	WalkableEnabled = v
-	if WalkableEnabled then
+desync.toggleWalkableDesync = function(v)
+	desync.WalkableEnabled = v
+	if desync.WalkableEnabled then
 		DesyncWalkable()
 		Notify("Notification", "Walkable Desync: Enabled", 3)
 	else
@@ -2399,7 +2398,7 @@ local function toggleWalkableDesync(v)
 	end
 end
 
-local function toggleGodmode(v)
+desync.toggleGodmode = function(v)
 	if getgenv().AnimGodmode then
 		getgenv().AnimGodmode.Set(v)
 	end
@@ -3688,14 +3687,14 @@ local secAntiAim = col4:section({name = "Anti-Aim", toggle = false})
 secAntiAim:toggle({name = "Desync", flag = "hood_desync_enabled", callback = function(v)
 	desync.toggleEnabled = v
 	if not v then
-		toggleDesync(false)
+		desync.toggleDesync(false)
 	end
 end}):keybind({name = "Desync Key", flag = "hood_desync_key", callback = function(active)
 	if not desync.toggleEnabled or UserInputService:GetFocusedTextBox() then return end
 	if active and not desync.enabled then
-		toggleDesync(true)
+		desync.toggleDesync(true)
 	elseif not active and desync.enabled then
-		toggleDesync(false)
+		desync.toggleDesync(false)
 	end
 end})
 
@@ -3704,41 +3703,41 @@ secAntiAim:dropdown({name = "Desync Method", flag = "hood_desync_method", items 
 end})
 
 secAntiAim:slider({name = "Custom Pos X", flag = "hood_desync_x", min = -30, max = 30, default = 10, interval = 1, callback = function(v)
-	Offsetposx = v
+	desync.Offsetposx = v
 end})
 secAntiAim:slider({name = "Custom Pos Y", flag = "hood_desync_y", min = -30, max = 30, default = 10, interval = 1, callback = function(v)
-	OffsetposY = v
+	desync.OffsetposY = v
 end})
 secAntiAim:slider({name = "Custom Pos Z", flag = "hood_desync_z", min = -30, max = 30, default = 10, interval = 1, callback = function(v)
-	Offsetposz = v
+	desync.Offsetposz = v
 end})
 
 secAntiAim:toggle({name = "Walkable Desync", flag = "hood_walkable_desync_enabled", callback = function(v)
-	toggleWalkableDesync(v)
+	desync.toggleWalkableDesync(v)
 end}):keybind({name = "Walkable Key", flag = "hood_walkable_desync_key", callback = function(active)
-	if active and not WalkableEnabled then
-		toggleWalkableDesync(true)
-	elseif not active and WalkableEnabled then
-		toggleWalkableDesync(false)
+	if active and not desync.WalkableEnabled then
+		desync.toggleWalkableDesync(true)
+	elseif not active and desync.WalkableEnabled then
+		desync.toggleWalkableDesync(false)
 	end
 end})
 
 secAntiAim:slider({name = "Desync Delay", flag = "hood_walkable_delay", min = 100, max = 2000, default = 800, interval = 1, suffix = " ms", callback = function(v)
-	WalkableDelay = v
+	desync.WalkableDelay = v
 end})
 secAntiAim:slider({name = "Desync Interval", flag = "hood_walkable_interval", min = 1, max = 20, default = 6, interval = 1, callback = function(v)
-	WalkableInterval = v
+	desync.WalkableInterval = v
 end})
 
 secAntiAim:toggle({name = "Godmode", flag = "hood_godmode_enabled", callback = function(v)
-	toggleGodmode(v)
+	desync.toggleGodmode(v)
 end}):keybind({name = "Godmode Key", flag = "hood_godmode_key", callback = function(active)
 	if not getgenv().AnimGodmode then return end
 	local current = getgenv().AnimGodmode.IsEnabled()
 	if active and not current then
-		toggleGodmode(true)
+		desync.toggleGodmode(true)
 	elseif not active and current then
-		toggleGodmode(false)
+		desync.toggleGodmode(false)
 	end
 end})
 
