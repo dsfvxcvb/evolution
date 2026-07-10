@@ -6156,6 +6156,7 @@ end
 
 -- Crosshair
 do
+	local UserInputService = game:GetService("UserInputService")
 	local Crosshair = {
 		Enabled = false,
 		FollowTarget = false,
