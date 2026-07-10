@@ -335,8 +335,9 @@ local rgbkey = ColorSequenceKeypoint.new
 		local esp;
 		local function update_elements() if esp and esp.refresh_elements then esp.refresh_elements() end end 
 		local column = Visuals:column()
-		local section = column:section({name = "General", toggle = false})
+		local section = column:section({name = "ESP", toggle = false})
 		section:toggle({name = "Enabled", flag = "Enabled", callback = update_elements})
+		section:toggle({name = "Local Player", flag = "Local_Player", callback = update_elements})
 		section:toggle({name = "Names", flag = "Names", callback = update_elements}):colorpicker({flag = "Name_Color", callback = update_elements})
 		local settings = section:toggle({name = "Boxes", flag = "Boxes", callback = update_elements})
 		section:dropdown({name = "Box Type", flag = "Box_Type", items = {"Corner", "Full"}, default = "Corner", callback = update_elements})
@@ -369,8 +370,12 @@ local rgbkey = ColorSequenceKeypoint.new
 		chams:colorpicker({name = "Chams Color", flag = "Chams_Color", callback = update_elements})
 		section:dropdown({name = "Chams Material", flag = "Chams_Material", items = {"ForceField", "Neon"}, default = "ForceField", callback = update_elements})
 		section:slider({name = "Chams Transparency", flag = "Chams_Transparency", min = 0, max = 1, default = 0.5, interval = 0.01, callback = update_elements})
+		section:slider({name = "Max Distance", flag = "Max_Distance", min = 0, max = 10000, default = 10000, interval = 100, suffix = " studs", callback = update_elements})
 		esp = window.esp_section:esp_preview({})
 		task.defer(function() if esp and esp.refresh_elements then esp.refresh_elements() end end)
+		
+		local worldColumn = Visuals:column()
+		local worldSection = worldColumn:section({name = "World", toggle = false})
 
 			-- Real in-game ESP
 
@@ -911,6 +916,17 @@ end
 					hideAll()
 					return
 				end
+
+				if player == LocalPlayer and not espFlags["Local_Player"] then
+					hideAll()
+					return
+				end
+
+				local maxDistance = espFlags["Max_Distance"] or 10000
+				if (hrp.Position - localHrp.Position).Magnitude > maxDistance then
+					hideAll()
+					return
+				end
 			
 				if humanoid.Health <= 0 then
 					hideAll()
@@ -1017,9 +1033,7 @@ end
 			Players.PlayerAdded:Connect(safeCreateEsp)
 			Players.PlayerRemoving:Connect(removeEsp)
 			for _, player in ipairs(Players:GetPlayers()) do
-				if player ~= LocalPlayer then
-					safeCreateEsp(player)
-				end
+				safeCreateEsp(player)
 			end
 			
 			RunService.RenderStepped:Connect(function()
