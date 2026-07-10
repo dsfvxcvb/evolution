@@ -8342,8 +8342,6 @@ end
 		end
 	end
 
-end
-
 
 	Aiming.open_tab() 
 -- 
