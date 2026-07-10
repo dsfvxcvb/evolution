@@ -281,8 +281,15 @@ local rgbkey = ColorSequenceKeypoint.new
 				selec:toggle({name = "ForceField Check", flag = "forcefield_check"})
 				selec:toggle({name = "Distance Check", flag = "distance_check", tooltip = "Checks if they are in the distance of the guns range"})
 				lock:toggle({name = "Enabled", flag = "silent_aim"})
+				:keybind({name = "Aim Key", flag = "silent_aim_bind"})
 				lock:toggle({name = "Auto Shoot", flag = "auto_shoot"})
-				lock:dropdown({name = "Aim Bone", flag = "silent_aim_bone", items = {"Hrp", "Head"}, default = "Head"})                lock:toggle({name = "Invisible Bullets", flag = "invis_bullet", tooltip = "Makes your bullets invisible"})
+				lock:dropdown({name = "Aim Bone", flag = "silent_aim_bone", items = {"Head", "Torso", "HumanoidRootPart"}, default = "Head"})
+				lock:slider({name = "FOV", flag = "silent_aim_fov", min = 0, max = 500, default = 150, interval = 1, suffix = " px"})
+				lock:slider({name = "Smoothness", flag = "silent_aim_smooth", min = 1, max = 100, default = 15, interval = 1, suffix = "%"})
+				lock:slider({name = "Max Distance", flag = "silent_aim_distance", min = 0, max = 1000, default = 500, interval = 5, suffix = " studs"})
+				lock:toggle({name = "Team Check", flag = "silent_aim_teamcheck"})
+				lock:toggle({name = "Visible Check", flag = "silent_aim_visiblecheck"})
+				lock:toggle({name = "Invisible Bullets", flag = "invis_bullet", tooltip = "Makes your bullets invisible"})
 				
 		local column =  Aiming:column() 
 			local vis, other  = column:multi_section({names = {"Visuals", "Other"}})
@@ -1062,6 +1069,114 @@ end
 				end
 			end)
 	-- 
+
+	-- Soft Aim / Aimbot
+		do
+			local Players = game:GetService("Players")
+			local RunService = game:GetService("RunService")
+			local Workspace = game:GetService("Workspace")
+			local Camera = Workspace.CurrentCamera
+			local LocalPlayer = Players.LocalPlayer
+
+			local function isKeyActive(bindFlag)
+				local bind = library.flags[bindFlag]
+				if not bind then return false end
+				if bind.mode == "always" then return true end
+				return bind.active == true
+			end
+
+			local function getAimBone(character)
+				local boneName = library.flags["silent_aim_bone"] or "Head"
+				return character:FindFirstChild(boneName)
+			end
+
+			local function isTeammate(player)
+				if player == LocalPlayer then return true end
+				if not LocalPlayer.Team or not player.Team then return false end
+				return LocalPlayer.Team == player.Team
+			end
+
+			local function isVisible(targetPart)
+				local origin = Camera.CFrame.Position
+				local direction = targetPart.Position - origin
+				local params = RaycastParams.new()
+				params.FilterDescendantsInstances = {LocalPlayer.Character}
+				params.FilterType = Enum.RaycastFilterType.Blacklist
+				local result = Workspace:Raycast(origin, direction, params)
+				if not result then return true end
+				return result.Instance and result.Instance:IsDescendantOf(targetPart.Parent)
+			end
+
+			local function getTarget()
+				local center = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+				local fov = library.flags["silent_aim_fov"] or 150
+				local maxDist = library.flags["silent_aim_distance"] or 500
+				local teamCheck = library.flags["silent_aim_teamcheck"]
+				local visCheck = library.flags["silent_aim_visiblecheck"]
+				local localChar = LocalPlayer.Character
+				local localHrp = localChar and localChar:FindFirstChild("HumanoidRootPart")
+
+				local closestBone, closestDist = nil, math.huge
+				for _, player in ipairs(Players:GetPlayers()) do
+					if player == LocalPlayer then continue end
+					local character = player.Character
+					if not character then continue end
+					local humanoid = character:FindFirstChildOfClass("Humanoid")
+					local hrp = character:FindFirstChild("HumanoidRootPart")
+					if not humanoid or not hrp then continue end
+					if humanoid.Health <= 0 then continue end
+					if teamCheck and isTeammate(player) then continue end
+
+					local bone = getAimBone(character)
+					if not bone or not bone:IsA("BasePart") then continue end
+
+					if localHrp then
+						local dist = (hrp.Position - localHrp.Position).Magnitude
+						if dist > maxDist then continue end
+					end
+
+					if visCheck and not isVisible(bone) then continue end
+
+					local pos, onScreen = Camera:WorldToViewportPoint(bone.Position)
+					if not onScreen then continue end
+					local screenDist = (Vector2.new(pos.X, pos.Y) - center).Magnitude
+					if screenDist <= fov and screenDist < closestDist then
+						closestBone = bone
+						closestDist = screenDist
+					end
+				end
+				return closestBone
+			end
+
+			local function aimAt(bone)
+				if not bone then return end
+				local smooth = library.flags["silent_aim_smooth"] or 15
+				local factor = math.clamp(smooth / 100, 0.01, 1)
+				local targetCFrame = CFrame.new(Camera.CFrame.Position, bone.Position)
+				Camera.CFrame = Camera.CFrame:Lerp(targetCFrame, factor)
+			end
+
+			local lastAutoShoot = 0
+			local function autoShoot()
+				if not library.flags["auto_shoot"] then return end
+				local tool = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Tool")
+				if not tool then return end
+				local now = tick()
+				if now - lastAutoShoot < 0.08 then return end
+				lastAutoShoot = now
+				pcall(function() tool:Activate() end)
+			end
+
+			RunService.RenderStepped:Connect(function()
+				if not library.flags["silent_aim"] then return end
+				if not isKeyActive("silent_aim_bind") then return end
+				local target = getTarget()
+				if target then
+					aimAt(target)
+					autoShoot()
+				end
+			end)
+		end
 
 	Aiming.open_tab() 
 -- 
