@@ -1976,12 +1976,18 @@
 					items.viewportframe.CurrentCamera = items.camera -- sick
 					character.Parent = items.viewportframe
 
+					if not character.PrimaryPart then
+						character.PrimaryPart = character:FindFirstChild("HumanoidRootPart") or character:FindFirstChild("Torso") or character:FindFirstChild("UpperTorso")
+					end
+
 					items.camera.CameraSubject = character
 
 					library:connection(run.RenderStepped, function()
 						task.wait()
 						cfg.rotation += 0.5
-						character:SetPrimaryPartCFrame(cfr(Vector3.new(0, 1, -6)) * angle(0, math.rad(cfg.rotation), 0))
+						pcall(function()
+							character:SetPrimaryPartCFrame(cfr(Vector3.new(0, 1, -6)) * angle(0, math.rad(cfg.rotation), 0))
+						end)
 					end)
 
 					library:connection(run.RenderStepped, function()
