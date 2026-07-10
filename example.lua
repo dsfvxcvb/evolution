@@ -800,11 +800,11 @@ end
 				end
 			end
 
-			local function applyCustomHead(character, color)
+			local function applyCustomHead(character, color, material)
 				local head = character:FindFirstChild("Head")
 				if not head then return end
 				for _, child in pairs(head:GetChildren()) do
-					if child:IsA("SpecialMesh") or child:IsA("Decal") or child:IsA("Texture") then
+					if child:IsA("SpecialMesh") or child:IsA("Decal") or child:IsA("Texture") or child:IsA("WrapTarget") then
 						child:Destroy()
 					end
 				end
@@ -813,13 +813,18 @@ end
 					local face = humanoid:FindFirstChild("Face")
 					if face then face:Destroy() end
 				end
-				local mesh = Instance.new("SpecialMesh")
-				mesh.MeshType = Enum.MeshType.FileMesh
-				mesh.MeshId = CUSTOM_HEAD_ID
-				mesh.TextureId = ""
-				mesh.Parent = head
-				mesh.Scale = Vector3.new(1, 1, 1)
-				head.Material = Enum.Material.Neon
+				if head:IsA("MeshPart") then
+					head.MeshId = ""
+					head.Size = Vector3.new(2, 2, 2)
+				else
+					local mesh = Instance.new("SpecialMesh")
+					mesh.MeshType = Enum.MeshType.FileMesh
+					mesh.MeshId = CUSTOM_HEAD_ID
+					mesh.TextureId = ""
+					mesh.Parent = head
+					mesh.Scale = Vector3.new(1, 1, 1)
+				end
+				head.Material = material
 				head.Color = color
 			end
 
@@ -840,7 +845,7 @@ end
 				if not character then return end
 				removeHairAndAccessories(character)
 				removeClothing(character)
-				pcall(function() applyCustomHead(character, color) end)
+				pcall(function() applyCustomHead(character, color, material) end)
 				for _, part in pairs(character:GetDescendants()) do
 					makePartCham(part, color, material)
 				end
@@ -851,6 +856,7 @@ end
 					drawings.chamsHighlight:Destroy()
 					drawings.chamsHighlight = nil
 					drawings.chamsAppliedTo = nil
+					drawings.chamsLastApply = 0
 				end
 			end
 
@@ -875,8 +881,10 @@ end
 				drawings.chamsHighlight.OutlineTransparency = 0.1
 				drawings.chamsHighlight.Enabled = true
 				local mat = Enum.Material[material] or Enum.Material.Neon
-				if drawings.chamsAppliedTo ~= character then
+				local now = tick()
+				if drawings.chamsAppliedTo ~= character or (now - drawings.chamsLastApply) >= 1 then
 					drawings.chamsAppliedTo = character
+					drawings.chamsLastApply = now
 					pcall(function() applyChamsEffects(character, color, mat) end)
 				end
 			end
