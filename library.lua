@@ -1939,609 +1939,624 @@
 			cfg.skeleton_bones = {};
 			cfg.refresh_elements = function() end
 
-			if not lp.Character then
-				warn("[Atlanta] esp_preview: LocalPlayer.Character is nil, skipping preview")
-				return cfg
-			end
+			local function build()
+				if not lp.Character then
+					warn("[Atlanta] esp_preview: LocalPlayer.Character is nil")
+					return
+				end
 
-			lp.Character.Archivable = true
-			local character = lp.Character:Clone()
-			if character:FindFirstChild("Animate") then
-				character.Animate:Destroy()
-			end
 
-			local items = cfg.items; do 
-				items.viewportframe = library:create( "ViewportFrame" , {
-					Parent = self.holder;
-					BackgroundTransparency = 1;
-					Size = dim2(1, 0, 0, 220);
-					BorderColor3 = rgb(0, 0, 0);
-					ZIndex = 1;
-					Position = dim2(0, 0, 0, 10);
-					BorderSizePixel = 0;
-					BackgroundColor3 = rgb(255, 255, 255)
-				});
-				
-				items.camera = library:create( "Camera" , {
-					FieldOfView = 70.00022888183594;
-					CameraType = Enum.CameraType.Track;
-					Focus = cfr(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1);
-					CFrame = cfr(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1);
-					Parent = ws;
-					Name = "\0"
-				}); 
+				lp.Character.Archivable = true
+				local character = lp.Character:Clone()
+				if character:FindFirstChild("Animate") then
+					character.Animate:Destroy()
+				end
 
-				items.viewportframe.CurrentCamera = items.camera -- sick
-				character.Parent = items.viewportframe
-
-				items.camera.CameraSubject = character
-
-				library:connection(run.RenderStepped, function()
-					task.wait()
-					cfg.rotation += 0.5
-					character:SetPrimaryPartCFrame(cfr(Vector3.new(0, 1, -6)) * angle(0, math.rad(cfg.rotation), 0))
-				end)
-
-				library:connection(run.RenderStepped, function()
-					task.wait()
-					cfg.update_skeletons()
-				end)
-			end 
-
-			local objects = cfg.objects; do 
-				objects[ "holder" ] = library:create( "Frame" , {
-					Parent = items.viewportframe;
-					Name = "\0";
-					BackgroundTransparency = 1;
-					Position = dim2(0.5, 0, 0.5, 10);
-					BorderColor3 = rgb(0, 0, 0);
-					Size = dim2(0, 135, 0, 190);
-					BorderSizePixel = 0;
-					AnchorPoint = vec2(0.5, 0.5);
-					BackgroundColor3 = rgb(255, 255, 255)
-				});
-				
-				objects[ "box_outline" ] = library:create( "UIStroke" , {
-					Parent = library.cache;
-					LineJoinMode = Enum.LineJoinMode.Miter
-				});
-				
-				objects[ "name" ] = library:create( "TextLabel" , {
-					FontFace = library.font;
-					Parent = library.cache;
-					TextColor3 = flags["Name_Color"].Color;
-					BorderColor3 = rgb(0, 0, 0);
-					Text = string.format("%s (@%s)", lp.DisplayName, lp.Name);
-					Name = "\0";
-					TextStrokeTransparency = 0;
-					AnchorPoint = vec2(0, 1);
-					Size = dim2(1, 0, 0, 0);
-					BackgroundTransparency = 1;
-					Position = dim2(0, 0, 0, -5);
-					BorderSizePixel = 0;
-					AutomaticSize = Enum.AutomaticSize.Y;
-					TextSize = 12;
-				});
-				
-				objects[ "box_handler" ] = library:create( "Frame" , {
-					Parent = library.cache;
-					Name = "\0";
-					BackgroundTransparency = 1;
-					Position = dim2(0, 1, 0, 1);
-					BorderColor3 = rgb(0, 0, 0);
-					Size = dim2(1, -2, 1, -2);
-					BorderSizePixel = 0;
-					BackgroundColor3 = rgb(255, 255, 255)
-				});
-				
-				objects[ "box_color" ] = library:create( "UIStroke" , {
-					Color = rgb(255, 255, 255);
-					LineJoinMode = Enum.LineJoinMode.Miter;
-					Name = "\0";
-					Parent = objects[ "box_handler" ]
-				});
-				
-				objects[ "outline" ] = library:create( "Frame" , {
-					Parent = objects[ "box_handler" ];
-					Name = "\0";
-					BackgroundTransparency = 1;
-					Position = dim2(0, 1, 0, 1);
-					BorderColor3 = rgb(0, 0, 0);
-					Size = dim2(1, -2, 1, -2);
-					BorderSizePixel = 0;
-					BackgroundColor3 = rgb(255, 255, 255)
-				});
-				
-				library:create( "UIStroke" , {
-					Parent = objects[ "outline" ];
-					LineJoinMode = Enum.LineJoinMode.Miter
-				});  
-				
-				-- Corner Boxes
-					objects[ "corners" ] = library:create( "Frame" , {
-						Visible = true;
-						BorderColor3 = rgb(0, 0, 0);
-						Parent = library.cache;
+				local items = cfg.items; do 
+					items.viewportframe = library:create( "ViewportFrame" , {
+						Parent = self.holder;
 						BackgroundTransparency = 1;
-						Position = dim2(0, -1, 0, 2);
-						Name = "\0";
-						Size = dim2(1, 0, 1, 0);
+						Size = dim2(1, 0, 0, 220);
+						BorderColor3 = rgb(0, 0, 0);
+						ZIndex = 1;
+						Position = dim2(0, 0, 0, 10);
 						BorderSizePixel = 0;
 						BackgroundColor3 = rgb(255, 255, 255)
 					});
-
-					objects[ "1" ] = library:create( "Frame" , {
-						Parent = objects[ "corners" ];
-						Name = "line";
-						Position = dim2(0, 0, 0, -2);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(0.4, 0, 0, 3);
-						BorderSizePixel = 0;
-						BackgroundColor3 = rgb(0, 0, 0)
-					});
-					
-					library:create( "Frame" , {
-						Parent = objects[ "1" ];
-						Position = dim2(0, 1, 0, 1);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(1, -2, 1, -2);
-						BorderSizePixel = 0;
-						BackgroundColor3 = flags["Box_Color"].Color
-					});
-					
-					objects[ "2" ] = library:create( "Frame" , {
-						Parent = objects[ "corners" ];
-						Name = "line";
-						Position = dim2(0, 0, 0, 1);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(0, 3, 0.25, 0);
-						BorderSizePixel = 0;
-						BackgroundColor3 = rgb(0, 0, 0)
-					});
-					
-					library:create( "Frame" , {
-						Parent = objects[ "2" ];
-						Position = dim2(0, 1, 0, -2);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(1, -2, 1, 1);
-						BorderSizePixel = 0;
-						BackgroundColor3 = flags["Box_Color"].Color
-					});
-					
-					objects[ "3" ] = library:create( "Frame" , {
-						AnchorPoint = vec2(1, 0);
-						Parent = objects[ "corners" ];
-						Name = "line";
-						Position = dim2(1, 0, 0, -2);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(0.4, 0, 0, 3);
-						BorderSizePixel = 0;
-						BackgroundColor3 = rgb(0, 0, 0)
-					});
-					
-					library:create( "Frame" , {
-						Parent = objects[ "3" ];
-						Position = dim2(0, 1, 0, 1);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(1, -2, 1, -2);
-						BorderSizePixel = 0;
-						BackgroundColor3 = flags["Box_Color"].Color
-					});
-					
-					objects[ "4" ] = library:create( "Frame" , {
-						AnchorPoint = vec2(1, 0);
-						Parent = objects[ "corners" ];
-						Name = "line";
-						Position = dim2(1, 0, 0, 1);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(0, 3, 0.25, 0);
-						BorderSizePixel = 0;
-						BackgroundColor3 = rgb(0, 0, 0)
-					});
-					
-					library:create( "Frame" , {
-						Parent = objects[ "4" ];
-						Position = dim2(0, 1, 0, -2);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(1, -2, 1, 1);
-						BorderSizePixel = 0;
-						BackgroundColor3 = flags["Box_Color"].Color
-					});
-					
-					objects[ "5" ] = library:create( "Frame" , {
-						AnchorPoint = vec2(0, 1);
-						Parent = objects[ "corners" ];
-						Name = "line";
-						Position = dim2(0, -1, 1, -2);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(0.4, 0, 0, 3);
-						BorderSizePixel = 0;
-						BackgroundColor3 = rgb(0, 0, 0)
-					});
-					
-					library:create( "Frame" , {
-						Parent = objects[ "5" ];
-						Position = dim2(0, 1, 0, 1);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(1, -2, 1, -2);
-						BorderSizePixel = 0;
-						BackgroundColor3 = flags["Box_Color"].Color
-					});
-					
-					objects[ "6" ] = library:create( "Frame" , {
-						BorderColor3 = rgb(0, 0, 0);
-						Rotation = 180;
-						Parent = objects[ "corners" ];
-						Name = "line";
-						Position = dim2(0, 0, 1, -4);
-						AnchorPoint = vec2(0, 1);
-						Size = dim2(0, 3, 0.25, 1);
-						BorderSizePixel = 0;
-						BackgroundColor3 = rgb(0, 0, 0)
-					});
-					
-					library:create( "Frame" , {
-						Parent = objects[ "6" ];
-						Position = dim2(0, 1, 0, -2);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(1, -2, 1, 1);
-						BorderSizePixel = 0;
-						BackgroundColor3 = flags["Box_Color"].Color
-					});
-					
-					objects[ "7" ] = library:create( "Frame" , {
-						AnchorPoint = vec2(1, 1);
-						Parent = objects[ "corners" ];
-						Name = "line";
-						Position = dim2(1, -1, 1, -2);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(0.4, 0, 0, 3);
-						BorderSizePixel = 0;
-						BackgroundColor3 = rgb(0, 0, 0)
-					});
-					
-					library:create( "Frame" , {
-						Parent = objects[ "7" ];
-						Position = dim2(0, 1, 0, 1);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(1, -2, 1, -2);
-						BorderSizePixel = 0;
-						BackgroundColor3 = flags["Box_Color"].Color
-					});
-					
-					objects[ "7" ] = library:create( "Frame" , {
-						BorderColor3 = rgb(0, 0, 0);
-						Rotation = 180;
-						Parent = objects[ "corners" ];
-						Name = "line";
-						Position = dim2(1, 0, 1, -4);
-						AnchorPoint = vec2(1, 1);
-						Size = dim2(0, 3, 0.25, 1);
-						BorderSizePixel = 0;
-						BackgroundColor3 = rgb(0, 0, 0)
-					});
-					
-					library:create( "Frame" , {
-						Parent = objects[ "7" ];
-						Position = dim2(0, 1, 0, -2);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(1, -2, 1, 1);
-						BorderSizePixel = 0;
-						BackgroundColor3 = flags["Box_Color"].Color
-					});
-				-- 
 				
-				-- Healthbar
-					objects[ "healthbar_holder" ] = library:create( "Frame" , {
-						AnchorPoint = vec2(1, 0);
-						Parent = library.cache;
-						Name = "\0";
-						Position = dim2(0, -5, 0, 0);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(0, 4, 1, 0);
-						BorderSizePixel = 0;
-						BackgroundColor3 = rgb(0, 0, 0)
-					});
-					
-					objects[ "healthbar" ] = library:create( "Frame" , {
-						Parent = objects[ "healthbar_holder" ];
-						Name = "\0";
-						Position = dim2(0, 1, 0, 1);
-						BorderColor3 = rgb(0, 0, 0);
-						Size = dim2(1, -2, 1, -2);
-						BorderSizePixel = 0;
-						BackgroundColor3 = rgb(255, 255, 255)
-					});
-				-- 
+					items.camera = library:create( "Camera" , {
+						FieldOfView = 70.00022888183594;
+						CameraType = Enum.CameraType.Track;
+						Focus = cfr(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1);
+						CFrame = cfr(0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0, 1);
+						Parent = ws;
+						Name = "\0"
+					}); 
 
-				-- Distance esp
-					objects[ "distance" ] = library:create( "TextLabel" , {
-						FontFace = library.font;
-						TextColor3 = flags["Distance_Color"].Color;
-						BorderColor3 = rgb(0, 0, 0);
-						Text = "127st";
-						Parent = library.cache;
-						TextStrokeTransparency = 0;
-						Name = "\0";
-						Size = dim2(1, 0, 0, 0);
-						BackgroundTransparency = 1;
-						Position = dim2(0, 0, 1, 5);
-						BorderSizePixel = 0;
-						AutomaticSize = Enum.AutomaticSize.Y;
-						TextSize = 12;
-					});                
-				-- 
+					items.viewportframe.CurrentCamera = items.camera -- sick
+					character.Parent = items.viewportframe
 
-				-- Weapon esp
-					objects[ "weapon" ] = library:create( "TextLabel" , {
-						FontFace = library.font;
-						TextColor3 = flags["Weapon_Color"].Color;
-						BorderColor3 = rgb(0, 0, 0);
-						Text = "[ Weapon ]";
-						Parent = library.cache;
-						TextStrokeTransparency = 0;
-						Name = "\0";
-						Size = dim2(1, 0, 0, 0);
-						BackgroundTransparency = 1;
-						Position = dim2(0, 0, 1, 19);
-						BorderSizePixel = 0;
-						AutomaticSize = Enum.AutomaticSize.Y;
-						TextSize = 12;
-					});
-				--  
+					items.camera.CameraSubject = character
 
-				-- Glow
-				objects["glow"] = library:create("ImageLabel", {
-					Name = "\0";
-					Parent = library.cache;
-					BackgroundTransparency = 1;
-					Image = "rbxassetid://110204605000367";
-					ImageColor3 = Color3.new(1, 1, 1);
-					ImageTransparency = 0.65;
-					ScaleType = Enum.ScaleType.Slice;
-					SliceCenter = Rect.new(21, 21, 79, 79);
-					ZIndex = 2;
-					Visible = false;
-					Position = dim2(0, -21, 0, -21);
-					Size = dim2(1, 42, 1, 42);
-				})
+					library:connection(run.RenderStepped, function()
+						task.wait()
+						cfg.rotation += 0.5
+						character:SetPrimaryPartCFrame(cfr(Vector3.new(0, 1, -6)) * angle(0, math.rad(cfg.rotation), 0))
+					end)
 
-				-- Fill
-				objects["fill"] = library:create("Frame", {
-					Name = "\0";
-					Parent = library.cache;
-					BackgroundColor3 = Color3.new(1, 1, 1);
-					BackgroundTransparency = 0.7;
-					BorderSizePixel = 0;
-					ZIndex = 2;
-					Visible = false;
-					Position = dim2(0, 0, 0, 0);
-					Size = dim2(1, 0, 1, 0);
-				})
-
-				-- Image Fill
-				objects["image_fill"] = library:create("ImageLabel", {
-					Name = "\0";
-					Parent = library.cache;
-					BackgroundTransparency = 1;
-					Image = "";
-					ImageColor3 = Color3.new(1, 1, 1);
-					ImageTransparency = 0.5;
-					ScaleType = Enum.ScaleType.Stretch;
-					ZIndex = 2;
-					Visible = false;
-					Position = dim2(0, 0, 0, 0);
-					Size = dim2(1, 0, 1, 0);
-				})
-
-				-- Skeletons
-				objects["skeletons"] = library:create("Frame", {
-					Name = "\\0";
-					Parent = library.cache;
-					BackgroundTransparency = 1;
-					AnchorPoint = Vector2.new(0, 0);
-					Position = dim2(0, 0, 0, 0);
-					Size = dim2(1, 0, 1, 0);
-					ZIndex = 2;
-					Visible = false;
-				})
-
-				local skeletonMap = {
-					{first = {"Head"}, second = {"UpperTorso", "Torso"}},
-					{first = {"UpperTorso", "Torso"}, second = {"LowerTorso"}},
-					{first = {"UpperTorso", "Torso"}, second = {"LeftUpperArm", "Left Arm"}},
-					{first = {"LeftUpperArm", "Left Arm"}, second = {"LeftLowerArm"}},
-					{first = {"LeftLowerArm"}, second = {"LeftHand"}},
-					{first = {"UpperTorso", "Torso"}, second = {"RightUpperArm", "Right Arm"}},
-					{first = {"RightUpperArm", "Right Arm"}, second = {"RightLowerArm"}},
-					{first = {"RightLowerArm"}, second = {"RightHand"}},
-					{first = {"LowerTorso", "Torso"}, second = {"LeftUpperLeg", "Left Leg"}},
-					{first = {"LeftUpperLeg", "Left Leg"}, second = {"LeftLowerLeg"}},
-					{first = {"LeftLowerLeg"}, second = {"LeftFoot"}},
-					{first = {"LowerTorso", "Torso"}, second = {"RightUpperLeg", "Right Leg"}},
-					{first = {"RightUpperLeg", "Right Leg"}, second = {"RightLowerLeg"}},
-					{first = {"RightLowerLeg"}, second = {"RightFoot"}},
-				}
-
-				local function findPart(character, ...)
-					for _, name in ipairs({...}) do
-						local part = character:FindFirstChild(name)
-						if part then return part end
-					end
-					return nil
-				end
-
-				local function makeBone(pair, color, thickness)
-					local bone = library:create("Frame", {
-						Name = "\\0";
-						Parent = objects["skeletons"];
-						AnchorPoint = Vector2.new(0.5, 0.5);
-						Position = dim2(0, 0, 0, 0);
-						Size = dim2(0, 0, 0, thickness or 1);
-						Rotation = 0;
-						BorderSizePixel = 0;
-						BackgroundColor3 = color or Color3.new(1, 1, 1);
-						BackgroundTransparency = 0;
-						ZIndex = 3;
-					})
-					table.insert(cfg.skeleton_bones, {bone = bone, pair = pair, thickness = thickness or 1})
-					return bone
-				end
-
-				local skelColor = (flags["Skeleton_Color"] and flags["Skeleton_Color"].Color) or Color3.new(1, 1, 1)
-				local skelThickness = (flags["Skeleton_Thickness"] and flags["Skeleton_Thickness"]) or 1
-				for _, pair in ipairs(skeletonMap) do
-					makeBone(pair, skelColor, skelThickness)
-				end
-			end
-
-			cfg.refresh_elements = function()
-				objects.holder.Parent = flags["Enabled"] and items.viewportframe or library.cache
-
-				local temp = {
-					["Names"] = objects["name"]; 
-					["Name_Color"] = {objects["name"]};
-					["Healthbar"] = objects[ "healthbar_holder" ];
-					["Distance"] = objects[ "distance" ];
-					["Weapon"] = objects[ "weapon" ];
-					["Distance_Color"] = {objects[ "distance" ]};
-					["Weapon_Color"] = {objects[ "weapon" ]};
-				}
-
-				for flag, object in temp do 
-					if type(object) == "table" then 
-						object[1].TextColor3 = flags[flag].Color
-					else 
-						object.Parent = flags[flag] and objects[ "holder" ] or library.cache
-					end
+					library:connection(run.RenderStepped, function()
+						task.wait()
+						cfg.update_skeletons()
+					end)
 				end 
-				
-				local is_corner = flags[ "Box_Type" ] == "Corner"
 
-				if flags["Boxes"] then 
-					if is_corner then 
-						objects[ "corners" ].Parent = objects["holder"]
+				local objects = cfg.objects; do 
+					objects[ "holder" ] = library:create( "Frame" , {
+						Parent = items.viewportframe;
+						Name = "\0";
+						BackgroundTransparency = 1;
+						Position = dim2(0.5, 0, 0.5, 10);
+						BorderColor3 = rgb(0, 0, 0);
+						Size = dim2(0, 135, 0, 190);
+						BorderSizePixel = 0;
+						AnchorPoint = vec2(0.5, 0.5);
+						BackgroundColor3 = rgb(255, 255, 255)
+					});
+				
+					objects[ "box_outline" ] = library:create( "UIStroke" , {
+						Parent = library.cache;
+						LineJoinMode = Enum.LineJoinMode.Miter
+					});
+				
+					objects[ "name" ] = library:create( "TextLabel" , {
+						FontFace = library.font;
+						Parent = library.cache;
+						TextColor3 = flags["Name_Color"].Color;
+						BorderColor3 = rgb(0, 0, 0);
+						Text = string.format("%s (@%s)", lp.DisplayName, lp.Name);
+						Name = "\0";
+						TextStrokeTransparency = 0;
+						AnchorPoint = vec2(0, 1);
+						Size = dim2(1, 0, 0, 0);
+						BackgroundTransparency = 1;
+						Position = dim2(0, 0, 0, -5);
+						BorderSizePixel = 0;
+						AutomaticSize = Enum.AutomaticSize.Y;
+						TextSize = 12;
+					});
+				
+					objects[ "box_handler" ] = library:create( "Frame" , {
+						Parent = library.cache;
+						Name = "\0";
+						BackgroundTransparency = 1;
+						Position = dim2(0, 1, 0, 1);
+						BorderColor3 = rgb(0, 0, 0);
+						Size = dim2(1, -2, 1, -2);
+						BorderSizePixel = 0;
+						BackgroundColor3 = rgb(255, 255, 255)
+					});
+				
+					objects[ "box_color" ] = library:create( "UIStroke" , {
+						Color = rgb(255, 255, 255);
+						LineJoinMode = Enum.LineJoinMode.Miter;
+						Name = "\0";
+						Parent = objects[ "box_handler" ]
+					});
+				
+					objects[ "outline" ] = library:create( "Frame" , {
+						Parent = objects[ "box_handler" ];
+						Name = "\0";
+						BackgroundTransparency = 1;
+						Position = dim2(0, 1, 0, 1);
+						BorderColor3 = rgb(0, 0, 0);
+						Size = dim2(1, -2, 1, -2);
+						BorderSizePixel = 0;
+						BackgroundColor3 = rgb(255, 255, 255)
+					});
+				
+					library:create( "UIStroke" , {
+						Parent = objects[ "outline" ];
+						LineJoinMode = Enum.LineJoinMode.Miter
+					});  
+				
+					-- Corner Boxes
+						objects[ "corners" ] = library:create( "Frame" , {
+							Visible = true;
+							BorderColor3 = rgb(0, 0, 0);
+							Parent = library.cache;
+							BackgroundTransparency = 1;
+							Position = dim2(0, -1, 0, 2);
+							Name = "\0";
+							Size = dim2(1, 0, 1, 0);
+							BorderSizePixel = 0;
+							BackgroundColor3 = rgb(255, 255, 255)
+						});
+
+						objects[ "1" ] = library:create( "Frame" , {
+							Parent = objects[ "corners" ];
+							Name = "line";
+							Position = dim2(0, 0, 0, -2);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(0.4, 0, 0, 3);
+							BorderSizePixel = 0;
+							BackgroundColor3 = rgb(0, 0, 0)
+						});
+					
+						library:create( "Frame" , {
+							Parent = objects[ "1" ];
+							Position = dim2(0, 1, 0, 1);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(1, -2, 1, -2);
+							BorderSizePixel = 0;
+							BackgroundColor3 = flags["Box_Color"].Color
+						});
+					
+						objects[ "2" ] = library:create( "Frame" , {
+							Parent = objects[ "corners" ];
+							Name = "line";
+							Position = dim2(0, 0, 0, 1);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(0, 3, 0.25, 0);
+							BorderSizePixel = 0;
+							BackgroundColor3 = rgb(0, 0, 0)
+						});
+					
+						library:create( "Frame" , {
+							Parent = objects[ "2" ];
+							Position = dim2(0, 1, 0, -2);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(1, -2, 1, 1);
+							BorderSizePixel = 0;
+							BackgroundColor3 = flags["Box_Color"].Color
+						});
+					
+						objects[ "3" ] = library:create( "Frame" , {
+							AnchorPoint = vec2(1, 0);
+							Parent = objects[ "corners" ];
+							Name = "line";
+							Position = dim2(1, 0, 0, -2);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(0.4, 0, 0, 3);
+							BorderSizePixel = 0;
+							BackgroundColor3 = rgb(0, 0, 0)
+						});
+					
+						library:create( "Frame" , {
+							Parent = objects[ "3" ];
+							Position = dim2(0, 1, 0, 1);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(1, -2, 1, -2);
+							BorderSizePixel = 0;
+							BackgroundColor3 = flags["Box_Color"].Color
+						});
+					
+						objects[ "4" ] = library:create( "Frame" , {
+							AnchorPoint = vec2(1, 0);
+							Parent = objects[ "corners" ];
+							Name = "line";
+							Position = dim2(1, 0, 0, 1);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(0, 3, 0.25, 0);
+							BorderSizePixel = 0;
+							BackgroundColor3 = rgb(0, 0, 0)
+						});
+					
+						library:create( "Frame" , {
+							Parent = objects[ "4" ];
+							Position = dim2(0, 1, 0, -2);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(1, -2, 1, 1);
+							BorderSizePixel = 0;
+							BackgroundColor3 = flags["Box_Color"].Color
+						});
+					
+						objects[ "5" ] = library:create( "Frame" , {
+							AnchorPoint = vec2(0, 1);
+							Parent = objects[ "corners" ];
+							Name = "line";
+							Position = dim2(0, -1, 1, -2);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(0.4, 0, 0, 3);
+							BorderSizePixel = 0;
+							BackgroundColor3 = rgb(0, 0, 0)
+						});
+					
+						library:create( "Frame" , {
+							Parent = objects[ "5" ];
+							Position = dim2(0, 1, 0, 1);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(1, -2, 1, -2);
+							BorderSizePixel = 0;
+							BackgroundColor3 = flags["Box_Color"].Color
+						});
+					
+						objects[ "6" ] = library:create( "Frame" , {
+							BorderColor3 = rgb(0, 0, 0);
+							Rotation = 180;
+							Parent = objects[ "corners" ];
+							Name = "line";
+							Position = dim2(0, 0, 1, -4);
+							AnchorPoint = vec2(0, 1);
+							Size = dim2(0, 3, 0.25, 1);
+							BorderSizePixel = 0;
+							BackgroundColor3 = rgb(0, 0, 0)
+						});
+					
+						library:create( "Frame" , {
+							Parent = objects[ "6" ];
+							Position = dim2(0, 1, 0, -2);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(1, -2, 1, 1);
+							BorderSizePixel = 0;
+							BackgroundColor3 = flags["Box_Color"].Color
+						});
+					
+						objects[ "7" ] = library:create( "Frame" , {
+							AnchorPoint = vec2(1, 1);
+							Parent = objects[ "corners" ];
+							Name = "line";
+							Position = dim2(1, -1, 1, -2);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(0.4, 0, 0, 3);
+							BorderSizePixel = 0;
+							BackgroundColor3 = rgb(0, 0, 0)
+						});
+					
+						library:create( "Frame" , {
+							Parent = objects[ "7" ];
+							Position = dim2(0, 1, 0, 1);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(1, -2, 1, -2);
+							BorderSizePixel = 0;
+							BackgroundColor3 = flags["Box_Color"].Color
+						});
+					
+						objects[ "7" ] = library:create( "Frame" , {
+							BorderColor3 = rgb(0, 0, 0);
+							Rotation = 180;
+							Parent = objects[ "corners" ];
+							Name = "line";
+							Position = dim2(1, 0, 1, -4);
+							AnchorPoint = vec2(1, 1);
+							Size = dim2(0, 3, 0.25, 1);
+							BorderSizePixel = 0;
+							BackgroundColor3 = rgb(0, 0, 0)
+						});
+					
+						library:create( "Frame" , {
+							Parent = objects[ "7" ];
+							Position = dim2(0, 1, 0, -2);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(1, -2, 1, 1);
+							BorderSizePixel = 0;
+							BackgroundColor3 = flags["Box_Color"].Color
+						});
+					-- 
+				
+					-- Healthbar
+						objects[ "healthbar_holder" ] = library:create( "Frame" , {
+							AnchorPoint = vec2(1, 0);
+							Parent = library.cache;
+							Name = "\0";
+							Position = dim2(0, -5, 0, 0);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(0, 4, 1, 0);
+							BorderSizePixel = 0;
+							BackgroundColor3 = rgb(0, 0, 0)
+						});
+					
+						objects[ "healthbar" ] = library:create( "Frame" , {
+							Parent = objects[ "healthbar_holder" ];
+							Name = "\0";
+							Position = dim2(0, 1, 0, 1);
+							BorderColor3 = rgb(0, 0, 0);
+							Size = dim2(1, -2, 1, -2);
+							BorderSizePixel = 0;
+							BackgroundColor3 = rgb(255, 255, 255)
+						});
+					-- 
+
+					-- Distance esp
+						objects[ "distance" ] = library:create( "TextLabel" , {
+							FontFace = library.font;
+							TextColor3 = flags["Distance_Color"].Color;
+							BorderColor3 = rgb(0, 0, 0);
+							Text = "127st";
+							Parent = library.cache;
+							TextStrokeTransparency = 0;
+							Name = "\0";
+							Size = dim2(1, 0, 0, 0);
+							BackgroundTransparency = 1;
+							Position = dim2(0, 0, 1, 5);
+							BorderSizePixel = 0;
+							AutomaticSize = Enum.AutomaticSize.Y;
+							TextSize = 12;
+						});                
+					-- 
+
+					-- Weapon esp
+						objects[ "weapon" ] = library:create( "TextLabel" , {
+							FontFace = library.font;
+							TextColor3 = flags["Weapon_Color"].Color;
+							BorderColor3 = rgb(0, 0, 0);
+							Text = "[ Weapon ]";
+							Parent = library.cache;
+							TextStrokeTransparency = 0;
+							Name = "\0";
+							Size = dim2(1, 0, 0, 0);
+							BackgroundTransparency = 1;
+							Position = dim2(0, 0, 1, 19);
+							BorderSizePixel = 0;
+							AutomaticSize = Enum.AutomaticSize.Y;
+							TextSize = 12;
+						});
+					--  
+
+					-- Glow
+					objects["glow"] = library:create("ImageLabel", {
+						Name = "\0";
+						Parent = library.cache;
+						BackgroundTransparency = 1;
+						Image = "rbxassetid://110204605000367";
+						ImageColor3 = Color3.new(1, 1, 1);
+						ImageTransparency = 0.65;
+						ScaleType = Enum.ScaleType.Slice;
+						SliceCenter = Rect.new(21, 21, 79, 79);
+						ZIndex = 2;
+						Visible = false;
+						Position = dim2(0, -21, 0, -21);
+						Size = dim2(1, 42, 1, 42);
+					})
+
+					-- Fill
+					objects["fill"] = library:create("Frame", {
+						Name = "\0";
+						Parent = library.cache;
+						BackgroundColor3 = Color3.new(1, 1, 1);
+						BackgroundTransparency = 0.7;
+						BorderSizePixel = 0;
+						ZIndex = 2;
+						Visible = false;
+						Position = dim2(0, 0, 0, 0);
+						Size = dim2(1, 0, 1, 0);
+					})
+
+					-- Image Fill
+					objects["image_fill"] = library:create("ImageLabel", {
+						Name = "\0";
+						Parent = library.cache;
+						BackgroundTransparency = 1;
+						Image = "";
+						ImageColor3 = Color3.new(1, 1, 1);
+						ImageTransparency = 0.5;
+						ScaleType = Enum.ScaleType.Stretch;
+						ZIndex = 2;
+						Visible = false;
+						Position = dim2(0, 0, 0, 0);
+						Size = dim2(1, 0, 1, 0);
+					})
+
+					-- Skeletons
+					objects["skeletons"] = library:create("Frame", {
+						Name = "\\0";
+						Parent = library.cache;
+						BackgroundTransparency = 1;
+						AnchorPoint = Vector2.new(0, 0);
+						Position = dim2(0, 0, 0, 0);
+						Size = dim2(1, 0, 1, 0);
+						ZIndex = 2;
+						Visible = false;
+					})
+
+					local skeletonMap = {
+						{first = {"Head"}, second = {"UpperTorso", "Torso"}},
+						{first = {"UpperTorso", "Torso"}, second = {"LowerTorso"}},
+						{first = {"UpperTorso", "Torso"}, second = {"LeftUpperArm", "Left Arm"}},
+						{first = {"LeftUpperArm", "Left Arm"}, second = {"LeftLowerArm"}},
+						{first = {"LeftLowerArm"}, second = {"LeftHand"}},
+						{first = {"UpperTorso", "Torso"}, second = {"RightUpperArm", "Right Arm"}},
+						{first = {"RightUpperArm", "Right Arm"}, second = {"RightLowerArm"}},
+						{first = {"RightLowerArm"}, second = {"RightHand"}},
+						{first = {"LowerTorso", "Torso"}, second = {"LeftUpperLeg", "Left Leg"}},
+						{first = {"LeftUpperLeg", "Left Leg"}, second = {"LeftLowerLeg"}},
+						{first = {"LeftLowerLeg"}, second = {"LeftFoot"}},
+						{first = {"LowerTorso", "Torso"}, second = {"RightUpperLeg", "Right Leg"}},
+						{first = {"RightUpperLeg", "Right Leg"}, second = {"RightLowerLeg"}},
+						{first = {"RightLowerLeg"}, second = {"RightFoot"}},
+					}
+
+					local function findPart(character, ...)
+						for _, name in ipairs({...}) do
+							local part = character:FindFirstChild(name)
+							if part then return part end
+						end
+						return nil
+					end
+
+					local function makeBone(pair, color, thickness)
+						local bone = library:create("Frame", {
+							Name = "\\0";
+							Parent = objects["skeletons"];
+							AnchorPoint = Vector2.new(0.5, 0.5);
+							Position = dim2(0, 0, 0, 0);
+							Size = dim2(0, 0, 0, thickness or 1);
+							Rotation = 0;
+							BorderSizePixel = 0;
+							BackgroundColor3 = color or Color3.new(1, 1, 1);
+							BackgroundTransparency = 0;
+							ZIndex = 3;
+						})
+						table.insert(cfg.skeleton_bones, {bone = bone, pair = pair, thickness = thickness or 1})
+						return bone
+					end
+
+					local skelColor = (flags["Skeleton_Color"] and flags["Skeleton_Color"].Color) or Color3.new(1, 1, 1)
+					local skelThickness = (flags["Skeleton_Thickness"] and flags["Skeleton_Thickness"]) or 1
+					for _, pair in ipairs(skeletonMap) do
+						makeBone(pair, skelColor, skelThickness)
+					end
+				end
+
+				cfg.refresh_elements = function()
+					objects.holder.Parent = flags["Enabled"] and items.viewportframe or library.cache
+
+					local temp = {
+						["Names"] = objects["name"]; 
+						["Name_Color"] = {objects["name"]};
+						["Healthbar"] = objects[ "healthbar_holder" ];
+						["Distance"] = objects[ "distance" ];
+						["Weapon"] = objects[ "weapon" ];
+						["Distance_Color"] = {objects[ "distance" ]};
+						["Weapon_Color"] = {objects[ "weapon" ]};
+					}
+
+					for flag, object in temp do 
+						if type(object) == "table" then 
+							object[1].TextColor3 = flags[flag].Color
+						else 
+							object.Parent = flags[flag] and objects[ "holder" ] or library.cache
+						end
+					end 
+				
+					local is_corner = flags[ "Box_Type" ] == "Corner"
+
+					if flags["Boxes"] then 
+						if is_corner then 
+							objects[ "corners" ].Parent = objects["holder"]
+							objects[ "box_handler" ].Parent = library.cache
+							objects[ "box_outline" ].Parent = library.cache
+						else 
+							objects[ "box_handler" ].Parent = objects[ "holder" ]
+							objects[ "box_outline" ].Parent = objects[ "holder" ]
+							objects[ "corners" ].Parent = library.cache
+						end 
+					else
+						objects[ "corners" ].Parent =  library.cache
 						objects[ "box_handler" ].Parent = library.cache
 						objects[ "box_outline" ].Parent = library.cache
-					else 
-						objects[ "box_handler" ].Parent = objects[ "holder" ]
-						objects[ "box_outline" ].Parent = objects[ "holder" ]
-						objects[ "corners" ].Parent = library.cache
 					end 
-				else
-					objects[ "corners" ].Parent =  library.cache
-					objects[ "box_handler" ].Parent = library.cache
-					objects[ "box_outline" ].Parent = library.cache
-				end 
 
-				objects[ "box_color" ].Color = flags["Box_Color"].Color 
+					objects[ "box_color" ].Color = flags["Box_Color"].Color 
 
-				for _, corner in objects[ "corners" ]:GetChildren() do
-					corner.Frame.BackgroundColor3 = flags["Box_Color"].Color
-				end
+					for _, corner in objects[ "corners" ]:GetChildren() do
+						corner.Frame.BackgroundColor3 = flags["Box_Color"].Color
+					end
 
-				-- Glow / Fill / Image Fill / Skeletons
-				local enabled = flags["Enabled"]
-				local holder = objects["holder"]
+					-- Glow / Fill / Image Fill / Skeletons
+					local enabled = flags["Enabled"]
+					local holder = objects["holder"]
 
-				objects["glow"].ImageColor3 = (flags["Glow_Color"] and flags["Glow_Color"].Color) or Color3.new(1, 1, 1)
-				objects["glow"].Parent = (enabled and flags["Glow"]) and holder or library.cache
-				objects["glow"].Visible = enabled and flags["Glow"]
+					objects["glow"].ImageColor3 = (flags["Glow_Color"] and flags["Glow_Color"].Color) or Color3.new(1, 1, 1)
+					objects["glow"].Parent = (enabled and flags["Glow"]) and holder or library.cache
+					objects["glow"].Visible = enabled and flags["Glow"]
 
-				objects["fill"].BackgroundColor3 = (flags["Fill_Color"] and flags["Fill_Color"].Color) or Color3.new(1, 1, 1)
-				objects["fill"].BackgroundTransparency = flags["Fill_Transparency"] or 0.7
-				objects["fill"].Parent = (enabled and flags["Fill"]) and holder or library.cache
-				objects["fill"].Visible = enabled and flags["Fill"]
+					objects["fill"].BackgroundColor3 = (flags["Fill_Color"] and flags["Fill_Color"].Color) or Color3.new(1, 1, 1)
+					objects["fill"].BackgroundTransparency = flags["Fill_Transparency"] or 0.7
+					objects["fill"].Parent = (enabled and flags["Fill"]) and holder or library.cache
+					objects["fill"].Visible = enabled and flags["Fill"]
 
-				local url = flags["Image_Fill_URL"] or ""
-				if url ~= "" then
-					objects["image_fill"].Image = url
-				end
-				objects["image_fill"].ImageColor3 = (flags["Image_Fill_Color"] and flags["Image_Fill_Color"].Color) or Color3.new(1, 1, 1)
-				objects["image_fill"].ImageTransparency = flags["Image_Fill_Transparency"] or 0.5
-				objects["image_fill"].Parent = (enabled and flags["Image_Fill"] and url ~= "") and holder or library.cache
-				objects["image_fill"].Visible = enabled and flags["Image_Fill"] and url ~= ""
+					local url = flags["Image_Fill_URL"] or ""
+					if url ~= "" then
+						objects["image_fill"].Image = url
+					end
+					objects["image_fill"].ImageColor3 = (flags["Image_Fill_Color"] and flags["Image_Fill_Color"].Color) or Color3.new(1, 1, 1)
+					objects["image_fill"].ImageTransparency = flags["Image_Fill_Transparency"] or 0.5
+					objects["image_fill"].Parent = (enabled and flags["Image_Fill"] and url ~= "") and holder or library.cache
+					objects["image_fill"].Visible = enabled and flags["Image_Fill"] and url ~= ""
 
-				objects["skeletons"].Parent = (enabled and flags["Skeletons"]) and holder or library.cache
-				objects["skeletons"].Visible = enabled and flags["Skeletons"]
-				local skelTransparency = flags["Skeleton_Transparency"] or 0
-				local skelColor = (flags["Skeleton_Color"] and flags["Skeleton_Color"].Color) or Color3.new(1, 1, 1)
-				for _, boneData in ipairs(cfg.skeleton_bones) do
-					local bone = boneData.bone
-					if bone then
-						bone.BackgroundColor3 = skelColor
-						bone.BackgroundTransparency = skelTransparency
+					objects["skeletons"].Parent = (enabled and flags["Skeletons"]) and holder or library.cache
+					objects["skeletons"].Visible = enabled and flags["Skeletons"]
+					local skelTransparency = flags["Skeleton_Transparency"] or 0
+					local skelColor = (flags["Skeleton_Color"] and flags["Skeleton_Color"].Color) or Color3.new(1, 1, 1)
+					for _, boneData in ipairs(cfg.skeleton_bones) do
+						local bone = boneData.bone
+						if bone then
+							bone.BackgroundColor3 = skelColor
+							bone.BackgroundTransparency = skelTransparency
+						end
 					end
 				end
-			end
 
-			cfg.change_health = function()
-				if flags[ "healthbar_holder" ] and flags[ "healthbar_holder" ].Parent ~= objects[ "holder" ] then 
-					return 
+				cfg.change_health = function()
+					if flags[ "healthbar_holder" ] and flags[ "healthbar_holder" ].Parent ~= objects[ "holder" ] then 
+						return 
+					end
+
+					local humanoid = character.Humanoid
+				
+					local multiplier = humanoid.MaxHealth * math.abs(math.sin(tick() * 2)) / humanoid.MaxHealth
+					local color = flags[ "Health_Low" ].Color:Lerp( flags["Health_High"].Color, multiplier)
+				
+					objects[ "healthbar" ].Size = UDim2.new(1, -2, multiplier, -2)
+					objects[ "healthbar" ].Position = UDim2.new(0, 1, 1 - multiplier, 1)
+					objects[ "healthbar" ].BackgroundColor3 = color
 				end
 
-				local humanoid = character.Humanoid
-				
-				local multiplier = humanoid.MaxHealth * math.abs(math.sin(tick() * 2)) / humanoid.MaxHealth
-				local color = flags[ "Health_Low" ].Color:Lerp( flags["Health_High"].Color, multiplier)
-				
-				objects[ "healthbar" ].Size = UDim2.new(1, -2, multiplier, -2)
-				objects[ "healthbar" ].Position = UDim2.new(0, 1, 1 - multiplier, 1)
-				objects[ "healthbar" ].BackgroundColor3 = color
-			end
+				cfg.update_skeletons = function()
+					if not objects["skeletons"].Visible then return end
+					local cam = items.camera
+					local vp = items.viewportframe
+					local vpSize = vp.AbsoluteSize
+					if vpSize.X <= 0 or vpSize.Y <= 0 then return end
 
-			cfg.update_skeletons = function()
-				if not objects["skeletons"].Visible then return end
-				local cam = items.camera
-				local vp = items.viewportframe
-				local vpSize = vp.AbsoluteSize
-				if vpSize.X <= 0 or vpSize.Y <= 0 then return end
+					local vpPos = vp.AbsolutePosition
+					local holderPos = objects["holder"].AbsolutePosition
+					local holderOffset = holderPos - vpPos
+					local holderSize = objects["holder"].AbsoluteSize
 
-				local vpPos = vp.AbsolutePosition
-				local holderPos = objects["holder"].AbsolutePosition
-				local holderOffset = holderPos - vpPos
-				local holderSize = objects["holder"].AbsoluteSize
+					local function worldToHolder(part)
+						local pos = cam:WorldToViewportPoint(part.Position)
+						if pos.Z <= 0 then return nil end
+						return Vector2.new(pos.X, pos.Y) - holderOffset
+					end
 
-				local function worldToHolder(part)
-					local pos = cam:WorldToViewportPoint(part.Position)
-					if pos.Z <= 0 then return nil end
-					return Vector2.new(pos.X, pos.Y) - holderOffset
-				end
-
-				for _, data in ipairs(cfg.skeleton_bones) do
-					local first = findPart(character, unpack(data.pair.first))
-					local second = findPart(character, unpack(data.pair.second))
-					local bone = data.bone
-					if first and second then
-						local p1 = worldToHolder(first)
-						local p2 = worldToHolder(second)
-						if p1 and p2 then
-							local dx = p2.X - p1.X
-							local dy = p2.Y - p1.Y
-							local len = math.sqrt(dx * dx + dy * dy)
-							if len > 0.001 then
-								bone.Position = dim2(0, (p1.X + p2.X) / 2, 0, (p1.Y + p2.Y) / 2)
-								bone.Size = dim2(0, len, 0, data.thickness)
-								bone.Rotation = math.deg(math.atan2(dy, dx))
-								bone.Visible = true
+					for _, data in ipairs(cfg.skeleton_bones) do
+						local first = findPart(character, unpack(data.pair.first))
+						local second = findPart(character, unpack(data.pair.second))
+						local bone = data.bone
+						if first and second then
+							local p1 = worldToHolder(first)
+							local p2 = worldToHolder(second)
+							if p1 and p2 then
+								local dx = p2.X - p1.X
+								local dy = p2.Y - p1.Y
+								local len = math.sqrt(dx * dx + dy * dy)
+								if len > 0.001 then
+									bone.Position = dim2(0, (p1.X + p2.X) / 2, 0, (p1.Y + p2.Y) / 2)
+									bone.Size = dim2(0, len, 0, data.thickness)
+									bone.Rotation = math.deg(math.atan2(dy, dx))
+									bone.Visible = true
+								else
+									bone.Visible = false
+								end
 							else
 								bone.Visible = false
 							end
 						else
 							bone.Visible = false
 						end
-					else
-						bone.Visible = false
 					end
 				end
+
+				task.spawn(function()
+					while true do 
+						task.wait()
+						cfg.change_health()
+					end 
+				end)
+
 			end
 
-			task.spawn(function()
-				while true do 
-					task.wait()
-					cfg.change_health()
-				end 
-			end)
+			if lp.Character then
+				build()
+			else
+				warn("[Atlanta] esp_preview: waiting for LocalPlayer.Character...")
+				task.spawn(function()
+					lp.CharacterAdded:Wait()
+					build()
+					pcall(function() if cfg.refresh_elements then cfg.refresh_elements() end end)
+				end)
+			end
 
 			return setmetatable(cfg, library)
 		end
