@@ -338,6 +338,7 @@ local rgbkey = ColorSequenceKeypoint.new
 		local section = column:section({name = "ESP", toggle = false})
 		section:toggle({name = "Enabled", flag = "Enabled", callback = update_elements})
 		section:toggle({name = "Local Player", flag = "Local_Player", callback = update_elements})
+		section:toggle({name = "Dynamic Boxes", flag = "Dynamic_Boxes", default = true, callback = update_elements})
 		section:toggle({name = "Names", flag = "Names", callback = update_elements}):colorpicker({flag = "Name_Color", callback = update_elements})
 		local settings = section:toggle({name = "Boxes", flag = "Boxes", callback = update_elements})
 		section:dropdown({name = "Box Type", flag = "Box_Type", items = {"Corner", "Full"}, default = "Corner", callback = update_elements})
@@ -642,8 +643,15 @@ local rgbkey = ColorSequenceKeypoint.new
 						end
 						return
 					end
-					local hLen = math.min(w * 0.4, w * 0.5)
-					local vLen = math.min(h * 0.25, h * 0.5)
+					local dynamic = espFlags["Dynamic_Boxes"]
+					local hLen, vLen
+					if dynamic then
+						hLen = math.min(w * 0.4, w * 0.5)
+						vLen = math.min(h * 0.25, h * 0.5)
+					else
+						hLen = math.min(20, w * 0.5)
+						vLen = math.min(15, h * 0.5)
+					end
 					lines[1].From = Vector2.new(x, y); lines[1].To = Vector2.new(x + hLen, y)
 					lines[2].From = Vector2.new(x, y); lines[2].To = Vector2.new(x, y + vLen)
 					lines[3].From = Vector2.new(x + w, y); lines[3].To = Vector2.new(x + w - hLen, y)
