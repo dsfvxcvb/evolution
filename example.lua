@@ -519,8 +519,8 @@ local rgbkey = ColorSequenceKeypoint.new
 					drawings.headDot.NumSides = 12
 					drawings.headDot.Visible = false
 		
-				drawings.chamsFolder = nil
-					drawings.chamsParts = {}
+				drawings.chamsHighlight = nil
+					drawings.chamsAppliedTo = nil
 		
 				drawings.boxOutline.Thickness = 1
 				drawings.boxOutline.Filled = false
@@ -553,6 +553,11 @@ local rgbkey = ColorSequenceKeypoint.new
 			local function removeEsp(player)
 				local drawings = espObjects[player]
 				if not drawings then return end
+				if drawings.chamsHighlight then
+					drawings.chamsHighlight:Destroy()
+					drawings.chamsHighlight = nil
+				end
+				drawings.chamsAppliedTo = nil
 				for _, d in pairs(drawings) do
 					if typeof(d) == "table" then
 						for _, dd in ipairs(d) do
@@ -732,61 +737,147 @@ end
 				end
 			end
 
-			local materialMap = {
-				ForceField = Enum.Material.ForceField,
-				Neon = Enum.Material.Neon,
-			}
+			local CUSTOM_HEAD_ID = "rbxassetid://12386274"
 
-			local function clearChams(drawings)
-				if drawings.chamsFolder then
-					drawings.chamsFolder:Destroy()
-					drawings.chamsFolder = nil
-					drawings.chamsParts = {}
+			local function ensureBloom()
+				local Lighting = game:GetService("Lighting")
+				for _, effect in pairs(Lighting:GetChildren()) do
+					if effect:IsA("BloomEffect") and effect.Name == "NeonBloom" then
+						return
+					end
+				end
+				local bloom = Instance.new("BloomEffect")
+				bloom.Name = "NeonBloom"
+				bloom.Intensity = 1.5
+				bloom.Size = 24
+				bloom.Threshold = 0.85
+				bloom.Parent = Lighting
+			end
+			pcall(ensureBloom)
+
+			local function removeHairAndAccessories(character)
+				local hair = character:FindFirstChild("Hair")
+				if hair then hair:Destroy() end
+				local accessories = character:FindFirstChild("Accessories")
+				if accessories then
+					for _, accessory in pairs(accessories:GetChildren()) do
+						accessory:Destroy()
+					end
+				end
+				for _, descendant in pairs(character:GetDescendants()) do
+					if descendant:IsA("Accessory") or descendant.Name == "Handle" then
+						descendant:Destroy()
+					end
+				end
+				for _, part in pairs(character:GetDescendants()) do
+					if part:IsA("MeshPart") and part:FindFirstAncestorOfClass("Accessory") then
+						part:Destroy()
+					end
 				end
 			end
 
-			local function updateChams(drawings, character, color, visible)
+			local function removeClothing(character)
+				local shirt = character:FindFirstChild("Shirt")
+				if shirt then shirt:Destroy() end
+				local pants = character:FindFirstChild("Pants")
+				if pants then pants:Destroy() end
+				local humanoid = character:FindFirstChild("Humanoid")
+				if humanoid then
+					for _, clothing in pairs(humanoid:GetChildren()) do
+						if clothing:IsA("Clothing") then
+							clothing:Destroy()
+						end
+					end
+				end
+				for _, part in pairs(character:GetDescendants()) do
+					if part:IsA("BasePart") then
+						for _, decal in pairs(part:GetChildren()) do
+							if decal:IsA("Decal") or decal:IsA("Texture") then
+								decal:Destroy()
+							end
+						end
+					end
+				end
+			end
+
+			local function applyCustomHead(character, color)
+				local head = character:FindFirstChild("Head")
+				if not head then return end
+				for _, child in pairs(head:GetChildren()) do
+					if child:IsA("SpecialMesh") or child:IsA("Decal") or child:IsA("Texture") then
+						child:Destroy()
+					end
+				end
+				local humanoid = character:FindFirstChild("Humanoid")
+				if humanoid then
+					local face = humanoid:FindFirstChild("Face")
+					if face then face:Destroy() end
+				end
+				local mesh = Instance.new("SpecialMesh")
+				mesh.MeshType = Enum.MeshType.FileMesh
+				mesh.MeshId = CUSTOM_HEAD_ID
+				mesh.TextureId = ""
+				mesh.Parent = head
+				mesh.Scale = Vector3.new(1, 1, 1)
+				head.Material = Enum.Material.Neon
+				head.Color = color
+			end
+
+			local function makePartCham(part, color, material)
+				if not part or not part:IsA("BasePart") then return end
+				if part.Name == "HumanoidRootPart" then return end
+				part.Material = material
+				part.Color = color
+				part.CastShadow = false
+				for _, child in pairs(part:GetChildren()) do
+					if child:IsA("Decal") or child:IsA("Texture") then
+						child:Destroy()
+					end
+				end
+			end
+
+			local function applyChamsEffects(character, color, material)
+				if not character then return end
+				removeHairAndAccessories(character)
+				removeClothing(character)
+				pcall(function() applyCustomHead(character, color) end)
+				for _, part in pairs(character:GetDescendants()) do
+					makePartCham(part, color, material)
+				end
+			end
+
+			local function clearChams(drawings)
+				if drawings.chamsHighlight then
+					drawings.chamsHighlight:Destroy()
+					drawings.chamsHighlight = nil
+					drawings.chamsAppliedTo = nil
+				end
+			end
+
+			local function updateChams(drawings, character, color, visible, material)
 				if not visible then
-					clearChams(drawings)
+					if drawings.chamsHighlight then
+						drawings.chamsHighlight.Enabled = false
+					end
 					return
 				end
-				if not drawings.chamsFolder then
-					drawings.chamsFolder = Instance.new("Folder")
-					drawings.chamsFolder.Name = ""
-					drawings.chamsFolder.Parent = Workspace
-					drawings.chamsParts = {}
+				if not drawings.chamsHighlight then
+					drawings.chamsHighlight = Instance.new("Highlight")
+					drawings.chamsHighlight.Name = ""
+					drawings.chamsHighlight.DepthMode = Enum.HighlightDepthMode.AlwaysOnTop
+					drawings.chamsHighlight.Parent = espGlowGui
 				end
-				local materialName = espFlags["Chams_Material"] or "ForceField"
-				local material = materialMap[materialName] or Enum.Material.ForceField
-				local transparency = espFlags["Chams_Transparency"] or 0.5
-				for part, chamPart in pairs(drawings.chamsParts) do
-					if not part:IsDescendantOf(character) then
-						chamPart:Destroy()
-						drawings.chamsParts[part] = nil
-					end
-				end
-				for _, part in ipairs(character:GetDescendants()) do
-					if part:IsA("BasePart") then
-						local chamPart = drawings.chamsParts[part]
-						if not chamPart then
-							chamPart = Instance.new("Part")
-							chamPart.Name = ""
-							chamPart.Anchored = true
-							chamPart.CanCollide = false
-							chamPart.CanTouch = false
-							chamPart.CanQuery = false
-							chamPart.CastShadow = false
-							chamPart.Size = part.Size
-							chamPart.Shape = Enum.PartType.Block
-							chamPart.Parent = drawings.chamsFolder
-							drawings.chamsParts[part] = chamPart
-						end
-						chamPart.CFrame = part.CFrame
-						chamPart.Size = part.Size * 1.02
-						chamPart.Material = material
-						chamPart.Color = color
-						chamPart.Transparency = transparency
-					end
+				local transparency = espFlags["Chams_Transparency"] or 0
+				drawings.chamsHighlight.Adornee = character
+				drawings.chamsHighlight.FillColor = color
+				drawings.chamsHighlight.OutlineColor = color
+				drawings.chamsHighlight.FillTransparency = transparency
+				drawings.chamsHighlight.OutlineTransparency = 0.1
+				drawings.chamsHighlight.Enabled = true
+				local mat = Enum.Material[material] or Enum.Material.Neon
+				if drawings.chamsAppliedTo ~= character then
+					drawings.chamsAppliedTo = character
+					pcall(function() applyChamsEffects(character, color, mat) end)
 				end
 			end
 
@@ -804,7 +895,9 @@ end
 							pcall(function() d.Visible = false end)
 						end
 					end
-					clearChams(drawings)
+					if drawings.chamsHighlight then
+						drawings.chamsHighlight.Enabled = false
+					end
 				end
 			
 				if not espFlags["Enabled"] then
@@ -919,7 +1012,7 @@ end
 			
 				updateSkeleton(drawings, character, getColor("Skeleton_Color"), espFlags["Skeletons"])
 				updateHeadDot(drawings, character, getColor("HeadDot_Color"), espFlags["HeadDot"])
-				updateChams(drawings, character, getColor("Chams_Color"), espFlags["Chams"])
+				updateChams(drawings, character, getColor("Chams_Color"), espFlags["Chams"], espFlags["Chams_Material"] or "ForceField")
 			end
 			
 			local function safeCreateEsp(player)
