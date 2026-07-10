@@ -2263,6 +2263,29 @@ local desync = {
 	WalkableInterval = 6
 }
 
+local TargetStrafeConfig = {
+	Enabled = false,
+	Type = "Strafe",
+	Speed = 5,
+	Height = 0,
+	Distance = 8,
+	RandomRange = 10,
+	BodyColor = Color3.fromRGB(127, 13, 195),
+	Visualize = true,
+	Indicator = false,
+	IndicatorColor = Color3.fromRGB(193, 247, 255),
+	IndicatorGlowColor = Color3.fromRGB(193, 247, 255),
+	IndicatorBackgroundColor = Color3.fromRGB(15, 15, 15)
+}
+
+local bodyClone
+local indicatorCircle = Drawing.new("Circle")
+indicatorCircle.Visible = false
+indicatorCircle.Radius = 20
+indicatorCircle.Thickness = 2
+indicatorCircle.Filled = false
+indicatorCircle.NumSides = 32
+
 -- ============================================
 do
 -- ANTI-AIM (DESYNC)
@@ -2438,7 +2461,6 @@ end)
 -- ============================================
 -- TARGET STRAFE
 -- ============================================
-local bodyClone
 pcall(function()
 	bodyClone = game:GetObjects("rbxassetid://8246626421")[1]
 	if bodyClone then
@@ -2457,32 +2479,10 @@ pcall(function()
 	end
 end)
 
-local TargetStrafeConfig = {
-	Enabled = false,
-	Type = "Strafe",
-	Speed = 5,
-	Height = 0,
-	Distance = 8,
-	RandomRange = 10,
-	BodyColor = Color3.fromRGB(127, 13, 195),
-	Visualize = true,
-	Indicator = false,
-	IndicatorColor = Color3.fromRGB(193, 247, 255),
-	IndicatorGlowColor = Color3.fromRGB(193, 247, 255),
-	IndicatorBackgroundColor = Color3.fromRGB(15, 15, 15)
-}
-
 local Radians = 0
 local saved_desync = nil
 local hook_active = false
 local old_index_strafe = nil
-
-local indicatorCircle = Drawing.new("Circle")
-indicatorCircle.Visible = false
-indicatorCircle.Radius = 20
-indicatorCircle.Thickness = 2
-indicatorCircle.Filled = false
-indicatorCircle.NumSides = 32
 
 local function enableStrafeHook()
 	if not hook_active and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -2511,6 +2511,7 @@ local function disableStrafeHook()
 		old_index_strafe = nil
 	end
 end
+TargetStrafeConfig.disableStrafeHook = disableStrafeHook
 
 local function updateStrafeIndicator(worldPosition)
 	if not TargetStrafeConfig.Indicator or not worldPosition then
@@ -3747,7 +3748,7 @@ secStrafe:toggle({name = "Target Strafe", flag = "hood_target_strafe_enabled", c
 	TargetStrafeConfig.Enabled = v
 	if not v then
 		if bodyClone then bodyClone:SetPrimaryPartCFrame(CFrame.new(9999,9999,9999)) end
-		disableStrafeHook()
+		TargetStrafeConfig.disableStrafeHook()
 	end
 end}):keybind({name = "Strafe Key", flag = "hood_target_strafe_key", callback = function(active)
 	if active and not TargetStrafeConfig.Enabled then
@@ -3755,7 +3756,7 @@ end}):keybind({name = "Strafe Key", flag = "hood_target_strafe_key", callback = 
 	elseif not active and TargetStrafeConfig.Enabled then
 		TargetStrafeConfig.Enabled = false
 		if bodyClone then bodyClone:SetPrimaryPartCFrame(CFrame.new(9999,9999,9999)) end
-		disableStrafeHook()
+		TargetStrafeConfig.disableStrafeHook()
 	end
 end})
 
