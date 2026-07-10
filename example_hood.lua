@@ -4844,6 +4844,7 @@ end
 -- ============================================
 
 do
+	local UserInputService = game:GetService("UserInputService")
 	local lastShotTime = 0
 	local damageWindow = 1.0
 	getgenv().hood_visuals_last_shot_time = lastShotTime
@@ -6968,6 +6969,7 @@ end
 
 	-- === MISC LOGIC (ported from evolution_hood.lua) ===
 	do
+		local UserInputService = game:GetService("UserInputService")
 		local HM = getgenv().HoodMisc or {}
 		getgenv().HoodMisc = HM
 
