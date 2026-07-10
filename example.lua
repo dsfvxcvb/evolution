@@ -338,7 +338,6 @@ local rgbkey = ColorSequenceKeypoint.new
 		local section = column:section({name = "ESP", toggle = false})
 		section:toggle({name = "Enabled", flag = "Enabled", callback = update_elements})
 		section:toggle({name = "Local Player", flag = "Local_Player", callback = update_elements})
-		section:toggle({name = "Dynamic Boxes", flag = "Dynamic_Boxes", default = true, callback = update_elements})
 		section:toggle({name = "Names", flag = "Names", callback = update_elements}):colorpicker({flag = "Name_Color", callback = update_elements})
 		local settings = section:toggle({name = "Boxes", flag = "Boxes", callback = update_elements})
 		section:dropdown({name = "Box Type", flag = "Box_Type", items = {"Corner", "Full"}, default = "Corner", callback = update_elements})
@@ -635,25 +634,16 @@ local rgbkey = ColorSequenceKeypoint.new
 				drawings.imageFillLabel.Visible = true
 			end
 			
-			local function updateCornerBox(drawings, x, y, w, h, color, visible, distance)
-				local dynamic = library.flags["Dynamic_Boxes"]
-				local function setLines(lines, isOutline)
+			local function updateCornerBox(drawings, x, y, w, h, color, visible)
+				local function setLines(lines)
 					if not visible then
 						for _, line in ipairs(lines) do
 							line.Visible = false
 						end
 						return
 					end
-					local hLen, vLen
-					if dynamic then
-						hLen = math.min(w * 0.4, w * 0.5)
-						vLen = math.min(h * 0.25, h * 0.5)
-					else
-						hLen = math.min(20, w * 0.5)
-						vLen = math.min(15, h * 0.5)
-					end
-					local baseThickness = dynamic and math.clamp(300 / math.max(distance, 1), 1, 5) or 3
-					local thickness = isOutline and baseThickness + 2 or baseThickness
+					local hLen = math.min(w * 0.4, w * 0.5)
+					local vLen = math.min(h * 0.25, h * 0.5)
 					lines[1].From = Vector2.new(x, y); lines[1].To = Vector2.new(x + hLen, y)
 					lines[2].From = Vector2.new(x, y); lines[2].To = Vector2.new(x, y + vLen)
 					lines[3].From = Vector2.new(x + w, y); lines[3].To = Vector2.new(x + w - hLen, y)
@@ -663,12 +653,11 @@ local rgbkey = ColorSequenceKeypoint.new
 					lines[7].From = Vector2.new(x + w, y + h); lines[7].To = Vector2.new(x + w - hLen, y + h)
 					lines[8].From = Vector2.new(x + w, y + h); lines[8].To = Vector2.new(x + w, y + h - vLen)
 					for _, line in ipairs(lines) do
-						line.Thickness = thickness
 						line.Visible = true
 					end
 				end
-				setLines(drawings.cornerOutlines, true)
-				setLines(drawings.cornerLines, false)
+				setLines(drawings.cornerOutlines)
+				setLines(drawings.cornerLines)
 				if visible then
 					for _, line in ipairs(drawings.cornerLines) do
 						line.Color = color
@@ -958,31 +947,25 @@ end
 				updateFill(drawings, x, y, w, h, getColor("Fill_Color"), espFlags["Fill"])
 				updateImageFill(drawings, x, y, w, h, espFlags["Image_Fill"])
 			
-				local dist = math.floor((hrp.Position - localHrp.Position).Magnitude)
-				local dynamic = library.flags["Dynamic_Boxes"]
-				local boxThickness = dynamic and math.clamp(300 / math.max(dist, 1), 1, 5) or 1
-
 				if espFlags["Boxes"] then
 					if isCorner then
-						updateCornerBox(drawings, x, y, w, h, boxColor, true, dist)
+						updateCornerBox(drawings, x, y, w, h, boxColor, true)
 						drawings.boxOutline.Visible = false
 						drawings.box.Visible = false
 					else
-						updateCornerBox(drawings, x, y, w, h, boxColor, false, dist)
+						updateCornerBox(drawings, x, y, w, h, boxColor, false)
 						drawings.boxOutline.Visible = true
 						drawings.boxOutline.Size = Vector2.new(w + 2, h + 2)
 						drawings.boxOutline.Position = Vector2.new(x - 1, y - 1)
 						drawings.boxOutline.Color = Color3.new(0, 0, 0)
-						drawings.boxOutline.Thickness = boxThickness + 1
 			
 						drawings.box.Visible = true
 						drawings.box.Size = Vector2.new(w, h)
 						drawings.box.Position = Vector2.new(x, y)
 						drawings.box.Color = boxColor
-						drawings.box.Thickness = boxThickness
 					end
 				else
-					updateCornerBox(drawings, x, y, w, h, boxColor, false, dist)
+					updateCornerBox(drawings, x, y, w, h, boxColor, false)
 					drawings.boxOutline.Visible = false
 					drawings.box.Visible = false
 				end
@@ -997,7 +980,7 @@ end
 				end
 			
 				if espFlags["Distance"] then
-					dist = math.floor((hrp.Position - localHrp.Position).Magnitude)
+					local dist = math.floor((hrp.Position - localHrp.Position).Magnitude)
 					drawings.distance.Visible = true
 					drawings.distance.Text = tostring(dist) .. " studs"
 					drawings.distance.Position = Vector2.new(x + w / 2, y + h + 3)
