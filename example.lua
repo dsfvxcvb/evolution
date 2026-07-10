@@ -568,13 +568,13 @@ local rgbkey = ColorSequenceKeypoint.new
 						for _, dd in ipairs(d) do
 							pcall(function() dd:Remove() end)
 						end
-					elseif typeof(d) ~= "string" and typeof(d) ~= "boolean" and d then
+					elseif typeof(d) ~= "string" and typeof(d) ~= "boolean" and typeof(d) ~= "number" and d then
 						if typeof(d) == "Instance" then
 							if d.Parent then
 								d:Destroy()
 							end
 						else
-							d:Remove()
+							pcall(function() d:Remove() end)
 						end
 					end
 				end

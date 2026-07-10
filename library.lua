@@ -1937,10 +1937,18 @@
 			print("[Atlanta] esp_preview: modified version")
 			local cfg = {items = {}, rotation = 0; objects = {};}
 			cfg.skeleton_bones = {};
+			cfg.refresh_elements = function() end
+
+			if not lp.Character then
+				warn("[Atlanta] esp_preview: LocalPlayer.Character is nil, skipping preview")
+				return cfg
+			end
 
 			lp.Character.Archivable = true
 			local character = lp.Character:Clone()
-			character.Animate:Destroy()
+			if character:FindFirstChild("Animate") then
+				character.Animate:Destroy()
+			end
 
 			local items = cfg.items; do 
 				items.viewportframe = library:create( "ViewportFrame" , {
