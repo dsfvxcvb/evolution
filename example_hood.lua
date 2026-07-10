@@ -8,6 +8,23 @@ local rgb = Color3.fromRGB
 local rgbseq = ColorSequence.new
 local rgbkey = ColorSequenceKeypoint.new 
 
+local Players = game:GetService("Players")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local SoundService = game:GetService("SoundService")
+local CoreGui = game:GetService("CoreGui")
+local TweenService = game:GetService("TweenService")
+local TextChatService = game:GetService("TextChatService")
+local Lighting = game:GetService("Lighting")
+local LocalPlayer = Players.LocalPlayer
+local Mouse = LocalPlayer:GetMouse()
+local Camera = Workspace.CurrentCamera
+local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent", 5)
+local MainEvent = ReplicatedStorage:WaitForChild("MainEvent", 5)
+getgenv().MainEvent = MainEvent
+
 -- documentation 
 	-- Capture panels created by library:window so we can combine Style + Config later
 	local originalPanel = library.panel
@@ -449,21 +466,6 @@ local rgbkey = ColorSequenceKeypoint.new
 -- ============================================
 
 do
-local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
-local SoundService = game:GetService("SoundService")
-local CoreGui = game:GetService("CoreGui")
-local TweenService = game:GetService("TweenService")
-local TextChatService = game:GetService("TextChatService")
-local LocalPlayer = Players.LocalPlayer
-local Mouse = LocalPlayer:GetMouse()
-local Camera = Workspace.CurrentCamera
-local UnreliableMainEvent = ReplicatedStorage:WaitForChild("UnreliableMainEvent", 5)
-local MainEvent = ReplicatedStorage:WaitForChild("MainEvent", 5)
-getgenv().MainEvent = MainEvent
 local newcclosure = newcclosure or function(f) return f end
 
 local function Notify(title, text, duration)
@@ -654,6 +656,7 @@ local AutoKill = {
 		KnifeAuraMode = false,
 	},
 }
+getgenv().AutoKill = AutoKill
 
 local ProtectPlayer = {
 	Enabled = false,
