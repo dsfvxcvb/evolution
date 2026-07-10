@@ -1181,6 +1181,9 @@ end
 	Aiming.open_tab() 
 -- 
 
+	-- DEBUG: expose flags for MCP testing (remove before final)
+	_G.atlanta_test = {flags = library.flags}
+
 -- Initialisation stuff
 library:config_list_update()
 
