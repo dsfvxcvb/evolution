@@ -2,6 +2,7 @@
 -- MAIN SCRIPT
 print("evolution")
 print("niccer slave ass boy")
+print("bruh load")
 -- ============================================
 local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
 print("aids")
