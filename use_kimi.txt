@@ -2507,7 +2507,8 @@ getgenv().RunService = RunService
 getgenv().ReplicatedStorage = ReplicatedStorage
 getgenv().LocalPlayer = LocalPlayer
 getgenv().Players = Players
-loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/hvh-test/refs/heads/main/hvh6.lua'))()
+loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/hvh-test/refs/heads/main/hvh7.lua'))()
+print("testing hvh")
 
 -- If AutoKill is already on when this runs
 if AutoKill.Enabled then
