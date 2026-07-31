@@ -10247,7 +10247,6 @@ do
         end
     })
 end
-HoodAddonsIntegration()
 local SkinData = {
 Guns = {
 Revolver = {"None", "Candy Cane", "Gingerbread", "Snowflake", "Ghost"},
