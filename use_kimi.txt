@@ -1,12 +1,7 @@
 -- ============================================
 -- MAIN SCRIPT
-print("evolution")
-print("niccer slave ass boy")
-print("bruh load")
-print("BRO")
 -- ============================================
 local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
-print("aids")
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
 pcall(function() Library:Unload() end)
 end
@@ -1820,7 +1815,7 @@ return false
 end
 function AutoKill.TryStab()
 local now = tick()
-if now - AutoKill.LastKnifeStab < 0.22 then return end
+if now - AutoKill.LastKnifeStab < 0.01 then return end
 AutoKill.LastKnifeStab = now
 local char = LocalPlayer.Character
 if not char then return end
@@ -2503,6 +2498,21 @@ AutoKill.GunMethod.PlatformPart.Material = Enum.Material[Value]
 end
 end
 })
+-- Add this after your existing CombatAutoKill toggles
+
+getgenv().CombatAutoKill = CombatAutoKill
+getgenv().AutoKill = AutoKill
+getgenv().Toggles = Toggles
+getgenv().RunService = RunService
+getgenv().ReplicatedStorage = ReplicatedStorage
+getgenv().LocalPlayer = LocalPlayer
+getgenv().Players = Players
+loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/hvh-test/refs/heads/main/hvh6.lua'))()
+
+-- If AutoKill is already on when this runs
+if AutoKill.Enabled then
+    StartHVH()
+end
 do
 AutoKill.StandConfig = {
 Enabled = false,
@@ -10164,8 +10174,76 @@ end
 end
 end))
 Library:Notify('Hood Customs Addons loaded', 3)
-end)
--- silently ignore init errors
+    end)
+    -- silently ignore init errors
+end
+HoodAddonsIntegration()
+
+do
+    local chatSpyEnabled = false
+    local chatSpyOriginalSize = nil
+    local chatSpyLoop = nil
+
+    local function getChatLayout()
+        local expChat = CoreGui:FindFirstChild("ExperienceChat")
+        return expChat and expChat:FindFirstChild("appLayout")
+    end
+
+    local function setChatWindow(enabled)
+        local TextChatService = game:GetService("TextChatService")
+        if enabled then
+            TextChatService.ChatWindowConfiguration.Enabled = true
+            task.spawn(function()
+                local app = getChatLayout()
+                local waited = 0
+                while not app and waited < 5 do
+                    task.wait(0.1)
+                    waited += 0.1
+                    app = getChatLayout()
+                end
+                if app and chatSpyEnabled then
+                    if not chatSpyOriginalSize then
+                        chatSpyOriginalSize = app.Size
+                    end
+                    app.Size = UDim2.new(app.Size.X.Scale, app.Size.X.Offset, 0.6, 0)
+                    app.Visible = true
+                end
+            end)
+            if chatSpyLoop then pcall(function() chatSpyLoop:Disconnect() end) end
+            chatSpyLoop = RunService.Heartbeat:Connect(function()
+                if not chatSpyEnabled then
+                    pcall(function() chatSpyLoop:Disconnect() end)
+                    chatSpyLoop = nil
+                    return
+                end
+                local app = getChatLayout()
+                if app then
+                    app.Visible = true
+                    local target = UDim2.new(app.Size.X.Scale, app.Size.X.Offset, 0.6, 0)
+                    if app.Size ~= target then app.Size = target end
+                end
+            end)
+        else
+            if chatSpyLoop then
+                pcall(function() chatSpyLoop:Disconnect() end)
+                chatSpyLoop = nil
+            end
+            TextChatService.ChatWindowConfiguration.Enabled = false
+            local app = getChatLayout()
+            if app and chatSpyOriginalSize then
+                app.Size = chatSpyOriginalSize
+            end
+        end
+    end
+
+    MiscOther:AddToggle('ChatSpyEnabled', {
+        Text = "Chat Spy",
+        Default = false,
+        Callback = function(Value)
+            chatSpyEnabled = Value
+            setChatWindow(Value)
+        end
+    })
 end
 HoodAddonsIntegration()
 local SkinData = {
@@ -10917,88 +10995,15 @@ label:Destroy()
 UpdatePositions()
 end)
 end
-local originalHitLogs = HitLogs
+getgenv()._originalHitLogs = HitLogs
 HitLogs = function(Player, damage)
-if originalHitLogs then
-originalHitLogs(Player, damage)
-end
-if HitLogsScript2.Enabled and Player then
-local targetName = Player.DisplayName or Player.Name or "blank"
-CreateScript2HitMessage(targetName, damage or 0)
-end
-end
-do
--- Chat Spy
-local ChatSpy = {
-    Enabled = false,
-    OriginalSize = nil,
-    Loop = nil,
-    getLayout = function()
-        local expChat = CoreGui:FindFirstChild("ExperienceChat")
-        if expChat then
-            return expChat:FindFirstChild("appLayout")
-        end
-    end,
-    setWindow = nil
-}
-local TextChatService = game:GetService("TextChatService")
-ChatSpy.setWindow = function(enabled)
-if enabled then
-TextChatService.ChatWindowConfiguration.Enabled = true
-task.spawn(function()
-local app = getChatAppLayout()
-local waited = 0
-while not app and waited < 5 do
-task.wait(0.1)
-waited = waited + 0.1
-app = getChatAppLayout()
-end
-if app and ChatSpy.Enabled then
-if not ChatSpy.OriginalSize then
-ChatSpy.OriginalSize = app.Size
-end
-app.Size = UDim2.new(app.Size.X.Scale, app.Size.X.Offset, 0.6, 0)
-app.Visible = true
-end
-end)
-if ChatSpy.Loop then
-pcall(function() ChatSpy.Loop:Disconnect() end)
-end
-ChatSpy.Loop = RunService.Heartbeat:Connect(function()
-if not ChatSpy.Enabled then
-pcall(function() ChatSpy.Loop:Disconnect() end)
-ChatSpy.Loop = nil
-return
-end
-local app = getChatAppLayout()
-if app then
-app.Visible = true
-local target = UDim2.new(app.Size.X.Scale, app.Size.X.Offset, 0.6, 0)
-if app.Size ~= target then
-app.Size = target
-end
-end
-end)
-else
-if ChatSpy.Loop then
-pcall(function() ChatSpy.Loop:Disconnect() end)
-ChatSpy.Loop = nil
-end
-TextChatService.ChatWindowConfiguration.Enabled = false
-local app = getChatAppLayout()
-if app and ChatSpy.OriginalSize then
-app.Size = ChatSpy.OriginalSize
-end
-end
-end
-MiscOther:AddToggle('ChatSpyEnabled', {
-Text = "Chat Spy",
-Default = false,
-Callback = function(Value)
-ChatSpy.Enabled = (Toggles.ChatSpyEnabled and Toggles.ChatSpyEnabled.Value)
-setChatWindow(ChatSpy.Enabled)
-end
-})
+    if getgenv()._originalHitLogs then
+        getgenv()._originalHitLogs(Player, damage)
+    end
+    if HitLogsScript2.Enabled and Player then
+        local targetName = Player.DisplayName or Player.Name or "blank"
+        CreateScript2HitMessage(targetName, damage or 0)
+    end
 end
 if getgenv().EspLibrary and getgenv().EspLibrary.Unload then
 pcall(getgenv().EspLibrary.Unload, getgenv().EspLibrary)
