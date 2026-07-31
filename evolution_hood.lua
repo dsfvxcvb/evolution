@@ -355,6 +355,70 @@ local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = Workspace.CurrentCamera
 
+local serverPosCache = {}
+local smoothedPos = {}
+local lastValidPos = {}
+local trackerConns = {}
+
+local MAX_DELTA = 1000
+local SMOOTH_ALPHA = 0.15
+local RECONCILE_THRESHOLD = 50
+
+local function getServerPosition(target)
+    if not target or not target.Character then return nil end
+    local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+    return smoothedPos[target.UserId] or serverPosCache[target.UserId] or hrp.CFrame
+end
+
+local function trackPlayer(p)
+    if trackerConns[p.UserId] then return end
+    local function onChar(char)
+        local hrp = char:WaitForChild("HumanoidRootPart", 5)
+        if not hrp then return end
+
+        smoothedPos[p.UserId] = hrp.CFrame
+        lastValidPos[p.UserId] = hrp.CFrame
+        serverPosCache[p.UserId] = hrp.CFrame
+
+        local conn = hrp:GetPropertyChangedSignal("CFrame"):Connect(function()
+            local incoming = hrp.CFrame
+            local last = lastValidPos[p.UserId]
+
+            if last then
+                local delta = (incoming.Position - last.Position).Magnitude
+                if delta > MAX_DELTA then return end
+            end
+
+            lastValidPos[p.UserId] = incoming
+            local prev = smoothedPos[p.UserId] or incoming
+            smoothedPos[p.UserId] = prev:Lerp(incoming, SMOOTH_ALPHA)
+            serverPosCache[p.UserId] = smoothedPos[p.UserId]
+        end)
+
+        trackerConns[p.UserId] = conn
+    end
+
+    if p.Character then onChar(p.Character) end
+    p.CharacterAdded:Connect(onChar)
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then trackPlayer(p) end
+end
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then trackPlayer(p) end
+end)
+Players.PlayerRemoving:Connect(function(p)
+    serverPosCache[p.UserId] = nil
+    smoothedPos[p.UserId] = nil
+    lastValidPos[p.UserId] = nil
+    if trackerConns[p.UserId] then
+        trackerConns[p.UserId]:Disconnect()
+        trackerConns[p.UserId] = nil
+    end
+end)
+
 -- ============================================================
 -- EXTERNAL DEPENDENCIES STUBS (ForceHit / AnimGodmode)
 -- ============================================================
@@ -1663,58 +1727,82 @@ end
 end
 end
 function AutoKill.KnifeAttackStep(target)
-if AutoKill.KnifeAura then
-AutoKill.KnifeAuraStep()
-return
-end
-if not target or not target.Character then return end
-local char = LocalPlayer.Character
-if not char then return end
-AutoKill.UnhideCharacter()
-AutoKill.RemoveVoidPlatform()
-local root = char:FindFirstChild("HumanoidRootPart")
-if not root then return end
-local targetChar = target.Character
-local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-if not targetRoot then return end
-AutoKill.OwnPart(root)
-AutoKill.OwnPart(targetRoot)
-local knifeTool = char:FindFirstChild("[Knife]")
-if not knifeTool then
-AutoKill.TryEquipKnife()
-knifeTool = char:FindFirstChild("[Knife]")
-end
-if knifeTool then
-local scriptObj = knifeTool:FindFirstChild("Script")
-if scriptObj then
-local can1 = scriptObj:FindFirstChild("CanHitPlayer")
-local can2 = scriptObj:FindFirstChild("CanHitPlayer2")
-if can1 then pcall(function() can1.Value = targetChar end) end
-if can2 then pcall(function() can2.Value = targetChar end) end
-end
-end
-pcall(function()
-sethiddenproperty(root, "PhysicsRepRootPart", targetRoot)
-local offset, lookAt = AutoKill.GetAttachOffset()
--- Spread multiple stands around the target when in surround formation
-if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
-local angle = AutoKill.StandConfig.FormationAngle
-local dist = 5 + (math.sin(angle * 7) + 1) * 2 -- 5 to 9 based on stand
-local yOff = math.sin(angle * 3) * 1.5
-offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
-lookAt = true
-end
-local targetCF = targetRoot.CFrame
-if not lookAt then
-root.CFrame = targetCF
-else
-local attachCF = targetCF * offset
-root.CFrame = CFrame.lookAt(attachCF.Position, targetCF.Position)
-end
-root.AssemblyLinearVelocity = Vector3.zero
-root.AssemblyAngularVelocity = Vector3.zero
-end)
-AutoKill.TryStab()
+    if AutoKill.KnifeAura then
+        AutoKill.KnifeAuraStep()
+        return
+    end
+    if not target or not target.Character then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    AutoKill.UnhideCharacter()
+    AutoKill.RemoveVoidPlatform()
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local targetChar = target.Character
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+    AutoKill.OwnPart(root)
+    AutoKill.OwnPart(targetRoot)
+    local knifeTool = char:FindFirstChild("[Knife]")
+    if not knifeTool then
+        AutoKill.TryEquipKnife()
+        knifeTool = char:FindFirstChild("[Knife]")
+    end
+    if knifeTool then
+        local scriptObj = knifeTool:FindFirstChild("Script")
+        if scriptObj then
+            local can1 = scriptObj:FindFirstChild("CanHitPlayer")
+            local can2 = scriptObj:FindFirstChild("CanHitPlayer2")
+            if can1 then pcall(function() can1.Value = targetChar end) end
+            if can2 then pcall(function() can2.Value = targetChar end) end
+        end
+    end
+    pcall(function()
+        -- Get the SERVER position using the anti-connection system
+        local serverPos = getServerPosition(target) or targetRoot.CFrame
+        
+        -- Validate it isn't a spoof frame (anti-connection spam)
+        if lastValidPos[target.UserId] then
+            local delta = (serverPos.Position - lastValidPos[target.UserId].Position).Magnitude
+            if delta > 1000 then -- Anti-connection detection threshold
+                serverPos = lastValidPos[target.UserId] -- Use last known valid position
+            else
+                lastValidPos[target.UserId] = serverPos -- Update valid position
+            end
+        end
+        
+        -- Force the target root back to server position if it's been spoofed
+        if lastValidPos[target.UserId] then
+            local drift = (targetRoot.CFrame.Position - lastValidPos[target.UserId].Position).Magnitude
+            if drift > 50 then
+                pcall(function() targetRoot.CFrame = lastValidPos[target.UserId] end)
+            end
+        end
+        
+        sethiddenproperty(root, "PhysicsRepRootPart", targetRoot)
+        local offset, lookAt = AutoKill.GetAttachOffset()
+        
+        -- Spread multiple stands around the target when in surround formation
+        if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
+            local angle = AutoKill.StandConfig.FormationAngle
+            local dist = 5 + (math.sin(angle * 7) + 1) * 2 -- 5 to 9 based on stand
+            local yOff = math.sin(angle * 3) * 1.5
+            offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
+            lookAt = true
+        end
+        
+        -- Use the server position for targeting
+        local targetCF = serverPos
+        if not lookAt then
+            root.CFrame = targetCF
+        else
+            local attachCF = targetCF * offset
+            root.CFrame = CFrame.lookAt(attachCF.Position, targetCF.Position)
+        end
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end)
+    AutoKill.TryStab()
 end
 function AutoKill.IsValidPlayer(player)
 if not player or player == LocalPlayer then return false end
