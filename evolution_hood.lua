@@ -2,6 +2,7 @@
 -- MAIN SCRIPT
 print("evolution")
 print("niccer slave ass boy")
+print("NIGAGAGGAGAGAGAAGGAGA")
 -- ============================================
 local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
 print("aids")
