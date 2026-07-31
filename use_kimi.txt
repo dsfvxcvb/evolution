@@ -874,10 +874,9 @@ AntiGroundShot = false,
 SpectateTarget = false,
 LookAtTarget = false,
 }
--- ============================================
--- AUTO KILL (Knife + Gun Method)
--- Independent of Target Aim
--- ============================================
+
+local AC = loadstring(game:HttpGet("https://raw.githubusercontent.com/dsfvxcvb/evolution/refs/heads/main/ACTracker.lua"))()
+
 local AutoKill = {
 Enabled = false,
 Target = nil,
@@ -1609,25 +1608,47 @@ if can2 then pcall(function() can2.Value = targetChar end) end
 end
 end
 pcall(function()
-sethiddenproperty(root, "PhysicsRepRootPart", targetRoot)
-local offset, lookAt = AutoKill.GetAttachOffset()
--- Spread multiple stands around the target when in surround formation
-if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
-local angle = AutoKill.StandConfig.FormationAngle
-local dist = 5 + (math.sin(angle * 7) + 1) * 2 -- 5 to 9 based on stand
-local yOff = math.sin(angle * 3) * 1.5
-offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
-lookAt = true
-end
-local targetCF = targetRoot.CFrame
-if not lookAt then
-root.CFrame = targetCF
+    sethiddenproperty(root, "PhysicsRepRootPart", targetRoot)
+
+    -- Use anti-connection resistant position from Script 2's tables
+    local rawCF = targetRoot.CFrame
+    local userId = target.UserId
+    local lastValid = AC.lastValid[userId]
+if lastValid then
+    local delta = (rawCF.Position - lastValid.Position).Magnitude
+    if delta > AC.MAX_DELTA then
+        rawCF = lastValid
+    else
+        AC.lastValid[userId] = rawCF
+    end
 else
-local attachCF = targetCF * offset
-root.CFrame = CFrame.lookAt(attachCF.Position, targetCF.Position)
+    AC.lastValid[userId] = rawCF
 end
-root.AssemblyLinearVelocity = Vector3.zero
-root.AssemblyAngularVelocity = Vector3.zero
+local smooth = AC.smoothed[userId]
+if smooth then
+    local drift = (targetRoot.CFrame.Position - smooth.Position).Magnitude
+    if drift > AC.RECONCILE then
+        pcall(function() targetRoot.CFrame = rawCF end)
+    end
+end
+
+    local offset, lookAt = AutoKill.GetAttachOffset()
+    if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
+        local angle = AutoKill.StandConfig.FormationAngle
+        local dist = 5 + (math.sin(angle * 7) + 1) * 2
+        local yOff = math.sin(angle * 3) * 1.5
+        offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
+        lookAt = true
+    end
+
+    if not lookAt then
+        root.CFrame = rawCF
+    else
+        local attachCF = rawCF * offset
+        root.CFrame = CFrame.lookAt(attachCF.Position, rawCF.Position)
+    end
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
 end)
 AutoKill.TryStab()
 end
@@ -10909,18 +10930,19 @@ end
 do
 -- Chat Spy
 local ChatSpy = {
-Enabled = false,
-OriginalSize = nil,
-Loop = nil
+    Enabled = false,
+    OriginalSize = nil,
+    Loop = nil,
+    getLayout = function()
+        local expChat = CoreGui:FindFirstChild("ExperienceChat")
+        if expChat then
+            return expChat:FindFirstChild("appLayout")
+        end
+    end,
+    setWindow = nil
 }
 local TextChatService = game:GetService("TextChatService")
-local function getChatAppLayout()
-local expChat = CoreGui:FindFirstChild("ExperienceChat")
-if expChat then
-return expChat:FindFirstChild("appLayout")
-end
-end
-local function setChatWindow(enabled)
+ChatSpy.setWindow = function(enabled)
 if enabled then
 TextChatService.ChatWindowConfiguration.Enabled = true
 task.spawn(function()
