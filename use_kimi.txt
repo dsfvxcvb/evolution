@@ -2,11 +2,11 @@
 -- MAIN SCRIPT
 print("evolution")
 print("niccer slave ass boy")
-print("bruh load")
-print("BRO")
+print("NIGAGAGGAGAGAGAAGGAGA")
 -- ============================================
-local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/main/'
 print("aids")
+print("horse")
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
 pcall(function() Library:Unload() end)
 end
@@ -343,7 +343,6 @@ local MiscShootSounds = MiscCosmeticsTabbox:AddTab('Shoot Sounds')
 local MiscAnimationPlayer = Tabs.Misc:AddLeftGroupbox('Animation Player')
 local MiscAnimatedTools = Tabs.Misc:AddLeftGroupbox('Animated Tools')
 local MiscAutoFood = Tabs.Misc:AddRightGroupbox('Food')
-local MiscCombat = Tabs.Misc:AddRightGroupbox('Automation')
 local MiscOther = Tabs.Misc:AddRightGroupbox('Other')
 local MiscUseStand = Tabs.Misc:AddRightGroupbox('Use Stand')
 local Players = game:GetService("Players")
@@ -357,6 +356,158 @@ local TweenService = game:GetService("TweenService")
 local LocalPlayer = Players.LocalPlayer
 local Mouse = LocalPlayer:GetMouse()
 local Camera = Workspace.CurrentCamera
+
+local serverPosCache = {}
+local smoothedPos = {}
+local lastValidPos = {}
+local trackerConns = {}
+
+local MAX_DELTA = 1000
+local SMOOTH_ALPHA = 0.15
+local RECONCILE_THRESHOLD = 50
+
+local function getServerPosition(target)
+    if not target or not target.Character then return nil end
+    local hrp = target.Character:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil end
+    return smoothedPos[target.UserId] or serverPosCache[target.UserId] or hrp.CFrame
+end
+
+local function trackPlayer(p)
+    if trackerConns[p.UserId] then return end
+    local function onChar(char)
+        local hrp = char:WaitForChild("HumanoidRootPart", 5)
+        if not hrp then return end
+
+        smoothedPos[p.UserId] = hrp.CFrame
+        lastValidPos[p.UserId] = hrp.CFrame
+        serverPosCache[p.UserId] = hrp.CFrame
+
+        local conn = hrp:GetPropertyChangedSignal("CFrame"):Connect(function()
+            local incoming = hrp.CFrame
+            local last = lastValidPos[p.UserId]
+
+            if last then
+                local delta = (incoming.Position - last.Position).Magnitude
+                if delta > MAX_DELTA then return end
+            end
+
+            lastValidPos[p.UserId] = incoming
+            local prev = smoothedPos[p.UserId] or incoming
+            smoothedPos[p.UserId] = prev:Lerp(incoming, SMOOTH_ALPHA)
+            serverPosCache[p.UserId] = smoothedPos[p.UserId]
+        end)
+
+        trackerConns[p.UserId] = conn
+    end
+
+    if p.Character then onChar(p.Character) end
+    p.CharacterAdded:Connect(onChar)
+end
+
+for _, p in ipairs(Players:GetPlayers()) do
+    if p ~= LocalPlayer then trackPlayer(p) end
+end
+Players.PlayerAdded:Connect(function(p)
+    if p ~= LocalPlayer then trackPlayer(p) end
+end)
+Players.PlayerRemoving:Connect(function(p)
+    serverPosCache[p.UserId] = nil
+    smoothedPos[p.UserId] = nil
+    lastValidPos[p.UserId] = nil
+    if trackerConns[p.UserId] then
+        trackerConns[p.UserId]:Disconnect()
+        trackerConns[p.UserId] = nil
+    end
+end)
+
+-- ============================================================
+-- EXTERNAL DEPENDENCIES STUBS (ForceHit / AnimGodmode)
+-- ============================================================
+if not getgenv().ForceHit then
+    getgenv().ForceHit = {
+        Enabled = false,
+        MaxDistance = 250,
+        WallCheck = true,
+        ForceFieldCheck = true,
+        DeathCheck = true,
+        PrefireForceField = false,
+        HitPart = "UpperTorso",
+        LastShotTime = 0,
+        _InternalOverride = false,
+    }
+end
+
+if not getgenv().FH_Fire then
+    getgenv().FH_Fire = function(target)
+        if not target or not target.Character then return end
+        local hitPartName = getgenv().ForceHit.HitPart or "Head"
+        local part = target.Character:FindFirstChild(hitPartName) or target.Character:FindFirstChild("Head")
+        if not part then return end
+        local myChar = LocalPlayer.Character
+        local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+        if not myHRP then return end
+
+        local pellets = {}
+        local offsets = {}
+        for i = 1, 5 do
+            pellets[i] = { Normal = part.Position, Instance = part, Position = part.Position }
+            offsets[i] = { thePart = part, theOffset = Vector3.new(0, 0, 0) }
+        end
+
+        local args = {
+            "Shoot",
+            {
+                pellets,
+                offsets,
+                myHRP.Position,
+                myHRP.Position,
+                workspace:GetServerTimeNow()
+            }
+        }
+        pcall(function()
+            ReplicatedStorage:WaitForChild("MainEvent"):FireServer(unpack(args))
+        end)
+        getgenv().ForceHit.LastShotTime = tick()
+    end
+end
+
+if not getgenv().AnimGodmode then
+    local animGodEnabled = false
+    local animGodConn = nil
+    getgenv().AnimGodmode = {
+        IsEnabled = function() return animGodEnabled end,
+        Set = function(value)
+            animGodEnabled = value
+            if animGodConn then
+                animGodConn:Disconnect()
+                animGodConn = nil
+            end
+            if value then
+                local char = LocalPlayer.Character
+                if char then
+                    local hum = char:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum.BreakJointsOnDeath = false
+                    end
+                end
+                animGodConn = LocalPlayer.CharacterAdded:Connect(function(character)
+                    task.wait(0.5)
+                    local hum = character:FindFirstChildOfClass("Humanoid")
+                    if hum then
+                        hum.BreakJointsOnDeath = false
+                        hum.HealthChanged:Connect(function(health)
+                            if health < hum.MaxHealth then
+                                hum.Health = hum.MaxHealth
+                            end
+                        end)
+                    end
+                end)
+            end
+        end
+    }
+end
+
 local SelectedShootSounds = {
 DoubleBarrel = "Mp40",
 Revolver = "Mp40",
@@ -1578,58 +1729,82 @@ end
 end
 end
 function AutoKill.KnifeAttackStep(target)
-if AutoKill.KnifeAura then
-AutoKill.KnifeAuraStep()
-return
-end
-if not target or not target.Character then return end
-local char = LocalPlayer.Character
-if not char then return end
-AutoKill.UnhideCharacter()
-AutoKill.RemoveVoidPlatform()
-local root = char:FindFirstChild("HumanoidRootPart")
-if not root then return end
-local targetChar = target.Character
-local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
-if not targetRoot then return end
-AutoKill.OwnPart(root)
-AutoKill.OwnPart(targetRoot)
-local knifeTool = char:FindFirstChild("[Knife]")
-if not knifeTool then
-AutoKill.TryEquipKnife()
-knifeTool = char:FindFirstChild("[Knife]")
-end
-if knifeTool then
-local scriptObj = knifeTool:FindFirstChild("Script")
-if scriptObj then
-local can1 = scriptObj:FindFirstChild("CanHitPlayer")
-local can2 = scriptObj:FindFirstChild("CanHitPlayer2")
-if can1 then pcall(function() can1.Value = targetChar end) end
-if can2 then pcall(function() can2.Value = targetChar end) end
-end
-end
-pcall(function()
-sethiddenproperty(root, "PhysicsRepRootPart", targetRoot)
-local offset, lookAt = AutoKill.GetAttachOffset()
--- Spread multiple stands around the target when in surround formation
-if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
-local angle = AutoKill.StandConfig.FormationAngle
-local dist = 5 + (math.sin(angle * 7) + 1) * 2 -- 5 to 9 based on stand
-local yOff = math.sin(angle * 3) * 1.5
-offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
-lookAt = true
-end
-local targetCF = targetRoot.CFrame
-if not lookAt then
-root.CFrame = targetCF
-else
-local attachCF = targetCF * offset
-root.CFrame = CFrame.lookAt(attachCF.Position, targetCF.Position)
-end
-root.AssemblyLinearVelocity = Vector3.zero
-root.AssemblyAngularVelocity = Vector3.zero
-end)
-AutoKill.TryStab()
+    if AutoKill.KnifeAura then
+        AutoKill.KnifeAuraStep()
+        return
+    end
+    if not target or not target.Character then return end
+    local char = LocalPlayer.Character
+    if not char then return end
+    AutoKill.UnhideCharacter()
+    AutoKill.RemoveVoidPlatform()
+    local root = char:FindFirstChild("HumanoidRootPart")
+    if not root then return end
+    local targetChar = target.Character
+    local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
+    if not targetRoot then return end
+    AutoKill.OwnPart(root)
+    AutoKill.OwnPart(targetRoot)
+    local knifeTool = char:FindFirstChild("[Knife]")
+    if not knifeTool then
+        AutoKill.TryEquipKnife()
+        knifeTool = char:FindFirstChild("[Knife]")
+    end
+    if knifeTool then
+        local scriptObj = knifeTool:FindFirstChild("Script")
+        if scriptObj then
+            local can1 = scriptObj:FindFirstChild("CanHitPlayer")
+            local can2 = scriptObj:FindFirstChild("CanHitPlayer2")
+            if can1 then pcall(function() can1.Value = targetChar end) end
+            if can2 then pcall(function() can2.Value = targetChar end) end
+        end
+    end
+    pcall(function()
+        -- Get the SERVER position using the anti-connection system
+        local serverPos = getServerPosition(target) or targetRoot.CFrame
+        
+        -- Validate it isn't a spoof frame (anti-connection spam)
+        if lastValidPos[target.UserId] then
+            local delta = (serverPos.Position - lastValidPos[target.UserId].Position).Magnitude
+            if delta > 1000 then -- Anti-connection detection threshold
+                serverPos = lastValidPos[target.UserId] -- Use last known valid position
+            else
+                lastValidPos[target.UserId] = serverPos -- Update valid position
+            end
+        end
+        
+        -- Force the target root back to server position if it's been spoofed
+        if lastValidPos[target.UserId] then
+            local drift = (targetRoot.CFrame.Position - lastValidPos[target.UserId].Position).Magnitude
+            if drift > 50 then
+                pcall(function() targetRoot.CFrame = lastValidPos[target.UserId] end)
+            end
+        end
+        
+        sethiddenproperty(root, "PhysicsRepRootPart", targetRoot)
+        local offset, lookAt = AutoKill.GetAttachOffset()
+        
+        -- Spread multiple stands around the target when in surround formation
+        if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
+            local angle = AutoKill.StandConfig.FormationAngle
+            local dist = 5 + (math.sin(angle * 7) + 1) * 2 -- 5 to 9 based on stand
+            local yOff = math.sin(angle * 3) * 1.5
+            offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
+            lookAt = true
+        end
+        
+        -- Use the server position for targeting
+        local targetCF = serverPos
+        if not lookAt then
+            root.CFrame = targetCF
+        else
+            local attachCF = targetCF * offset
+            root.CFrame = CFrame.lookAt(attachCF.Position, targetCF.Position)
+        end
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+    end)
+    AutoKill.TryStab()
 end
 function AutoKill.IsValidPlayer(player)
 if not player or player == LocalPlayer then return false end
@@ -7966,7 +8141,7 @@ lastHitLogTime[player] = nil
 end)
 end
 local MiscMovementSection = MiscMovement
-local MiscCombatSection = MiscCombat
+local MiscCombatSection = MiscOther
 do
 getgenv().cframeSpeedEnabled = false
 getgenv().cframeSpeedKeybindActive = false
@@ -9226,7 +9401,7 @@ Values = {" "},
 Default = " ",
 AllowNull = true,
 Callback = function(Value)
-if Value == " " then return end
+if not Value or Value == " " then return end
 local character = LocalPlayer.Character
 if not character then return end
 local accessory = character:FindFirstChild(Value)
