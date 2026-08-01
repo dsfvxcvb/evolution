@@ -2467,31 +2467,26 @@ Callback = function(Value)
 AutoKill.KnifeExpander.OutlineColor = Value
 end
 })
-CombatAutoKill:AddToggle('AutoKillCustomPlatform', {
-Text = "Custom Platform",
-Default = true,
-Callback = function(Value)
-end
-}):AddColorPicker('AutoKillPlatformColor', {
-Title = "Platform Color",
-Default = Color3.fromRGB(255, 0, 255),
-Callback = function(Value)
-AutoKill.GunMethod.PlatformColor = Value
-if AutoKill.GunMethod.PlatformPart then
-AutoKill.GunMethod.PlatformPart.Color = Value
-end
-end
-})
 CombatAutoKill:AddDropdown('AutoKillPlatformMaterial', {
-Text = "Platform Material",
-Values = {"Neon", "ForceField", "Glass", "SmoothPlastic", "Wood", "Metal", "Foil", "Granite", "Marble", "Fabric"},
-Default = "Neon",
-Callback = function(Value)
-AutoKill.GunMethod.PlatformMaterial = Enum.Material[Value]
-if AutoKill.GunMethod.PlatformPart then
-AutoKill.GunMethod.PlatformPart.Material = Enum.Material[Value]
-end
-end
+    Text = "Platform Material",
+    Values = {"Neon", "ForceField", "Glass", "SmoothPlastic", "Wood", "Metal", "Foil", "Granite", "Marble", "Fabric"},
+    Default = "Neon",
+    Callback = function(Value)
+        AutoKill.GunMethod.PlatformMaterial = Enum.Material[Value]
+        if AutoKill.GunMethod.PlatformPart then
+            AutoKill.GunMethod.PlatformPart.Material = Enum.Material[Value]
+        end
+    end
+})
+CombatAutoKill:AddLabel('Platform Color'):AddColorPicker('AutoKillPlatformColor', {
+    Title = "Platform Color",
+    Default = Color3.fromRGB(255, 0, 255),
+    Callback = function(Value)
+        AutoKill.GunMethod.PlatformColor = Value
+        if AutoKill.GunMethod.PlatformPart then
+            AutoKill.GunMethod.PlatformPart.Color = Value
+        end
+    end
 })
 CombatAutoKill:AddToggle('SpectateAutoKillTarget', {
     Text = "Spectate Target",
@@ -5270,9 +5265,8 @@ RunService.RenderStepped:Wait()
 hrp.CFrame = saved_desync
 else
 bodyClone:SetPrimaryPartCFrame(CFrame.new(9999,9999,9999))
--- Show indicator at server position even when not strafing
-if TargetStrafeConfig.Indicator and hrp then
-updateIndicator(hrp.CFrame.Position, dt)
+if TargetStrafeConfig.Indicator and saved_desync then
+updateIndicator(saved_desync.Position, dt)
 else
 updateIndicator(nil)
 end
@@ -5280,8 +5274,8 @@ disableHook()
 end
 else
 bodyClone:SetPrimaryPartCFrame(CFrame.new(9999,9999,9999))
-if TargetStrafeConfig.Indicator and hrp then
-updateIndicator(hrp.CFrame.Position, dt)
+if TargetStrafeConfig.Indicator and saved_desync then
+updateIndicator(saved_desync.Position, dt)
 else
 updateIndicator(nil)
 end
