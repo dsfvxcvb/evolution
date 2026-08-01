@@ -746,7 +746,7 @@ toggleDesync(not desync.enabled)
 end,
 Mode = 'Toggle'})
 DesyncSection:AddDropdown('DesyncMethodDropdown',{Text = "Method",
-Values = {"Destroy Cheaters", "Rotation", "Custom", "Underground", "Void Spam", "Raining", "Teleport Maze", "Void", "UnderGroundV2", "Anti Connection v1"},
+Values = {"Destroy Cheaters", "Rotation", "Custom", "Underground", "Void Spam", "Teleport Maze", "Void", "UnderGroundV2", "Anti Connection v1"},
 Default = "Void",
 Callback = function(Value)
 setDesyncMode(Options.DesyncMethodDropdown.Value)
@@ -805,12 +805,6 @@ desync.teleportPosition = Vector3.new(
 rootPart.Position.X + math.random(-444444, 444444),
 rootPart.Position.Y + math.random(-444444, 444444),
 rootPart.Position.Z + math.random(-44444, 44444)
-)
-elseif desync.mode == "Raining" then
-desync.teleportPosition = Vector3.new(
-rootPart.Position.X + math.random(-10, 10),
-rootPart.Position.Y + math.random(2, 5),
-rootPart.Position.Z + math.random(-10, 10)
 )
 elseif desync.mode == "Teleport Maze" then
 desync.teleportPosition = Vector3.new(
@@ -5276,12 +5270,21 @@ RunService.RenderStepped:Wait()
 hrp.CFrame = saved_desync
 else
 bodyClone:SetPrimaryPartCFrame(CFrame.new(9999,9999,9999))
+-- Show indicator at server position even when not strafing
+if TargetStrafeConfig.Indicator and hrp then
+updateIndicator(hrp.CFrame.Position, dt)
+else
 updateIndicator(nil)
+end
 disableHook()
 end
 else
 bodyClone:SetPrimaryPartCFrame(CFrame.new(9999,9999,9999))
+if TargetStrafeConfig.Indicator and hrp then
+updateIndicator(hrp.CFrame.Position, dt)
+else
 updateIndicator(nil)
+end
 disableHook()
 end
 end
@@ -5469,67 +5472,8 @@ end
 end
 do
 end
-do
-local WalkableEnabled = false
-local WalkableDelay = 800
-local WalkableInterval = 6
-local RunService = game:GetService("RunService")
-local InputService = game:GetService("UserInputService")
-local LocalPlayer = Players.LocalPlayer
-local SetProperty = sethiddenproperty
-local VProEn = true
-function Desync()
-task.spawn(function()
-while WalkableEnabled do
-task.wait()
-if LocalPlayer.Character then
-local loop = RunService.Heartbeat:Connect(function()
-SetProperty(LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
-task.wait()
-SetProperty(LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
-task.wait()
-SetProperty(LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
-task.wait()
-SetProperty(LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
-task.wait()
-SetProperty(LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
-task.wait()
-SetProperty(LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", false)
-task.wait()
-SetProperty(LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
-task.wait()
-SetProperty(LocalPlayer.Character.HumanoidRootPart, "NetworkIsSleeping", true)
-task.wait()
-end)
-task.wait()
-if loop then
-loop:Disconnect()
-end
-end
-end
-end)
-end
-function toggleWalkableDesync()
-WalkableEnabled = (Toggles.WalkableDesync and Toggles.WalkableDesync.Value)
-if WalkableEnabled then
-Desync()
-Notify("Notification", "Walkable Desync: Enabled", 3)
-else
-Notify("Notification", "Walkable Desync: Disabled", 3)
-end
-end
-function onWalkableKeybind()
-if (Toggles.WalkableDesync and Toggles.WalkableDesync.Value) then
-WalkableEnabled = not WalkableEnabled
-if WalkableEnabled then
-Desync()
-Notify("Notification", "Walkable Desync: Enabled", 3)
-else
-Notify("Notification", "Walkable Desync: Disabled", 3)
-end
-end
-end
-function toggleTeleportAway()
+local WalkableSection = CombatAntiAim
+local function toggleTeleportAway()
 local enabled = (Toggles.TeleportAway and Toggles.TeleportAway.Value)
 if getgenv().AnimGodmode then
 getgenv().AnimGodmode.Set(enabled)
@@ -5540,43 +5484,20 @@ else
 Notify("Notification", "Animation Godmode: Disabled", 3)
 end
 end
-function onTeleportKeybind()
+local function onTeleportKeybind()
 if Toggles.TeleportAway and getgenv().AnimGodmode then
 local enabled = not getgenv().AnimGodmode.IsEnabled()
 Toggles.TeleportAway:SetValue(enabled)
 end
 end
-function onWalkableDelayChange()
-WalkableDelay = (Options.WalkableDelay and Options.WalkableDelay.Value) or 800
-end
-function onWalkableIntervalChange()
-WalkableInterval = (Options.WalkableInterval and Options.WalkableInterval.Value) or 6
-end
-local WalkableSection = CombatAntiAim
-WalkableSection:AddToggle('WalkableDesync',{Text = "Enable Walkable Desync",
-Default = false,
-Callback = toggleWalkableDesync}):AddKeyPicker('WalkableKeybind',{Text = "Walkable Keybind",
-Default = 'None',
-Callback = onWalkableKeybind,
-Mode = 'Toggle'})
-WalkableSection:AddSlider('WalkableDelay',{Text = "Desync Delay",
-Min = 100,
-Max = 2000,
-Default = 800,
-Rounding = 0,
-Callback = onWalkableDelayChange})
-WalkableSection:AddSlider('WalkableInterval',{Text = "Desync Interval",
-Min = 1,
-Max = 20,
-Default = 6,
-Rounding = 0,
-Callback = onWalkableIntervalChange})
 WalkableSection:AddToggle('TeleportAway',{Text = "Godmode",
 Default = false,
 Callback = toggleTeleportAway}):AddKeyPicker('TeleportKeybind',{Text = "Godmode Keybind",
 Default = 'None',
 Callback = onTeleportKeybind,
 Mode = 'Toggle'})
+do
+local VProEn = true
 local mt = getrawmetatable(game)
 local oldIndex = mt.__index
 setreadonly(mt, false)
