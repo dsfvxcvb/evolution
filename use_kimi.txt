@@ -2499,7 +2499,7 @@ AutoKill.GunMethod.PlatformPart.Material = Enum.Material[Value]
 end
 end
 })
-CombatAutoKill:AddToggle('SpectateTarget', {
+CombatAutoKill:AddToggle('SpectateAutoKillTarget', {
     Text = "Spectate Target",
     Default = false,
     Callback = function(Value)
@@ -2511,34 +2511,13 @@ CombatAutoKill:AddToggle('SpectateTarget', {
 })
 
 RunService.RenderStepped:Connect(function()
-    if not (Toggles.SpectateTarget and Toggles.SpectateTarget.Value) then return end
+    if not (Toggles.SpectateAutoKillTarget and Toggles.SpectateAutoKillTarget.Value) then return end
     local target = AutoKill.Target
     if target and target.Character then
         local hum = target.Character:FindFirstChildOfClass("Humanoid")
-        if hum then workspace.CurrentCamera.CameraSubject = hum end
-    else
-        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-        if hum then workspace.CurrentCamera.CameraSubject = hum end
-    end
-end)
-
-CombatAutoKill:AddToggle('SpectateTarget', {
-    Text = "Spectate Target",
-    Default = false,
-    Callback = function(Value)
-        if not Value then
-            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-            if hum then workspace.CurrentCamera.CameraSubject = hum end
+        if hum and hum.Health > 0 then
+            workspace.CurrentCamera.CameraSubject = hum
         end
-    end
-})
-
-RunService.RenderStepped:Connect(function()
-    if not (Toggles.SpectateTarget and Toggles.SpectateTarget.Value) then return end
-    local target = AutoKill.Target
-    if target and target.Character then
-        local hum = target.Character:FindFirstChildOfClass("Humanoid")
-        if hum then workspace.CurrentCamera.CameraSubject = hum end
     else
         local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
         if hum then workspace.CurrentCamera.CameraSubject = hum end
