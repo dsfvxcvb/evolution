@@ -2499,7 +2499,28 @@ AutoKill.GunMethod.PlatformPart.Material = Enum.Material[Value]
 end
 end
 })
--- Add this after your existing CombatAutoKill toggles
+CombatAutoKill:AddToggle('SpectateTarget', {
+    Text = "Spectate Target",
+    Default = false,
+    Callback = function(Value)
+        if not Value then
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then workspace.CurrentCamera.CameraSubject = hum end
+        end
+    end
+})
+
+RunService.RenderStepped:Connect(function()
+    if not (Toggles.SpectateTarget and Toggles.SpectateTarget.Value) then return end
+    local target = AutoKill.Target
+    if target and target.Character then
+        local hum = target.Character:FindFirstChildOfClass("Humanoid")
+        if hum then workspace.CurrentCamera.CameraSubject = hum end
+    else
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then workspace.CurrentCamera.CameraSubject = hum end
+    end
+end)
 
 getgenv().CombatAutoKill = CombatAutoKill
 getgenv().AutoKill = AutoKill
@@ -2508,13 +2529,10 @@ getgenv().RunService = RunService
 getgenv().ReplicatedStorage = ReplicatedStorage
 getgenv().LocalPlayer = LocalPlayer
 getgenv().Players = Players
+
 loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/hvh-test/refs/heads/main/hvh7.lua'))()
 print("testing hvh")
 
--- If AutoKill is already on when this runs
-if AutoKill.Enabled then
-    StartHVH()
-end
 do
 AutoKill.StandConfig = {
 Enabled = false,
@@ -10850,7 +10868,7 @@ Callback = function(Value)
 HitLogsScript2.CustomText = Value
 end
 })
-VisualsHitLogs:AddColorPicker('HitLogsWord1Color', {
+VisualsHitLogs:AddLabel(''):AddColorPicker('HitLogsWord1Color', {
 Title = "Word 1",
 Default = HitLogsScript2.WordColors[1],
 Callback = function(Value)
