@@ -2522,6 +2522,29 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+CombatAutoKill:AddToggle('SpectateTarget', {
+    Text = "Spectate Target",
+    Default = false,
+    Callback = function(Value)
+        if not Value then
+            local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+            if hum then workspace.CurrentCamera.CameraSubject = hum end
+        end
+    end
+})
+
+RunService.RenderStepped:Connect(function()
+    if not (Toggles.SpectateTarget and Toggles.SpectateTarget.Value) then return end
+    local target = AutoKill.Target
+    if target and target.Character then
+        local hum = target.Character:FindFirstChildOfClass("Humanoid")
+        if hum then workspace.CurrentCamera.CameraSubject = hum end
+    else
+        local hum = LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+        if hum then workspace.CurrentCamera.CameraSubject = hum end
+    end
+end)
+
 getgenv().CombatAutoKill = CombatAutoKill
 getgenv().AutoKill = AutoKill
 getgenv().Toggles = Toggles
@@ -2529,6 +2552,7 @@ getgenv().RunService = RunService
 getgenv().ReplicatedStorage = ReplicatedStorage
 getgenv().LocalPlayer = LocalPlayer
 getgenv().Players = Players
+getgenv().AutoStompEnabled = true
 
 loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/hvh-test/refs/heads/main/hvh7.lua'))()
 print("testing hvh")
