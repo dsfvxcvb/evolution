@@ -1,6 +1,3 @@
--- protected.lua
--- Sensitive exploit logic. Obfuscate THIS file with PolSec.
--- Load this BEFORE the main UI script via loader.lua.
 print("ll")
 
 local Players = game:GetService("Players")
@@ -463,7 +460,6 @@ getgenv().FH_Fire = function(targetPlayer)
     return false
 end
 
--- Animation Godmode module
 local AnimGodmode = {
     Enabled = false,
     EmoteId = "rbxassetid://70883871260184",
@@ -504,11 +500,7 @@ local function playFrozenEmote()
     local anim = Instance.new("Animation")
     anim.AnimationId = AnimGodmode.EmoteId
     AnimGodmode.Track = hum:LoadAnimation(anim)
-    -- Core priority + weight 1: the track is active and replicates server-side,
-    -- but default idle/walk animations (Movement priority) override it locally.
     AnimGodmode.Track.Priority = Enum.AnimationPriority.Core
-    -- Weight 0 keeps the track active/replicating (so the godmode state still works)
-    -- but produces no visible pose, so nobody sees the emote animation.
     AnimGodmode.Track:Play(0, 0, 1)
     AnimGodmode.Heartbeat = RunService.Heartbeat:Connect(function()
         if AnimGodmode.Track and AnimGodmode.Enabled then
