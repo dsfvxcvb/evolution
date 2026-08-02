@@ -1114,7 +1114,7 @@ do
             BackgroundTransparency = 1;
             Position = UDim2.new(0, 0, 0.5, -6);
             Size = UDim2.new(0, 12, 0, 12);
-            Image = 'rbxassetid://5289181873';
+            Image = 'rbxassetid://108529772374237';
             ImageColor3 = Color3.fromRGB(160, 160, 160);
             ZIndex = 52;
             Parent = KeyPopupTitleRow;
