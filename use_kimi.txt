@@ -1597,65 +1597,66 @@ if can1 then pcall(function() can1.Value = targetChar end) end
 if can2 then pcall(function() can2.Value = targetChar end) end
 end
 end
-local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
-local savedCF = root.CFrame
-local savedVel = root.AssemblyLinearVelocity
-local rawCF = targetRoot.CFrame
-local userId = target.UserId
-local lastValid = AC.lastValid[userId]
-if lastValid then
-    local delta = (rawCF.Position - lastValid.Position).Magnitude
-    if delta > AC.MAX_DELTA then
-        rawCF = lastValid
+pcall(function()
+    sethiddenproperty(root, "PhysicsRepRootPart", targetRoot)
+
+    local rawCF = targetRoot.CFrame
+    local userId = target.UserId
+    local lastValid = AC.lastValid[userId]
+    if lastValid then
+        local delta = (rawCF.Position - lastValid.Position).Magnitude
+        if delta > AC.MAX_DELTA then
+            rawCF = lastValid
+        else
+            AC.lastValid[userId] = rawCF
+        end
     else
         AC.lastValid[userId] = rawCF
     end
-else
-    AC.lastValid[userId] = rawCF
-end
-local smooth = AC.smoothed[userId]
-if smooth then
-    local drift = (targetRoot.CFrame.Position - smooth.Position).Magnitude
-    if drift > AC.RECONCILE then
-        pcall(function() targetRoot.CFrame = rawCF end)
+    local smooth = AC.smoothed[userId]
+    if smooth then
+        local drift = (targetRoot.CFrame.Position - smooth.Position).Magnitude
+        if drift > AC.RECONCILE then
+            pcall(function() targetRoot.CFrame = rawCF end)
+        end
     end
-end
-local offset, lookAt = AutoKill.GetAttachOffset()
-if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
-    local angle = AutoKill.StandConfig.FormationAngle
-    local dist = 5 + (math.sin(angle * 7) + 1) * 2
-    local yOff = math.sin(angle * 3) * 1.5
-    offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
-    lookAt = true
-end
-local targetCF
-if not lookAt then
-    targetCF = rawCF
-else
-    local attachCF = rawCF * offset
-    targetCF = CFrame.lookAt(attachCF.Position, rawCF.Position)
-end
-if getgenv().AutoKillSpoof then
-    local o = root.CFrame
-    local originalVel = root.AssemblyLinearVelocity
-    local cam = workspace.CurrentCamera
-    local originalSubject = cam.CameraSubject
-    getgenv().AutoKillSetback.CFrame = CFrame.new(o.Position)
-    cam.CameraSubject = getgenv().AutoKillSetback
-    root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 1)
-    root.AssemblyLinearVelocity = Vector3.zero
-    root.AssemblyAngularVelocity = Vector3.zero
-    RunService.RenderStepped:Wait()
-    AutoKill.TryStab()
-    root.CFrame = o
-    root.AssemblyLinearVelocity = originalVel
-    cam.CameraSubject = originalSubject
-else
-    root.CFrame = targetCF
-    root.AssemblyLinearVelocity = Vector3.zero
-    root.AssemblyAngularVelocity = Vector3.zero
-    AutoKill.TryStab()
-end
+
+    local offset, lookAt = AutoKill.GetAttachOffset()
+    if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
+        local angle = AutoKill.StandConfig.FormationAngle
+        local dist = 5 + (math.sin(angle * 7) + 1) * 2
+        local yOff = math.sin(angle * 3) * 1.5
+        offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
+        lookAt = true
+    end
+
+    if getgenv().AutoKillSpoof then
+        local o = root.CFrame
+        local originalVel = root.AssemblyLinearVelocity
+        local cam = workspace.CurrentCamera
+        local originalSubject = cam.CameraSubject
+        getgenv().AutoKillSetback.CFrame = CFrame.new(o.Position)
+        cam.CameraSubject = getgenv().AutoKillSetback
+        root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 1)
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+        RunService.RenderStepped:Wait()
+        AutoKill.TryStab()
+        root.CFrame = o
+        root.AssemblyLinearVelocity = originalVel
+        cam.CameraSubject = originalSubject
+    else
+        if not lookAt then
+            root.CFrame = rawCF
+        else
+            local attachCF = rawCF * offset
+            root.CFrame = CFrame.lookAt(attachCF.Position, rawCF.Position)
+        end
+        root.AssemblyLinearVelocity = Vector3.zero
+        root.AssemblyAngularVelocity = Vector3.zero
+        AutoKill.TryStab()
+    end
+end)
 end
 function AutoKill.IsValidPlayer(player)
 if not player or player == LocalPlayer then return false end
@@ -12443,4 +12444,4 @@ SaveManager:LoadAutoloadConfig()
 if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then
 Toggles.KnifeHitboxToggle:SetValue(true)
 end
-print("spoof")
+print("fully done?")
