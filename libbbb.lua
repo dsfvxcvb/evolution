@@ -8,7 +8,6 @@ local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
-print("FAMILY")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
@@ -1155,7 +1154,7 @@ do
         -- Row: "+ create keybind" (when no keybind) OR "+ edit keybind" (when has keybind)
         local CreateRow, CreateBtn = MakeSimpleRow('+ create keybind', nil);
         -- Row: "trash delete keybind" (only when has keybind)
-        local DeleteRow, DeleteBtn = MakeSimpleRow('delete keybind', 'rbxassetid://2804603877');
+        local DeleteRow, DeleteBtn = MakeSimpleRow('delete keybind', 'rbxassetid://95365264015831');
         -- Row: "key | none" (hidden until create/edit clicked)
         local KeyRow = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
@@ -3257,7 +3256,7 @@ function Library:CreateWindow(...)
         BackgroundTransparency = 1;
         Position = UDim2.new(0, 3, 0.5, -8);
         Size = UDim2.new(0, 16, 0, 16);
-        Image = 'rbxassetid://2804603877';
+        Image = 'rbxassetid://118685771787843';
         ImageColor3 = Color3.fromRGB(180, 180, 180);
         ZIndex = 11;
         Parent = SearchBox;
