@@ -1,9 +1,8 @@
 -- Trail Addon for evolution
 -- Run AFTER use_kimi.txt has loaded
-print("balrihgt")
 
 if not getgenv().Tabs then
-    warn("[Trail Addon] Tabs global not found - make sure use_kimi.txt loaded first")
+    warn("[Trail Addon] Tabs global not found")
     return
 end
 
@@ -129,31 +128,27 @@ VisualsTrail:AddToggle('TrailUse', {
     Callback = function() _refreshTrail() end
 })
 
-VisualsTrail:AddDropdown('TrailLifetime', {
+VisualsTrail:AddSlider('TrailLifetime', {
     Text = 'Lifetime',
-    Values = {'Short', 'Normal', 'Long', 'Very Long'},
-    Default = 'Normal',
+    Min = 0.1,
+    Max = 5,
+    Default = 1.2,
+    Rounding = 1,
     Callback = function(Value)
-        if Value == 'Short' then _trailLifetime = 0.4
-        elseif Value == 'Normal' then _trailLifetime = 1.2
-        elseif Value == 'Long' then _trailLifetime = 2.5
-        elseif Value == 'Very Long' then _trailLifetime = 5
-        end
-        if _trailMain then _trailMain.Lifetime = _trailLifetime end
-        if _trailGlow then _trailGlow.Lifetime = _trailLifetime end
+        _trailLifetime = Value
+        if _trailMain then _trailMain.Lifetime = Value end
+        if _trailGlow then _trailGlow.Lifetime = Value end
     end
 })
 
-VisualsTrail:AddDropdown('TrailWidth', {
+VisualsTrail:AddSlider('TrailWidth', {
     Text = 'Width',
-    Values = {'Thin', 'Normal', 'Wide', 'Thick'},
-    Default = 'Normal',
+    Min = 1,
+    Max = 100,
+    Default = 7,
+    Rounding = 0,
     Callback = function(Value)
-        if Value == 'Thin' then _trailWidth = 0.03
-        elseif Value == 'Normal' then _trailWidth = 0.07
-        elseif Value == 'Wide' then _trailWidth = 0.15
-        elseif Value == 'Thick' then _trailWidth = 0.28
-        end
+        _trailWidth = Value / 100
         if _trailMain then
             _trailMain.WidthScale = NumberSequence.new({
                 NumberSequenceKeypoint.new(0, _trailWidth),
@@ -171,18 +166,61 @@ VisualsTrail:AddDropdown('TrailWidth', {
     end
 })
 
-VisualsTrail:AddDropdown('TrailHeight', {
+VisualsTrail:AddSlider('TrailHeight', {
     Text = 'Height',
-    Values = {'Short', 'Normal', 'Tall', 'Extra Tall'},
-    Default = 'Normal',
+    Min = 1,
+    Max = 100,
+    Default = 20,
+    Rounding = 0,
     Callback = function(Value)
-        if Value == 'Short' then _trailHeight = 0.1
-        elseif Value == 'Normal' then _trailHeight = 0.2
-        elseif Value == 'Tall' then _trailHeight = 0.4
-        elseif Value == 'Extra Tall' then _trailHeight = 0.7
-        end
+        _trailHeight = Value / 100
         _refreshTrail()
     end
 })
+
+-- ===== INDICATOR OUTLINE =====
+-- Inject UIStroke onto the indicator frame whenever it gets created
+local function _injectStroke()
+    local ui = Library and Library._targetUIInstance
+    if not ui then return false end
+    local mainFrame = ui:FindFirstChildOfClass("Frame")
+    if not mainFrame then return false end
+    -- remove existing stroke if any
+    local existing = mainFrame:FindFirstChildOfClass("UIStroke")
+    if existing then existing:Destroy() end
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = getgenv().TargetUIGlowColor or getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
+    stroke.Thickness = 2
+    stroke.Transparency = 0
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = mainFrame
+    getgenv()._indicatorUIStroke = stroke
+    -- hide the old OuterBorder so we dont get double outline
+    if Library._targetUIOuterBorder then
+        Library._targetUIOuterBorder.BackgroundTransparency = 1
+    end
+    return true
+end
+
+-- poll until indicator exists then inject
+task.spawn(function()
+    while true do
+        task.wait(1)
+        if Library and Library._targetUIInstance then
+            _injectStroke()
+            break
+        end
+    end
+end)
+
+-- also re-inject whenever the indicator is rebuilt (toggled off/on)
+local _origTargetui = Library and Library.targetui
+if Library and Library.targetui then
+    Library.targetui = function(self, style)
+        local result = _origTargetui(self, style)
+        task.delay(0.3, _injectStroke)
+        return result
+    end
+end
 
 print("[Trail Addon] Loaded")
