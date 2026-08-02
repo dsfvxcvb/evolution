@@ -1,5 +1,6 @@
 -- Trail Addon for evolution
 -- Run AFTER use_kimi.txt has loaded
+print("dndhd")
 
 if not getgenv().Tabs then
     warn("[Trail Addon] Tabs global not found - make sure use_kimi.txt loaded first")
