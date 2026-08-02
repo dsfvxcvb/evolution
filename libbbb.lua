@@ -10,6 +10,7 @@ local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
 print("texture id")
 print("texture id nigga 2")
+print("NIGGIGIGIGER")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
