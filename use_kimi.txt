@@ -3,7 +3,6 @@
 -- ============================================
 print("bro")
 print("sososso")
-print("print")
 print("outline slave")
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
 pcall(function() Library:Unload() end)
@@ -42,7 +41,6 @@ Visuals = Window:AddTab('Visuals'),
 Misc = Window:AddTab('Misc'),
 ['UI Settings'] = Window:AddTab('UI Settings'),
 }
-getgenv().Tabs = Tabs
 getgenv().Tabs = Tabs
 local CombatTargetAim = Tabs.Combat:AddLeftGroupbox('Target Aim')
 local CombatProtectPlayer = Tabs.Combat:AddLeftGroupbox('Protect Player')
