@@ -1,32 +1,12 @@
 -- Trail Addon for evolution
--- Run AFTER use_kimi.txt has loaded
+-- Relies on Tabs global set by use_kimi.txt
 
-local Tabs = getgenv().Library and getgenv().Library._tabs or nil
-
--- Get the Visuals tab from the already-created window
-local VisualsTab = nil
-if getgenv().Library and getgenv().Library._window then
-    for _, tab in pairs(getgenv().Library._window.Tabs or {}) do
-        if tab.Name == "Visuals" then
-            VisualsTab = tab
-            break
-        end
-    end
-end
-
--- Fallback: grab it from the Window object directly
--- LinoriaLib stores tabs in Window object
-local Window = getgenv().Library and getgenv().Library._window
-if not VisualsTab and Window then
-    VisualsTab = Window:GetTab("Visuals")
-end
-
-if not VisualsTab then
-    warn("[Trail Addon] Could not find Visuals tab - make sure use_kimi.txt loaded first")
+if not getgenv().Tabs then
+    warn("[Trail Addon] Tabs global not found - make sure use_kimi.txt loaded first")
     return
 end
 
-local VisualsTrail = VisualsTab:AddRightGroupbox("Trail")
+local VisualsTrail = getgenv().Tabs.Visuals:AddRightGroupbox("Trail")
 
 local _trailAtt0, _trailAtt1, _trailMain, _trailGlow
 
@@ -69,9 +49,9 @@ local function _buildTrail(char)
         ColorSequenceKeypoint.new(1, c3),
     })
     _trailMain.WidthScale = NumberSequence.new({
-        ColorSequenceKeypoint.new(0, 0.07),
-        ColorSequenceKeypoint.new(0.85, 0.07),
-        ColorSequenceKeypoint.new(1, 0),
+        NumberSequenceKeypoint.new(0, 0.07),
+        NumberSequenceKeypoint.new(0.85, 0.07),
+        NumberSequenceKeypoint.new(1, 0),
     })
     _trailMain.Transparency = NumberSequence.new({
         NumberSequenceKeypoint.new(0, 0),
@@ -171,3 +151,5 @@ VisualsTrail:AddSlider('TrailLifetime', {
         if _trailGlow then _trailGlow.Lifetime = Value end
     end
 })
+
+print("[Trail Addon] Loaded successfully")
