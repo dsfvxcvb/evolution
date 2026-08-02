@@ -1638,17 +1638,18 @@ end
 if getgenv().AutoKillSpoof then
     local o = root.CFrame
     local originalVel = root.AssemblyLinearVelocity
-    -- move to target
-    root.CFrame = targetCF
+    local cam = workspace.CurrentCamera
+    local originalSubject = cam.CameraSubject
+    getgenv().AutoKillSetback.CFrame = CFrame.new(o.Position)
+    cam.CameraSubject = getgenv().AutoKillSetback
+    root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 1)
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
-    -- stab immediately
+    RunService.RenderStepped:Wait()
     AutoKill.TryStab()
-    -- restore on next task step before any rendering happens
-    task.defer(function()
-        root.CFrame = o
-        root.AssemblyLinearVelocity = originalVel
-    end)
+    root.CFrame = o
+    root.AssemblyLinearVelocity = originalVel
+    cam.CameraSubject = originalSubject
 else
     root.CFrame = targetCF
     root.AssemblyLinearVelocity = Vector3.zero
@@ -1833,28 +1834,9 @@ if not knife then
 AutoKill.TryEquipKnife()
 return
 end
-if targetPos and getgenv().AutoKillSpoof then
-    -- move just the hitbox to the target so Touched fires server-side
-    local handle = knife:FindFirstChild("Handle")
-    local hitbox = handle and handle:FindFirstChild("HITBOX_PART")
-    if hitbox then
-        local savedHitboxCF = hitbox.CFrame
-        pcall(function()
-            hitbox.CFrame = CFrame.new(targetPos)
-        end)
-        pcall(function() knife:Activate() end)
-        RunService.RenderStepped:Wait()
-        pcall(function()
-            hitbox.CFrame = savedHitboxCF
-        end)
-    else
-        pcall(function() knife:Activate() end)
-    end
-else
-    pcall(function()
-        knife:Activate()
-    end)
-end
+pcall(function()
+    knife:Activate()
+end)
 end
 function AutoKill.OwnPart(part)
 if part and part:IsA("BasePart") then
@@ -2070,7 +2052,20 @@ else
     local attachCF = targetRoot.CFrame * offset
     targetCF = CFrame.lookAt(attachCF.Position, targetRoot.Position)
 end
-if not getgenv().AutoKillSpoof then
+if getgenv().AutoKillSpoof then
+    local o = root.CFrame
+    local originalVel = root.AssemblyLinearVelocity
+    local cam = workspace.CurrentCamera
+    local originalSubject = cam.CameraSubject
+    getgenv().AutoKillSetback.CFrame = CFrame.new(o.Position)
+    cam.CameraSubject = getgenv().AutoKillSetback
+    root.CFrame = targetCF
+    root.AssemblyLinearVelocity = Vector3.zero
+    RunService.RenderStepped:Wait()
+    root.CFrame = o
+    root.AssemblyLinearVelocity = originalVel
+    cam.CameraSubject = originalSubject
+else
     root.CFrame = targetCF
     root.Velocity = Vector3.new(0, 0, 0)
 end
@@ -2153,6 +2148,7 @@ end
 function AutoKill.StartCombatCycle()
 if AutoKill.CycleActive then return end
 AutoKill.CycleActive = true
+
 local isKillAura = AutoKill.StandConfig and AutoKill.StandConfig.KillAuraMode
 if AutoKill.Method == "Gun" or isKillAura then
 if getgenv().ForceHit then
@@ -2335,6 +2331,7 @@ end
 function AutoKill.StopCycle()
 AutoKill.LockedOn = false
 AutoKill.CycleActive = false
+
 AutoKill.AuraLockedTarget = nil
 AutoKill.GunMethod.IsWaiting = false
 AutoKill.GunMethod.IsKilling = false
@@ -2563,6 +2560,8 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+
+
 CombatAutoKill:AddToggle('AutoKillSpoof', {
     Text = "Spoof",
     Default = false,
@@ -2570,6 +2569,15 @@ CombatAutoKill:AddToggle('AutoKillSpoof', {
         getgenv().AutoKillSpoof = Value
     end
 })
+
+-- Invisible anchor part used to hold camera in place during spoof teleport
+getgenv().AutoKillSetback = Instance.new("Part")
+getgenv().AutoKillSetback.Name = "AutoKillSetback"
+getgenv().AutoKillSetback.Size = Vector3.new(2, 2, 1)
+getgenv().AutoKillSetback.CanCollide = false
+getgenv().AutoKillSetback.Anchored = true
+getgenv().AutoKillSetback.Transparency = 1
+getgenv().AutoKillSetback.Parent = workspace
 
 getgenv().CombatAutoKill = CombatAutoKill
 getgenv().AutoKill = AutoKill
@@ -5526,7 +5534,7 @@ end
 do
 end
 local WalkableSection = CombatAntiAim
-local function toggleTeleportAway()
+function toggleTeleportAway()
 local enabled = (Toggles.TeleportAway and Toggles.TeleportAway.Value)
 if getgenv().AnimGodmode then
 getgenv().AnimGodmode.Set(enabled)
@@ -5537,7 +5545,7 @@ else
 Notify("Notification", "Animation Godmode: Disabled", 3)
 end
 end
-local function onTeleportKeybind()
+function onTeleportKeybind()
 if Toggles.TeleportAway and getgenv().AnimGodmode then
 local enabled = not getgenv().AnimGodmode.IsEnabled()
 Toggles.TeleportAway:SetValue(enabled)
@@ -12435,4 +12443,4 @@ SaveManager:LoadAutoloadConfig()
 if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then
 Toggles.KnifeHitboxToggle:SetValue(true)
 end
-print("nigger boo")
+print("spoof")
