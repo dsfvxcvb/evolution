@@ -9,6 +9,7 @@ local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
 print("trashcan chchchchc")
+print("delete")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
