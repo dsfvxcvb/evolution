@@ -1053,53 +1053,34 @@ do
             Info.Mode = 'Toggle'
         end
 
-        -- === KEYBIND: + button and gear icon ===
-        -- "create keybind" button with plus icon, sits on the right of the toggle label
+        -- === KEYBIND: just a gear icon by default ===
         local PickOuter = Library:Create('Frame', {
-            BackgroundColor3 = Library.BackgroundColor;
-            BorderColor3 = Library.OutlineColor;
+            BackgroundTransparency = 1;
+            BorderSizePixel = 0;
             AnchorPoint = Vector2.new(1, 0.5);
             Position = UDim2.new(1, 0, 0.5, 0);
-            Size = UDim2.new(0, 90, 0, 15);
+            Size = UDim2.new(0, 14, 0, 14);
             ZIndex = 6;
             Parent = ToggleLabel;
         });
-        Library:AddToRegistry(PickOuter, {
-            BackgroundColor3 = 'BackgroundColor';
-            BorderColor3 = 'OutlineColor';
-        });
 
-        -- plus icon
-        Library:Create('ImageLabel', {
-            BackgroundTransparency = 1;
-            Position = UDim2.new(0, 2, 0.5, -6);
-            Size = UDim2.new(0, 12, 0, 12);
-            Image = 'rbxassetid://1419621057';
-            ImageColor3 = Color3.fromRGB(160, 160, 160);
-            ZIndex = 7;
-            Parent = PickOuter;
-        });
-
+        -- hidden display label still needed for internal Update() calls
         local DisplayLabel = Library:CreateLabel({
-            Position = UDim2.new(0, 16, 0, 0);
-            Size = UDim2.new(1, -30, 1, 0);
+            Size = UDim2.new(0, 0, 0, 0);
             TextSize = 12;
-            Text = Info.Default == 'None' and 'create keybind' or Info.Default;
-            TextXAlignment = Enum.TextXAlignment.Left;
-            TextWrapped = false;
-            ZIndex = 7;
+            Text = Info.Default;
+            Visible = false;
+            ZIndex = 6;
             Parent = PickOuter;
         });
 
-        -- gear icon (opens key popup)
+        -- gear icon button
         local GearBtn = Library:Create('ImageButton', {
             BackgroundTransparency = 1;
-            AnchorPoint = Vector2.new(1, 0.5);
-            Position = UDim2.new(1, -2, 0.5, 0);
-            Size = UDim2.new(0, 12, 0, 12);
+            Size = UDim2.new(1, 0, 1, 0);
             Image = 'rbxassetid://7059346386';
             ImageColor3 = Color3.fromRGB(160, 160, 160);
-            ZIndex = 8;
+            ZIndex = 7;
             Parent = PickOuter;
         });
 
@@ -1107,8 +1088,8 @@ do
         local KeyPopup = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
             BorderColor3 = Library.OutlineColor;
-            Position = UDim2.fromOffset(0, 0); -- set dynamically
-            Size = UDim2.new(0, 110, 0, 42);
+            Position = UDim2.fromOffset(0, 0);
+            Size = UDim2.new(0, 130, 0, 52);
             Visible = false;
             ZIndex = 50;
             Parent = ScreenGui;
@@ -1118,20 +1099,50 @@ do
             BorderColor3 = 'OutlineColor';
         });
 
-        local KeyPopupTitle = Library:CreateLabel({
-            Position = UDim2.new(0, 6, 0, 4);
+        -- title row: + icon + "create keybind"
+        local KeyPopupTitleRow = Library:Create('Frame', {
+            BackgroundTransparency = 1;
+            Position = UDim2.new(0, 6, 0, 5);
             Size = UDim2.new(1, -12, 0, 14);
-            TextSize = 12;
-            Text = 'create keybind';
-            TextXAlignment = Enum.TextXAlignment.Left;
             ZIndex = 51;
             Parent = KeyPopup;
         });
 
+        Library:Create('ImageLabel', {
+            BackgroundTransparency = 1;
+            Position = UDim2.new(0, 0, 0.5, -6);
+            Size = UDim2.new(0, 12, 0, 12);
+            Image = 'rbxassetid://1419621057';
+            ImageColor3 = Color3.fromRGB(160, 160, 160);
+            ZIndex = 52;
+            Parent = KeyPopupTitleRow;
+        });
+
+        Library:CreateLabel({
+            Position = UDim2.new(0, 15, 0, 0);
+            Size = UDim2.new(1, -15, 1, 0);
+            TextSize = 12;
+            Text = 'create keybind';
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = 52;
+            Parent = KeyPopupTitleRow;
+        });
+
+        -- divider
+        Library:Create('Frame', {
+            BackgroundColor3 = Library.OutlineColor;
+            BorderSizePixel = 0;
+            Position = UDim2.new(0, 0, 0, 22);
+            Size = UDim2.new(1, 0, 0, 1);
+            ZIndex = 51;
+            Parent = KeyPopup;
+        });
+
+        -- key row
         local KeyRowOuter = Library:Create('Frame', {
             BackgroundColor3 = Library.MainColor;
             BorderColor3 = Library.OutlineColor;
-            Position = UDim2.new(0, 6, 0, 20);
+            Position = UDim2.new(0, 6, 0, 28);
             Size = UDim2.new(1, -12, 0, 16);
             ZIndex = 51;
             Parent = KeyPopup;
@@ -1141,7 +1152,7 @@ do
             BorderColor3 = 'OutlineColor';
         });
 
-        local KeyRowLabel = Library:CreateLabel({
+        Library:CreateLabel({
             Position = UDim2.new(0, 4, 0, 0);
             Size = UDim2.new(0, 25, 1, 0);
             TextSize = 11;
@@ -1154,7 +1165,7 @@ do
         local KeyValueLabel = Library:CreateLabel({
             AnchorPoint = Vector2.new(1, 0.5);
             Position = UDim2.new(1, -4, 0.5, 0);
-            Size = UDim2.new(0, 55, 1, 0);
+            Size = UDim2.new(0, 70, 1, 0);
             TextSize = 11;
             Text = Info.Default;
             TextXAlignment = Enum.TextXAlignment.Right;
