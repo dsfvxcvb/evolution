@@ -44,6 +44,7 @@ local Library = {
 
     Signals = {};
     ScreenGui = ScreenGui;
+    SearchIndex = {};
 };
 
 local RainbowStep = 0
@@ -1975,6 +1976,7 @@ do
         setmetatable(Toggle, BaseAddons);
 
         Toggles[Idx] = Toggle;
+        table.insert(Library.SearchIndex, {Text = Info.Text, Idx = Idx, Type = 'Toggle', Tab = self._Tab, Groupbox = self});
 
         Library:UpdateDependencyBoxes();
 
@@ -2173,6 +2175,7 @@ do
         Groupbox:Resize();
 
         Options[Idx] = Slider;
+        table.insert(Library.SearchIndex, {Text = Info.Text, Idx = Idx, Type = 'Slider', Tab = self._Tab, Groupbox = self});
 
         return Slider;
     end;
@@ -2620,6 +2623,7 @@ do
         Groupbox:Resize();
 
         Options[Idx] = Dropdown;
+        table.insert(Library.SearchIndex, {Text = Info.Text, Idx = Idx, Type = 'Dropdown', Tab = self._Tab, Groupbox = self});
 
         return Dropdown;
     end;
@@ -3068,6 +3072,159 @@ function Library:CreateWindow(...)
         Parent = TabArea;
     });
 
+    -- ===== SEARCH BOX =====
+    local SearchBox = Library:Create('Frame', {
+        BackgroundColor3 = Library.BackgroundColor;
+        BorderColor3 = Library.OutlineColor;
+        Position = UDim2.new(1, -155, 0, 0);
+        Size = UDim2.new(0, 147, 1, 0);
+        ZIndex = 10;
+        Parent = MainSectionInner;
+    });
+    Library:AddToRegistry(SearchBox, {
+        BackgroundColor3 = 'BackgroundColor';
+        BorderColor3 = 'OutlineColor';
+    });
+
+    local SearchIcon = Library:Create('ImageLabel', {
+        BackgroundTransparency = 1;
+        Position = UDim2.new(0, 3, 0, 2);
+        Size = UDim2.new(0, 14, 0, 14);
+        Image = 'rbxassetid://2804603877';
+        ImageColor3 = Library.FontColor;
+        ZIndex = 11;
+        Parent = SearchBox;
+    });
+    Library:AddToRegistry(SearchIcon, {
+        ImageColor3 = 'FontColor';
+    });
+
+    local SearchInput = Library:Create('TextBox', {
+        BackgroundTransparency = 1;
+        Position = UDim2.new(0, 20, 0, 0);
+        Size = UDim2.new(1, -24, 1, 0);
+        Font = Library.Font;
+        PlaceholderText = 'Search..';
+        PlaceholderColor3 = Color3.fromRGB(120, 120, 120);
+        Text = '';
+        TextColor3 = Library.FontColor;
+        TextSize = 13;
+        TextXAlignment = Enum.TextXAlignment.Left;
+        ClearTextOnFocus = true;
+        ZIndex = 11;
+        Parent = SearchBox;
+    });
+    Library:AddToRegistry(SearchInput, {
+        TextColor3 = 'FontColor';
+    });
+
+    -- Dropdown results frame
+    local SearchDropdown = Library:Create('Frame', {
+        BackgroundColor3 = Library.BackgroundColor;
+        BorderColor3 = Library.OutlineColor;
+        Position = UDim2.new(1, -155, 0, 22);
+        Size = UDim2.new(0, 147, 0, 0);
+        ZIndex = 100;
+        Visible = false;
+        ClipsDescendants = true;
+        Parent = MainSectionInner;
+    });
+    Library:AddToRegistry(SearchDropdown, {
+        BackgroundColor3 = 'BackgroundColor';
+        BorderColor3 = 'OutlineColor';
+    });
+
+    Library:Create('UIListLayout', {
+        FillDirection = Enum.FillDirection.Vertical;
+        SortOrder = Enum.SortOrder.LayoutOrder;
+        Parent = SearchDropdown;
+    });
+
+    local function ClearSearchDropdown()
+        for _, child in ipairs(SearchDropdown:GetChildren()) do
+            if not child:IsA('UIListLayout') then child:Destroy() end
+        end
+        SearchDropdown.Visible = false
+        SearchDropdown.Size = UDim2.new(0, 147, 0, 0)
+    end
+
+    local function PopulateSearchDropdown(query)
+        ClearSearchDropdown()
+        if #query == 0 then return end
+        local q = query:lower()
+        local count = 0
+        for _, entry in ipairs(Library.SearchIndex) do
+            if entry.Text and entry.Text:lower():find(q, 1, true) then
+                local ResultBtn = Library:Create('TextButton', {
+                    BackgroundColor3 = Library.BackgroundColor;
+                    BorderSizePixel = 0;
+                    Size = UDim2.new(1, 0, 0, 18);
+                    Font = Library.Font;
+                    Text = '  ' .. entry.Text;
+                    TextColor3 = Library.FontColor;
+                    TextSize = 12;
+                    TextXAlignment = Enum.TextXAlignment.Left;
+                    ZIndex = 101;
+                    Parent = SearchDropdown;
+                });
+                Library:AddToRegistry(ResultBtn, {
+                    BackgroundColor3 = 'BackgroundColor';
+                    TextColor3 = 'FontColor';
+                });
+
+                local TypeLabel = Library:Create('TextLabel', {
+                    BackgroundTransparency = 1;
+                    Position = UDim2.new(1, -35, 0, 0);
+                    Size = UDim2.new(0, 32, 1, 0);
+                    Font = Library.Font;
+                    Text = entry.Type:sub(1,1);
+                    TextColor3 = Library.AccentColor;
+                    TextSize = 11;
+                    TextXAlignment = Enum.TextXAlignment.Right;
+                    ZIndex = 102;
+                    Parent = ResultBtn;
+                });
+                Library:AddToRegistry(TypeLabel, {
+                    TextColor3 = 'AccentColor';
+                });
+
+                local capturedEntry = entry
+                ResultBtn.MouseEnter:Connect(function()
+                    ResultBtn.BackgroundColor3 = Library.MainColor
+                end)
+                ResultBtn.MouseLeave:Connect(function()
+                    ResultBtn.BackgroundColor3 = Library.BackgroundColor
+                end)
+                ResultBtn.MouseButton1Click:Connect(function()
+                    -- navigate to the tab containing this element
+                    if capturedEntry.Tab then
+                        capturedEntry.Tab:ShowTab()
+                    end
+                    SearchInput.Text = ''
+                    ClearSearchDropdown()
+                end)
+
+                count = count + 1
+                if count >= 8 then break end
+            end
+        end
+        if count > 0 then
+            SearchDropdown.Visible = true
+            SearchDropdown.Size = UDim2.new(0, 147, 0, count * 18)
+        end
+    end
+
+    SearchInput:GetPropertyChangedSignal('Text'):Connect(function()
+        PopulateSearchDropdown(SearchInput.Text)
+    end)
+
+    SearchInput.FocusLost:Connect(function()
+        task.delay(0.15, function()
+            ClearSearchDropdown()
+        end)
+    end)
+    -- ===== END SEARCH BOX =====
+
     local TabContainer = Library:Create('Frame', {
         BackgroundColor3 = Library.MainColor;
         BorderColor3 = Library.OutlineColor;
@@ -3307,6 +3464,8 @@ function Library:CreateWindow(...)
             end;
 
             Groupbox.Container = Container;
+            Groupbox._Tab = Tab;
+            Groupbox._TabName = Name;
             setmetatable(Groupbox, BaseGroupbox);
 
             Groupbox:AddBlank(3);
