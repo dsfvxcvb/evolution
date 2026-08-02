@@ -1116,7 +1116,7 @@ local wasEnabled = getgenv().ForceHit and getgenv().ForceHit.Enabled
 if getgenv().ForceHit then
 getgenv().ForceHit.Enabled = true
 end
-pcall(function() getgenv().FH_Fire(target) end)
+pcall(function() if getgenv().FH_Fire then pcall(function() getgenv().FH_Fire(target) end) end end)
 if getgenv().ForceHit and wasEnabled ~= nil then
 -- If the user wants ForceHit on, don't let this temporary override turn it back off.
 getgenv().ForceHit.Enabled = useForcehit or wasEnabled
@@ -1558,7 +1558,7 @@ if timeSince < cooldown then
 return
 end
 if targetChar and getgenv().FH_Fire then
-pcall(function() getgenv().FH_Fire(target) end)
+pcall(function() if getgenv().FH_Fire then pcall(function() getgenv().FH_Fire(target) end) end end)
 else
 local tool = char:FindFirstChild("[DoubleBarrel]")
 if tool then
@@ -1601,10 +1601,9 @@ local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
 local savedCF = root.CFrame
 local savedVel = root.AssemblyLinearVelocity
 local savedCamOffset = hum and hum.CameraOffset
-pcall(function()
-    local rawCF = targetRoot.CFrame
-    local userId = target.UserId
-    local lastValid = AC.lastValid[userId]
+local rawCF = targetRoot.CFrame
+local userId = target.UserId
+local lastValid = AC.lastValid[userId]
 if lastValid then
     local delta = (rawCF.Position - lastValid.Position).Magnitude
     if delta > AC.MAX_DELTA then
@@ -1622,32 +1621,36 @@ if smooth then
         pcall(function() targetRoot.CFrame = rawCF end)
     end
 end
-    local offset, lookAt = AutoKill.GetAttachOffset()
-    if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
-        local angle = AutoKill.StandConfig.FormationAngle
-        local dist = 5 + (math.sin(angle * 7) + 1) * 2
-        local yOff = math.sin(angle * 3) * 1.5
-        offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
-        lookAt = true
-    end
-    if not lookAt then
-        root.CFrame = rawCF
-    else
-        local attachCF = rawCF * offset
-        root.CFrame = CFrame.lookAt(attachCF.Position, rawCF.Position)
-    end
+local offset, lookAt = AutoKill.GetAttachOffset()
+if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
+    local angle = AutoKill.StandConfig.FormationAngle
+    local dist = 5 + (math.sin(angle * 7) + 1) * 2
+    local yOff = math.sin(angle * 3) * 1.5
+    offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
+    lookAt = true
+end
+local targetCF
+if not lookAt then
+    targetCF = rawCF
+else
+    local attachCF = rawCF * offset
+    targetCF = CFrame.lookAt(attachCF.Position, rawCF.Position)
+end
+if getgenv().AutoKillSpoof then
+    -- move to target, offset camera so client doesn't see it, stab, restore
+    root.CFrame = targetCF
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
-    if getgenv().AutoKillSpoof and hum then hum.CameraOffset = savedCF.Position - root.Position end
-end)
-if getgenv().AutoKillSpoof then
-RunService.RenderStepped:Wait()
-end
-AutoKill.TryStab()
-if getgenv().AutoKillSpoof then
-root.CFrame = savedCF
-root.AssemblyLinearVelocity = savedVel
-if hum then hum.CameraOffset = savedCamOffset end
+    if hum then hum.CameraOffset = savedCF.Position - root.Position end
+    AutoKill.TryStab()
+    if hum then hum.CameraOffset = savedCamOffset end
+    root.CFrame = savedCF
+    root.AssemblyLinearVelocity = savedVel
+else
+    root.CFrame = targetCF
+    root.AssemblyLinearVelocity = Vector3.zero
+    root.AssemblyAngularVelocity = Vector3.zero
+    AutoKill.TryStab()
 end
 end
 function AutoKill.IsValidPlayer(player)
@@ -1921,9 +1924,9 @@ local savedCamOffset = hum and hum.CameraOffset
 root.CFrame = CFrame.new(platformPos)
 if hum then hum.CameraOffset = savedCF.Position - root.Position end
 RunService.RenderStepped:Wait()
+if hum then hum.CameraOffset = savedCamOffset end
 root.CFrame = savedCF
 root.AssemblyLinearVelocity = savedVel
-if hum then hum.CameraOffset = savedCamOffset end
 else
 root.CFrame = CFrame.new(platformPos)
 root.Velocity = Vector3.new(0, 0, 0)
@@ -1953,9 +1956,9 @@ local savedCamOffset = hum and hum.CameraOffset
 root.CFrame = CFrame.new(platformPos)
 if hum then hum.CameraOffset = savedCF.Position - root.Position end
 RunService.RenderStepped:Wait()
+if hum then hum.CameraOffset = savedCamOffset end
 root.CFrame = savedCF
 root.AssemblyLinearVelocity = savedVel
-if hum then hum.CameraOffset = savedCamOffset end
 else
 root.CFrame = CFrame.new(platformPos)
 root.Velocity = Vector3.new(0, 0, 0)
@@ -2068,15 +2071,15 @@ else
     targetCF = CFrame.lookAt(attachCF.Position, targetRoot.Position)
 end
 if getgenv().AutoKillSpoof then
-root.CFrame = targetCF
-if hum then hum.CameraOffset = savedCF.Position - root.Position end
-RunService.RenderStepped:Wait()
-root.CFrame = savedCF
-root.AssemblyLinearVelocity = savedVel
-if hum then hum.CameraOffset = savedCamOffset end
+    root.CFrame = targetCF
+    if hum then hum.CameraOffset = savedCF.Position - root.Position end
+    RunService.RenderStepped:Wait()
+    if hum then hum.CameraOffset = savedCamOffset end
+    root.CFrame = savedCF
+    root.AssemblyLinearVelocity = savedVel
 else
-root.CFrame = targetCF
-root.Velocity = Vector3.new(0, 0, 0)
+    root.CFrame = targetCF
+    root.Velocity = Vector3.new(0, 0, 0)
 end
 end
 function AutoKill.AutoStomp(target)
@@ -2304,7 +2307,7 @@ end
 -- One last forcefield check right before the shot
 local stillHasField = target.Character and AutoKill.HasForceField(target.Character)
 if not stillHasField then
-getgenv().FH_Fire(target)
+if getgenv().FH_Fire then pcall(function() getgenv().FH_Fire(target) end) end
 end
 local waitTime = cooldown - (tick() - (getgenv().ForceHit.LastShotTime or 0))
 if waitTime > 0.02 then
