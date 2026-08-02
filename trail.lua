@@ -1,19 +1,17 @@
--- Trail + Indicator Outline Addon for evolution
+-- Trail Addon for evolution
 -- Run AFTER use_kimi.txt has loaded
 
 if not getgenv().Tabs then
-    warn("[Addon] Tabs global not found")
+    warn("[Trail Addon] Tabs global not found - make sure use_kimi.txt loaded first")
     return
 end
 
--- =============================================
--- TRAIL
--- =============================================
 local VisualsTrail = getgenv().Tabs.Visuals:AddRightGroupbox("Trail")
 
 local _trailAtt0, _trailAtt1, _trailMain, _trailGlow
 local _trailWidth = 0.07
 local _trailHeight = 0.2
+local _trailLifetime = 1.2
 
 local function _destroyTrail()
     if _trailMain then _trailMain:Destroy() _trailMain = nil end
@@ -21,7 +19,6 @@ local function _destroyTrail()
     if _trailAtt0 then _trailAtt0:Destroy() _trailAtt0 = nil end
     if _trailAtt1 then _trailAtt1:Destroy() _trailAtt1 = nil end
 end
-print("outline")
 
 local function _buildTrail(char)
     _destroyTrail()
@@ -39,12 +36,11 @@ local function _buildTrail(char)
     local c1 = Options.TrailColorBeginning and Options.TrailColorBeginning.Value or Color3.fromRGB(0, 255, 255)
     local c2 = Options.TrailColorMiddle and Options.TrailColorMiddle.Value or Color3.fromRGB(0, 200, 255)
     local c3 = Options.TrailColorEnd and Options.TrailColorEnd.Value or Color3.fromRGB(0, 100, 255)
-    local lt = Options.TrailLifetime and Options.TrailLifetime.Value or 1.2
 
     _trailMain = Instance.new("Trail")
     _trailMain.Attachment0 = _trailAtt0
     _trailMain.Attachment1 = _trailAtt1
-    _trailMain.Lifetime = lt
+    _trailMain.Lifetime = _trailLifetime
     _trailMain.MinLength = 0
     _trailMain.FaceCamera = true
     _trailMain.LightEmission = 1
@@ -69,7 +65,7 @@ local function _buildTrail(char)
     _trailGlow = Instance.new("Trail")
     _trailGlow.Attachment0 = _trailAtt0
     _trailGlow.Attachment1 = _trailAtt1
-    _trailGlow.Lifetime = lt
+    _trailGlow.Lifetime = _trailLifetime
     _trailGlow.MinLength = 0
     _trailGlow.FaceCamera = true
     _trailGlow.LightEmission = 1
@@ -132,6 +128,21 @@ VisualsTrail:AddToggle('TrailUse', {
     Callback = function() _refreshTrail() end
 })
 
+VisualsTrail:AddDropdown('TrailLifetime', {
+    Text = 'Lifetime',
+    Values = {'Short', 'Normal', 'Long', 'Very Long'},
+    Default = 'Normal',
+    Callback = function(Value)
+        if Value == 'Short' then _trailLifetime = 0.4
+        elseif Value == 'Normal' then _trailLifetime = 1.2
+        elseif Value == 'Long' then _trailLifetime = 2.5
+        elseif Value == 'Very Long' then _trailLifetime = 5
+        end
+        if _trailMain then _trailMain.Lifetime = _trailLifetime end
+        if _trailGlow then _trailGlow.Lifetime = _trailLifetime end
+    end
+})
+
 VisualsTrail:AddDropdown('TrailWidth', {
     Text = 'Width',
     Values = {'Thin', 'Normal', 'Wide', 'Thick'},
@@ -173,91 +184,4 @@ VisualsTrail:AddDropdown('TrailHeight', {
     end
 })
 
-VisualsTrail:AddSlider('TrailLifetime', {
-    Text = 'Lifetime',
-    Min = 0.1,
-    Max = 5,
-    Default = 1.2,
-    Rounding = 1,
-    Callback = function(Value)
-        if _trailMain then _trailMain.Lifetime = Value end
-        if _trailGlow then _trailGlow.Lifetime = Value end
-    end
-})
-
--- =============================================
--- INDICATOR OUTLINE COLOR
--- Adds an "Outline Color" picker to the Combat
--- Target Indicators section and wires it to a
--- UIStroke on the indicator frame
--- =============================================
-local _indicatorStroke = nil
-
-local function _applyOutlineColor(color)
-    getgenv().TargetUIBorderColor = color
-    getgenv().TargetUIGlowColor = color
-    -- update the live OuterBorder if indicator is already open
-    if Library and Library._targetUIOuterBorder then
-        Library._targetUIOuterBorder.BackgroundColor3 = color
-    end
-    if Library and Library._targetUITopBar then
-        Library._targetUITopBar.BackgroundColor3 = color
-    end
-    if Library and Library._targetUIGlow then
-        if Library._targetUIGlow.ImageColor3 ~= nil then
-            Library._targetUIGlow.ImageColor3 = color
-        else
-            -- modern style glow holder (frames)
-            for _, child in ipairs(Library._targetUIGlow:GetChildren()) do
-                if child:IsA("Frame") then
-                    child.BackgroundColor3 = color
-                end
-            end
-        end
-    end
-    if _indicatorStroke then
-        _indicatorStroke.Color = color
-    end
-end
-
--- inject UIStroke once indicator is created
-task.spawn(function()
-    -- wait for the indicator to be built (it's created when targetui() is called)
-    local timeout = tick() + 15
-    repeat task.wait(0.5) until (Library and Library._targetUIInstance) or tick() > timeout
-
-    local ui = Library and Library._targetUIInstance
-    if not ui then return end
-
-    local mainFrame = ui:FindFirstChildOfClass("Frame")
-    if not mainFrame then return end
-
-    -- add UIStroke for clean outline
-    _indicatorStroke = Instance.new("UIStroke")
-    _indicatorStroke.Color = getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
-    _indicatorStroke.Thickness = 1.5
-    _indicatorStroke.Transparency = 0
-    _indicatorStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    _indicatorStroke.Parent = mainFrame
-
-    -- hide old OuterBorder (replaced by UIStroke)
-    if Library._targetUIOuterBorder then
-        Library._targetUIOuterBorder.BackgroundTransparency = 1
-    end
-end)
-
--- Add Outline Color picker to Combat > Target Indicators
-local CombatTargetIndicators = getgenv().Tabs and getgenv().Tabs.Combat
-if CombatTargetIndicators then
-    -- AddRightGroupbox so it appears on the right side of Combat tab
-    local OutlineGroup = getgenv().Tabs.Combat:AddRightGroupbox("Indicator Outline")
-    OutlineGroup:AddLabel("Outline Color"):AddColorPicker('IndicatorOutlineColor', {
-        Title = 'Outline Color',
-        Default = Color3.fromRGB(27, 206, 203),
-        Callback = function(Value)
-            _applyOutlineColor(Value)
-        end
-    })
-end
-
-print("[Addon] Trail + Indicator Outline loaded")
+print("[Trail Addon] Loaded")
