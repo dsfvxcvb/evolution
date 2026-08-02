@@ -3073,14 +3073,15 @@ function Library:CreateWindow(...)
     });
 
     -- ===== SEARCH BOX =====
-    -- Sits in TabArea just like a tab button
+    -- Anchored to far right of tab bar, same height as tabs
     local SearchBox = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
-        Size = UDim2.new(0, 110, 1, 0);
-        LayoutOrder = 9999;
+        AnchorPoint = Vector2.new(1, 0);
+        Position = UDim2.new(1, -8, 0, 8);
+        Size = UDim2.new(0, 115, 0, 21);
         ZIndex = 10;
-        Parent = TabArea;
+        Parent = MainSectionInner;
     });
     Library:AddToRegistry(SearchBox, {
         BackgroundColor3 = 'BackgroundColor';
@@ -3119,13 +3120,14 @@ function Library:CreateWindow(...)
         TextColor3 = 'FontColor';
     });
 
-    -- Dropdown anchored below the tab area
+    -- Dropdown directly below search box
     local SearchDropdown = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
-        Position = UDim2.new(1, -118, 0, 30);
-        Size = UDim2.new(0, 110, 0, 0);
-        ZIndex = 100;
+        AnchorPoint = Vector2.new(1, 0);
+        Position = UDim2.new(1, -8, 0, 30);
+        Size = UDim2.new(0, 115, 0, 0);
+        ZIndex = 200;
         Visible = false;
         ClipsDescendants = true;
         Parent = MainSectionInner;
@@ -3165,28 +3167,12 @@ function Library:CreateWindow(...)
                     TextColor3 = Library.FontColor;
                     TextSize = 12;
                     TextXAlignment = Enum.TextXAlignment.Left;
-                    ZIndex = 101;
+                    ZIndex = 201;
                     Parent = SearchDropdown;
                 });
                 Library:AddToRegistry(ResultBtn, {
                     BackgroundColor3 = 'BackgroundColor';
                     TextColor3 = 'FontColor';
-                });
-
-                local TypeLabel = Library:Create('TextLabel', {
-                    BackgroundTransparency = 1;
-                    Position = UDim2.new(1, -35, 0, 0);
-                    Size = UDim2.new(0, 32, 1, 0);
-                    Font = Library.Font;
-                    Text = entry.Type:sub(1,1);
-                    TextColor3 = Library.AccentColor;
-                    TextSize = 11;
-                    TextXAlignment = Enum.TextXAlignment.Right;
-                    ZIndex = 102;
-                    Parent = ResultBtn;
-                });
-                Library:AddToRegistry(TypeLabel, {
-                    TextColor3 = 'AccentColor';
                 });
 
                 local capturedEntry = entry
@@ -3197,10 +3183,27 @@ function Library:CreateWindow(...)
                     ResultBtn.BackgroundColor3 = Library.BackgroundColor
                 end)
                 ResultBtn.MouseButton1Click:Connect(function()
-                    -- navigate to the tab containing this element
-                    if capturedEntry.Tab then
-                        capturedEntry.Tab:ShowTab()
+                    local e = capturedEntry
+                    -- switch to the right tab
+                    if e.Tab then
+                        e.Tab:ShowTab()
                     end
+                    -- scroll to element
+                    task.delay(0.05, function()
+                        local gb = e.Groupbox
+                        if gb and gb._Tab then
+                            local side = gb._Side
+                            local scrollFrame = side == 2 and gb._Tab._RightSide or gb._Tab._LeftSide
+                            if scrollFrame and gb.Container then
+                                -- find the groupbox outer frame position
+                                local boxOuter = gb.Container.Parent and gb.Container.Parent.Parent
+                                if boxOuter then
+                                    local pos = boxOuter.Position.Y.Offset
+                                    scrollFrame.CanvasPosition = Vector2.new(0, math.max(0, pos - 10))
+                                end
+                            end
+                        end
+                    end)
                     SearchInput.Text = ''
                     ClearSearchDropdown()
                 end)
@@ -3338,6 +3341,9 @@ function Library:CreateWindow(...)
             Parent = TabFrame;
         });
 
+        Tab._LeftSide = LeftSide;
+        Tab._RightSide = RightSide;
+
         Library:Create('UIListLayout', {
             Padding = UDim.new(0, 8);
             FillDirection = Enum.FillDirection.Vertical;
@@ -3466,7 +3472,8 @@ function Library:CreateWindow(...)
 
             Groupbox.Container = Container;
             Groupbox._Tab = Tab;
-            Groupbox._TabName = Name;
+            Groupbox._TabName = Info.Name;
+            Groupbox._Side = Info.Side;
             setmetatable(Groupbox, BaseGroupbox);
 
             Groupbox:AddBlank(3);
