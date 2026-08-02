@@ -8,6 +8,7 @@ local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
+print("testing delete now")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
