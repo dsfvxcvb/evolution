@@ -2,6 +2,7 @@
 -- MAIN SCRIPT
 -- ============================================
 print("bro")
+print("sososso")
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
 pcall(function() Library:Unload() end)
 end
