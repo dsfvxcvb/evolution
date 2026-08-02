@@ -8,7 +8,6 @@ local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
-print("fat lard")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
@@ -3075,13 +3074,14 @@ function Library:CreateWindow(...)
     });
 
     -- ===== SEARCH BOX =====
-    -- Anchored to far right of tab bar, same height as tabs
+    local SearchBoxWidth = 115
+
     local SearchBox = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
         AnchorPoint = Vector2.new(1, 0);
         Position = UDim2.new(1, -8, 0, 8);
-        Size = UDim2.new(0, 115, 0, 21);
+        Size = UDim2.new(0, SearchBoxWidth, 0, 21);
         ZIndex = 10;
         Parent = MainSectionInner;
     });
@@ -3090,7 +3090,7 @@ function Library:CreateWindow(...)
         BorderColor3 = 'OutlineColor';
     });
 
-    local SearchIcon = Library:Create('ImageLabel', {
+    Library:Create('ImageLabel', {
         BackgroundTransparency = 1;
         Position = UDim2.new(0, 3, 0.5, -8);
         Size = UDim2.new(0, 16, 0, 16);
@@ -3102,8 +3102,8 @@ function Library:CreateWindow(...)
 
     local SearchInput = Library:Create('TextBox', {
         BackgroundTransparency = 1;
-        Position = UDim2.new(0, 20, 0, 0);
-        Size = UDim2.new(1, -22, 1, 0);
+        Position = UDim2.new(0, 22, 0, 0);
+        Size = UDim2.new(1, -24, 1, 0);
         Font = Library.Font;
         PlaceholderText = 'Search..';
         PlaceholderColor3 = Color3.fromRGB(120, 120, 120);
@@ -3115,17 +3115,15 @@ function Library:CreateWindow(...)
         ZIndex = 11;
         Parent = SearchBox;
     });
-    Library:AddToRegistry(SearchInput, {
-        TextColor3 = 'FontColor';
-    });
+    Library:AddToRegistry(SearchInput, { TextColor3 = 'FontColor' });
 
-    -- Dropdown directly below search box
+    -- Dropdown same width as search box, directly below it
     local SearchDropdown = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
         AnchorPoint = Vector2.new(1, 0);
         Position = UDim2.new(1, -8, 0, 30);
-        Size = UDim2.new(0, 115, 0, 0);
+        Size = UDim2.new(0, SearchBoxWidth, 0, 0);
         ZIndex = 200;
         Visible = false;
         ClipsDescendants = true;
@@ -3146,8 +3144,26 @@ function Library:CreateWindow(...)
         for _, child in ipairs(SearchDropdown:GetChildren()) do
             if not child:IsA('UIListLayout') then child:Destroy() end
         end
-        SearchDropdown.Visible = false
-        SearchDropdown.Size = UDim2.new(0, 147, 0, 0)
+        SearchDropdown.Visible = false;
+        SearchDropdown.Size = UDim2.new(0, SearchBoxWidth, 0, 0);
+    end
+
+    local function DoHighlight(frame)
+        if not frame then return end
+        local origColor = frame.BackgroundColor3
+        local highlight = Color3.fromRGB(0, 85, 255)
+        local startTime = tick()
+        local conn
+        conn = RenderStepped:Connect(function()
+            local elapsed = tick() - startTime
+            if elapsed >= 2 then
+                pcall(function() frame.BackgroundColor3 = origColor end)
+                conn:Disconnect()
+                return
+            end
+            local t = (math.sin(elapsed * math.pi * 3) + 1) / 2
+            pcall(function() frame.BackgroundColor3 = origColor:Lerp(highlight, t * 0.55) end)
+        end)
     end
 
     local function PopulateSearchDropdown(query)
@@ -3155,6 +3171,7 @@ function Library:CreateWindow(...)
         if #query == 0 then return end
         local q = query:lower()
         local count = 0
+
         for _, entry in ipairs(Library.SearchIndex) do
             if entry.Text and entry.Text:lower():find(q, 1, true) then
                 local ResultBtn = Library:Create('TextButton', {
@@ -3167,6 +3184,7 @@ function Library:CreateWindow(...)
                     TextSize = 12;
                     TextXAlignment = Enum.TextXAlignment.Left;
                     ZIndex = 201;
+                    ClipsDescendants = true;
                     Parent = SearchDropdown;
                 });
                 Library:AddToRegistry(ResultBtn, {
@@ -3185,50 +3203,32 @@ function Library:CreateWindow(...)
                     local e = capturedEntry
                     SearchInput.Text = ''
                     ClearSearchDropdown()
-                    -- switch to the right tab
                     if e.Tab then e.Tab:ShowTab() end
-                    task.delay(0.08, function()
+                    task.delay(0.1, function()
                         local gb = e.Groupbox
                         local frame = e.GetFrame and e.GetFrame()
-                        -- scroll so element is visible
                         if gb and frame then
                             local side = gb._Side
                             local scrollFrame = side == 2 and gb._Tab._RightSide or gb._Tab._LeftSide
                             if scrollFrame then
-                                -- AbsolutePosition relative to scrollFrame
                                 local frameAbs = frame.AbsolutePosition.Y
                                 local scrollAbs = scrollFrame.AbsolutePosition.Y
                                 local relY = frameAbs - scrollAbs + scrollFrame.CanvasPosition.Y
                                 scrollFrame.CanvasPosition = Vector2.new(0, math.max(0, relY - 20))
                             end
                         end
-                        -- pulse highlight: flash background of frame and label for 2 seconds
-                        if frame then
-                            local origColor = frame.BackgroundColor3
-                            local highlight = Color3.fromRGB(0, 85, 255)
-                            local pulseConn
-                            local startTime = tick()
-                            pulseConn = RenderStepped:Connect(function()
-                                local elapsed = tick() - startTime
-                                if elapsed >= 2 then
-                                    frame.BackgroundColor3 = origColor
-                                    pulseConn:Disconnect()
-                                    return
-                                end
-                                local t = (math.sin(elapsed * math.pi * 3) + 1) / 2
-                                frame.BackgroundColor3 = origColor:Lerp(highlight, t * 0.5)
-                            end)
-                        end
+                        DoHighlight(frame)
                     end)
                 end)
 
                 count = count + 1
-                if count >= 8 then break end
+                if count >= 10 then break end
             end
         end
+
         if count > 0 then
             SearchDropdown.Visible = true
-            SearchDropdown.Size = UDim2.new(0, 147, 0, count * 18)
+            SearchDropdown.Size = UDim2.new(0, SearchBoxWidth, 0, count * 18)
         end
     end
 
@@ -3239,6 +3239,7 @@ function Library:CreateWindow(...)
     SearchInput.FocusLost:Connect(function()
         task.delay(0.15, function()
             ClearSearchDropdown()
+            SearchInput.Text = ''
         end)
     end)
     -- ===== END SEARCH BOX =====
@@ -3489,6 +3490,16 @@ function Library:CreateWindow(...)
             Groupbox._TabName = Info.Name;
             Groupbox._Side = Info.Side;
             setmetatable(Groupbox, BaseGroupbox);
+            -- register groupbox name in search index
+            local capturedBoxOuter = BoxOuter
+            table.insert(Library.SearchIndex, {
+                Text = Info.Name;
+                Type = 'Section';
+                Tab = Tab;
+                Groupbox = Groupbox;
+                GetFrame = function() return capturedBoxOuter end;
+                GetLabel = nil;
+            });
 
             Groupbox:AddBlank(3);
             Groupbox:Resize();
