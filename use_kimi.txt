@@ -2,7 +2,6 @@
 -- MAIN SCRIPT
 -- ============================================
 print("bro")
-print("trailer nigga")
 print("sososso")
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
 pcall(function() Library:Unload() end)
@@ -12508,4 +12507,4 @@ SaveManager:LoadAutoloadConfig()
 if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then
 Toggles.KnifeHitboxToggle:SetValue(true)
 end
-print("accent line")
+print("accent liner ass nigga")
