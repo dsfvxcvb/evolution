@@ -4861,6 +4861,12 @@ Title = "Glow Color",
 Default = Color3.fromRGB(27, 206, 203),
 Callback = function(Value)
 getgenv().TargetUIGlowColor = Value
+if getgenv()._indicatorUIStroke then
+    getgenv()._indicatorUIStroke.Color = Value
+end
+if Library._targetUITopBar then
+    Library._targetUITopBar.BackgroundColor3 = Value
+end
 if Library._targetUIGlow then
 if Library._targetUIGlow:IsA("ImageLabel") then
 Library._targetUIGlow.ImageColor3 = Value
