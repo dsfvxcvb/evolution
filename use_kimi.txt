@@ -1553,7 +1553,7 @@ local cooldown = 0.4
 if getgenv().FH_GetWeaponCooldown then
 cooldown = getgenv().FH_GetWeaponCooldown()
 end
-local timeSince = tick() - (getgenv().ForceHit.LastShotTime or 0)
+local timeSince = tick() - (getgenv().ForceHit and getgenv().ForceHit.LastShotTime or 0)
 if timeSince < cooldown then
 return
 end
@@ -1597,10 +1597,11 @@ if can1 then pcall(function() can1.Value = targetChar end) end
 if can2 then pcall(function() can2.Value = targetChar end) end
 end
 end
+local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
+local savedCF = root.CFrame
+local savedVel = root.AssemblyLinearVelocity
+local savedCamOffset = hum and hum.CameraOffset
 pcall(function()
-    sethiddenproperty(root, "PhysicsRepRootPart", targetRoot)
-
-    -- Use anti-connection resistant position from Script 2's tables
     local rawCF = targetRoot.CFrame
     local userId = target.UserId
     local lastValid = AC.lastValid[userId]
@@ -1621,7 +1622,6 @@ if smooth then
         pcall(function() targetRoot.CFrame = rawCF end)
     end
 end
-
     local offset, lookAt = AutoKill.GetAttachOffset()
     if AutoKill.StandConfig and AutoKill.StandConfig.Enabled and AutoKill.StandConfig.FormationMode == "surround" then
         local angle = AutoKill.StandConfig.FormationAngle
@@ -1630,7 +1630,6 @@ end
         offset = CFrame.new(math.sin(angle) * dist, yOff, math.cos(angle) * dist)
         lookAt = true
     end
-
     if not lookAt then
         root.CFrame = rawCF
     else
@@ -1639,8 +1638,17 @@ end
     end
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
+    if getgenv().AutoKillSpoof and hum then hum.CameraOffset = savedCF.Position - root.Position end
 end)
+if getgenv().AutoKillSpoof then
+RunService.RenderStepped:Wait()
+end
 AutoKill.TryStab()
+if getgenv().AutoKillSpoof then
+root.CFrame = savedCF
+root.AssemblyLinearVelocity = savedVel
+if hum then hum.CameraOffset = savedCamOffset end
+end
 end
 function AutoKill.IsValidPlayer(player)
 if not player or player == LocalPlayer then return false end
@@ -1903,11 +1911,24 @@ local char = LocalPlayer.Character
 if not char then return end
 local root = char:FindFirstChild("HumanoidRootPart")
 if not root then return end
+local hum = char:FindFirstChildOfClass("Humanoid")
 AutoKill.CreateVoidPlatform()
 local platformPos = AutoKill.GunMethod.VoidPosition + Vector3.new(0, 5, 0)
+if getgenv().AutoKillSpoof then
+local savedCF = root.CFrame
+local savedVel = root.AssemblyLinearVelocity
+local savedCamOffset = hum and hum.CameraOffset
+root.CFrame = CFrame.new(platformPos)
+if hum then hum.CameraOffset = savedCF.Position - root.Position end
+RunService.RenderStepped:Wait()
+root.CFrame = savedCF
+root.AssemblyLinearVelocity = savedVel
+if hum then hum.CameraOffset = savedCamOffset end
+else
 root.CFrame = CFrame.new(platformPos)
 root.Velocity = Vector3.new(0, 0, 0)
 root.RotVelocity = Vector3.new(0, 0, 0)
+end
 for _, part in pairs(char:GetDescendants()) do
 if part:IsA("BasePart") then
 if part:GetAttribute("AutoKill_OriginalLTM") == nil then
@@ -1923,10 +1944,23 @@ local char = LocalPlayer.Character
 if not char then return end
 local root = char:FindFirstChild("HumanoidRootPart")
 if not root then return end
+local hum = char:FindFirstChildOfClass("Humanoid")
 local platformPos = AutoKill.GunMethod.VoidPosition + Vector3.new(0, 5, 0)
+if getgenv().AutoKillSpoof then
+local savedCF = root.CFrame
+local savedVel = root.AssemblyLinearVelocity
+local savedCamOffset = hum and hum.CameraOffset
+root.CFrame = CFrame.new(platformPos)
+if hum then hum.CameraOffset = savedCF.Position - root.Position end
+RunService.RenderStepped:Wait()
+root.CFrame = savedCF
+root.AssemblyLinearVelocity = savedVel
+if hum then hum.CameraOffset = savedCamOffset end
+else
 root.CFrame = CFrame.new(platformPos)
 root.Velocity = Vector3.new(0, 0, 0)
 root.RotVelocity = Vector3.new(0, 0, 0)
+end
 end
 function AutoKill.UnhideCharacter()
 local char = LocalPlayer.Character
@@ -2020,15 +2054,30 @@ local targetChar = target.Character
 if not targetChar then return end
 local targetRoot = targetChar:FindFirstChild("HumanoidRootPart")
 if not targetRoot then return end
+local hum = char:FindFirstChildOfClass("Humanoid")
 AutoKill.UnhideCharacter()
+local savedCF = root.CFrame
+local savedVel = root.AssemblyLinearVelocity
+local savedCamOffset = hum and hum.CameraOffset
 local offset, lookAt = AutoKill.GetAttachOffset()
+local targetCF
 if not lookAt then
-root.CFrame = targetRoot.CFrame
+    targetCF = targetRoot.CFrame
 else
-local attachCF = targetRoot.CFrame * offset
-root.CFrame = CFrame.lookAt(attachCF.Position, targetRoot.Position)
+    local attachCF = targetRoot.CFrame * offset
+    targetCF = CFrame.lookAt(attachCF.Position, targetRoot.Position)
 end
+if getgenv().AutoKillSpoof then
+root.CFrame = targetCF
+if hum then hum.CameraOffset = savedCF.Position - root.Position end
+RunService.RenderStepped:Wait()
+root.CFrame = savedCF
+root.AssemblyLinearVelocity = savedVel
+if hum then hum.CameraOffset = savedCamOffset end
+else
+root.CFrame = targetCF
 root.Velocity = Vector3.new(0, 0, 0)
+end
 end
 function AutoKill.AutoStomp(target)
 local state = getgenv().AutoStompState
@@ -2243,7 +2292,7 @@ local cooldown = 0.4
 if getgenv().FH_GetWeaponCooldown then
 cooldown = getgenv().FH_GetWeaponCooldown()
 end
-local timeSince = tick() - (getgenv().ForceHit.LastShotTime or 0)
+local timeSince = tick() - (getgenv().ForceHit and getgenv().ForceHit.LastShotTime or 0)
 local canFire = timeSince >= cooldown
 if canFire then
 local currentTime = tick()
@@ -2467,26 +2516,31 @@ Callback = function(Value)
 AutoKill.KnifeExpander.OutlineColor = Value
 end
 })
-CombatAutoKill:AddDropdown('AutoKillPlatformMaterial', {
-    Text = "Platform Material",
-    Values = {"Neon", "ForceField", "Glass", "SmoothPlastic", "Wood", "Metal", "Foil", "Granite", "Marble", "Fabric"},
-    Default = "Neon",
-    Callback = function(Value)
-        AutoKill.GunMethod.PlatformMaterial = Enum.Material[Value]
-        if AutoKill.GunMethod.PlatformPart then
-            AutoKill.GunMethod.PlatformPart.Material = Enum.Material[Value]
-        end
-    end
+CombatAutoKill:AddToggle('AutoKillCustomPlatform', {
+Text = "Custom Platform",
+Default = true,
+Callback = function(Value)
+end
+}):AddColorPicker('AutoKillPlatformColor', {
+Title = "Platform Color",
+Default = Color3.fromRGB(255, 0, 255),
+Callback = function(Value)
+AutoKill.GunMethod.PlatformColor = Value
+if AutoKill.GunMethod.PlatformPart then
+AutoKill.GunMethod.PlatformPart.Color = Value
+end
+end
 })
-CombatAutoKill:AddLabel('Platform Color'):AddColorPicker('AutoKillPlatformColor', {
-    Title = "Platform Color",
-    Default = Color3.fromRGB(255, 0, 255),
-    Callback = function(Value)
-        AutoKill.GunMethod.PlatformColor = Value
-        if AutoKill.GunMethod.PlatformPart then
-            AutoKill.GunMethod.PlatformPart.Color = Value
-        end
-    end
+CombatAutoKill:AddDropdown('AutoKillPlatformMaterial', {
+Text = "Platform Material",
+Values = {"Neon", "ForceField", "Glass", "SmoothPlastic", "Wood", "Metal", "Foil", "Granite", "Marble", "Fabric"},
+Default = "Neon",
+Callback = function(Value)
+AutoKill.GunMethod.PlatformMaterial = Enum.Material[Value]
+if AutoKill.GunMethod.PlatformPart then
+AutoKill.GunMethod.PlatformPart.Material = Enum.Material[Value]
+end
+end
 })
 CombatAutoKill:AddToggle('SpectateAutoKillTarget', {
     Text = "Spectate Target",
@@ -2512,6 +2566,14 @@ RunService.RenderStepped:Connect(function()
         if hum then workspace.CurrentCamera.CameraSubject = hum end
     end
 end)
+
+CombatAutoKill:AddToggle('AutoKillSpoof', {
+    Text = "Spoof",
+    Default = false,
+    Callback = function(Value)
+        getgenv().AutoKillSpoof = Value
+    end
+})
 
 getgenv().CombatAutoKill = CombatAutoKill
 getgenv().AutoKill = AutoKill
@@ -5265,8 +5327,9 @@ RunService.RenderStepped:Wait()
 hrp.CFrame = saved_desync
 else
 bodyClone:SetPrimaryPartCFrame(CFrame.new(9999,9999,9999))
-if TargetStrafeConfig.Indicator and saved_desync then
-updateIndicator(saved_desync.Position, dt)
+-- Show indicator at server position even when not strafing
+if TargetStrafeConfig.Indicator and hrp then
+updateIndicator(hrp.CFrame.Position, dt)
 else
 updateIndicator(nil)
 end
@@ -5274,8 +5337,8 @@ disableHook()
 end
 else
 bodyClone:SetPrimaryPartCFrame(CFrame.new(9999,9999,9999))
-if TargetStrafeConfig.Indicator and saved_desync then
-updateIndicator(saved_desync.Position, dt)
+if TargetStrafeConfig.Indicator and hrp then
+updateIndicator(hrp.CFrame.Position, dt)
 else
 updateIndicator(nil)
 end
