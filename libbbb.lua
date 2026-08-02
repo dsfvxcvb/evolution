@@ -8,7 +8,6 @@ local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
-print("dutch baby")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
@@ -3208,8 +3207,7 @@ function Library:CreateWindow(...)
                             local highlight = Color3.fromRGB(0, 85, 255)
                             local pulseConn
                             local startTime = tick()
-                            local bright = true
-                            pulseConn = game:GetService("RunService").Heartbeat:Connect(function()
+                            pulseConn = RenderStepped:Connect(function()
                                 local elapsed = tick() - startTime
                                 if elapsed >= 2 then
                                     frame.BackgroundColor3 = origColor
