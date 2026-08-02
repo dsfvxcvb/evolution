@@ -1225,11 +1225,12 @@ do
         local function AnimHeight(targetH)
             local startH = KeyPopup.Size.Y.Offset
             local s = tick(); local dur = 0.14
-            local c; c = RenderStepped:Connect(function()
+            local conn
+            conn = RenderStepped:Connect(function()
                 local t = math.min((tick()-s)/dur, 1)
                 local e = 1-(1-t)^3
                 KeyPopup.Size = UDim2.new(0,130,0, math.floor(startH+(targetH-startH)*e))
-                if t>=1 then KeyPopup.Size=UDim2.new(0,130,0,targetH) c:Disconnect() end
+                if t>=1 then KeyPopup.Size=UDim2.new(0,130,0,targetH) conn:Disconnect() end
             end)
         end
 
@@ -1267,14 +1268,15 @@ do
             end
             local startH = KeyPopup.Size.Y.Offset
             local s = tick(); local dur = 0.1
-            local c; c = RenderStepped:Connect(function()
+            local conn
+            conn = RenderStepped:Connect(function()
                 local t = math.min((tick()-s)/dur, 1)
                 local e = 1-(1-t)^3
                 KeyPopup.Size = UDim2.new(0,130,0, math.floor(startH*(1-e)))
                 if t>=1 then
                     KeyPopup.Visible = false
                     KeyPopup.Size = UDim2.new(0,130,0,0)
-                    c:Disconnect()
+                    conn:Disconnect()
                 end
             end)
         end
@@ -1288,11 +1290,12 @@ do
             local targetH = CalcPopupH() + 20
             AnimHeight(targetH)
             local s = tick(); local dur = 0.14
-            local c; c = RenderStepped:Connect(function()
+            local conn2
+            conn2 = RenderStepped:Connect(function()
                 local t = math.min((tick()-s)/dur, 1)
                 local e = 1-(1-t)^3
                 KeyRowOuter.Size = UDim2.new(1,-12,0, math.floor(16*e))
-                if t>=1 then KeyRowOuter.Size=UDim2.new(1,-12,0,16) c:Disconnect() end
+                if t>=1 then KeyRowOuter.Size=UDim2.new(1,-12,0,16) conn2:Disconnect() end
             end)
         end
 
@@ -4132,4 +4135,3 @@ Players.PlayerRemoving:Connect(OnPlayerChange);
 
 getgenv().Library = Library
 return Library
-print("bro this shit better work")
