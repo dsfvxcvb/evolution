@@ -8,7 +8,6 @@ local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
-print("search")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
@@ -1976,8 +1975,9 @@ do
         Toggle.Container = Container;
         setmetatable(Toggle, BaseAddons);
 
+        Toggle.OuterFrame = ToggleOuter;
         Toggles[Idx] = Toggle;
-        table.insert(Library.SearchIndex, {Text = Info.Text, Idx = Idx, Type = 'Toggle', Tab = self._Tab, Groupbox = self});
+        table.insert(Library.SearchIndex, {Text = Info.Text, Idx = Idx, Type = 'Toggle', Tab = self._Tab, Groupbox = self, GetFrame = function() return ToggleOuter end, GetLabel = function() return ToggleLabel end});
 
         Library:UpdateDependencyBoxes();
 
@@ -2176,7 +2176,7 @@ do
         Groupbox:Resize();
 
         Options[Idx] = Slider;
-        table.insert(Library.SearchIndex, {Text = Info.Text, Idx = Idx, Type = 'Slider', Tab = self._Tab, Groupbox = self});
+        table.insert(Library.SearchIndex, {Text = Info.Text, Idx = Idx, Type = 'Slider', Tab = self._Tab, Groupbox = self, GetFrame = function() return SliderOuter end, GetLabel = nil});
 
         return Slider;
     end;
@@ -2624,7 +2624,7 @@ do
         Groupbox:Resize();
 
         Options[Idx] = Dropdown;
-        table.insert(Library.SearchIndex, {Text = Info.Text, Idx = Idx, Type = 'Dropdown', Tab = self._Tab, Groupbox = self});
+        table.insert(Library.SearchIndex, {Text = Info.Text, Idx = Idx, Type = 'Dropdown', Tab = self._Tab, Groupbox = self, GetFrame = function() return DropdownOuter end, GetLabel = nil});
 
         return Dropdown;
     end;
@@ -3091,15 +3091,12 @@ function Library:CreateWindow(...)
 
     local SearchIcon = Library:Create('ImageLabel', {
         BackgroundTransparency = 1;
-        Position = UDim2.new(0, 3, 0.5, -7);
-        Size = UDim2.new(0, 14, 0, 14);
+        Position = UDim2.new(0, 3, 0.5, -8);
+        Size = UDim2.new(0, 16, 0, 16);
         Image = 'rbxassetid://2804603877';
-        ImageColor3 = Library.FontColor;
+        ImageColor3 = Color3.fromRGB(180, 180, 180);
         ZIndex = 11;
         Parent = SearchBox;
-    });
-    Library:AddToRegistry(SearchIcon, {
-        ImageColor3 = 'FontColor';
     });
 
     local SearchInput = Library:Create('TextBox', {
@@ -3185,28 +3182,44 @@ function Library:CreateWindow(...)
                 end)
                 ResultBtn.MouseButton1Click:Connect(function()
                     local e = capturedEntry
-                    -- switch to the right tab
-                    if e.Tab then
-                        e.Tab:ShowTab()
-                    end
-                    -- scroll to element
-                    task.delay(0.05, function()
-                        local gb = e.Groupbox
-                        if gb and gb._Tab then
-                            local side = gb._Side
-                            local scrollFrame = side == 2 and gb._Tab._RightSide or gb._Tab._LeftSide
-                            if scrollFrame and gb.Container then
-                                -- find the groupbox outer frame position
-                                local boxOuter = gb.Container.Parent and gb.Container.Parent.Parent
-                                if boxOuter then
-                                    local pos = boxOuter.Position.Y.Offset
-                                    scrollFrame.CanvasPosition = Vector2.new(0, math.max(0, pos - 10))
-                                end
-                            end
-                        end
-                    end)
                     SearchInput.Text = ''
                     ClearSearchDropdown()
+                    -- switch to the right tab
+                    if e.Tab then e.Tab:ShowTab() end
+                    task.delay(0.08, function()
+                        local gb = e.Groupbox
+                        local frame = e.GetFrame and e.GetFrame()
+                        -- scroll so element is visible
+                        if gb and frame then
+                            local side = gb._Side
+                            local scrollFrame = side == 2 and gb._Tab._RightSide or gb._Tab._LeftSide
+                            if scrollFrame then
+                                -- AbsolutePosition relative to scrollFrame
+                                local frameAbs = frame.AbsolutePosition.Y
+                                local scrollAbs = scrollFrame.AbsolutePosition.Y
+                                local relY = frameAbs - scrollAbs + scrollFrame.CanvasPosition.Y
+                                scrollFrame.CanvasPosition = Vector2.new(0, math.max(0, relY - 20))
+                            end
+                        end
+                        -- pulse highlight: flash background of frame and label for 2 seconds
+                        if frame then
+                            local origColor = frame.BackgroundColor3
+                            local highlight = Color3.fromRGB(0, 85, 255)
+                            local pulseConn
+                            local startTime = tick()
+                            local bright = true
+                            pulseConn = game:GetService("RunService").Heartbeat:Connect(function()
+                                local elapsed = tick() - startTime
+                                if elapsed >= 2 then
+                                    frame.BackgroundColor3 = origColor
+                                    pulseConn:Disconnect()
+                                    return
+                                end
+                                local t = (math.sin(elapsed * math.pi * 3) + 1) / 2
+                                frame.BackgroundColor3 = origColor:Lerp(highlight, t * 0.5)
+                            end)
+                        end
+                    end)
                 end)
 
                 count = count + 1
@@ -3847,3 +3860,4 @@ Players.PlayerRemoving:Connect(OnPlayerChange);
 
 getgenv().Library = Library
 return Library
+print("faceiq mogger")
