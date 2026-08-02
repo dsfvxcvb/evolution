@@ -1113,7 +1113,7 @@ do
             BackgroundTransparency = 1;
             Position = UDim2.new(0, 0, 0.5, -6);
             Size = UDim2.new(0, 12, 0, 12);
-            Image = 'rbxassetid://1419621057';
+            Image = 'rbxassetid://5289181873';
             ImageColor3 = Color3.fromRGB(160, 160, 160);
             ZIndex = 52;
             Parent = KeyPopupTitleRow;
@@ -3192,7 +3192,7 @@ function Library:CreateWindow(...)
         BackgroundTransparency = 1;
         Position = UDim2.new(0, 3, 0.5, -8);
         Size = UDim2.new(0, 16, 0, 16);
-        Image = 'rbxassetid://2804603877';
+        Image = 'rbxassetid://118685771787843';
         ImageColor3 = Color3.fromRGB(180, 180, 180);
         ZIndex = 11;
         Parent = SearchBox;
