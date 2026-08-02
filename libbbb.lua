@@ -8,8 +8,6 @@ local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
-print("trashcan chchchchc")
-print("delete")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
@@ -1125,14 +1123,15 @@ do
             if icon then
                 Library:Create('ImageLabel', {
                     BackgroundTransparency = 1;
-                    Position = UDim2.new(0, 6, 0.5, -7);
-                    Size = UDim2.new(0, 14, 0, 14);
+                    AnchorPoint = Vector2.new(0, 0.5);
+                    Position = UDim2.new(0, 6, 0.5, 0);
+                    Size = UDim2.new(0, 12, 0, 12);
                     Image = icon;
-                    ImageColor3 = Color3.fromRGB(160, 160, 160);
+                    ImageColor3 = Color3.fromRGB(180, 180, 180);
                     ZIndex = 52;
                     Parent = row;
                 });
-                xOffset = 24
+                xOffset = 22
             end
             Library:CreateLabel({
                 Position = UDim2.new(0, xOffset, 0, 0);
@@ -1156,7 +1155,7 @@ do
         -- Row: "+ create keybind" (when no keybind) OR "+ edit keybind" (when has keybind)
         local CreateRow, CreateBtn = MakeSimpleRow('+ create keybind', nil);
         -- Row: "trash delete keybind" (only when has keybind)
-        local DeleteRow, DeleteBtn = MakeSimpleRow('delete keybind', 'rbxassetid://95365264015831');
+        local DeleteRow, DeleteBtn = MakeSimpleRow('delete keybind', 'rbxassetid://90865958932830');
         -- Row: "key | none" (hidden until create/edit clicked)
         local KeyRow = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
