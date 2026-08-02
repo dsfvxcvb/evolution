@@ -1053,36 +1053,165 @@ do
             Info.Mode = 'Toggle'
         end
 
+        -- === KEYBIND: + button and gear icon ===
+        -- "create keybind" button with plus icon, sits on the right of the toggle label
         local PickOuter = Library:Create('Frame', {
-            BackgroundColor3 = Color3.new(0, 0, 0);
-            BorderColor3 = Color3.new(0, 0, 0);
-            Size = UDim2.new(0, 28, 0, 15);
+            BackgroundColor3 = Library.BackgroundColor;
+            BorderColor3 = Library.OutlineColor;
+            AnchorPoint = Vector2.new(1, 0.5);
+            Position = UDim2.new(1, 0, 0.5, 0);
+            Size = UDim2.new(0, 90, 0, 15);
             ZIndex = 6;
             Parent = ToggleLabel;
         });
-
-        local PickInner = Library:Create('Frame', {
-            BackgroundColor3 = Library.BackgroundColor;
-            BorderColor3 = Library.OutlineColor;
-            BorderMode = Enum.BorderMode.Inset;
-            Size = UDim2.new(1, 0, 1, 0);
-            ZIndex = 7;
-            Parent = PickOuter;
-        });
-
-        Library:AddToRegistry(PickInner, {
+        Library:AddToRegistry(PickOuter, {
             BackgroundColor3 = 'BackgroundColor';
             BorderColor3 = 'OutlineColor';
         });
 
-        local DisplayLabel = Library:CreateLabel({
-            Size = UDim2.new(1, 0, 1, 0);
-            TextSize = 13;
-            Text = Info.Default;
-            TextWrapped = true;
-            ZIndex = 8;
-            Parent = PickInner;
+        -- plus icon
+        Library:Create('ImageLabel', {
+            BackgroundTransparency = 1;
+            Position = UDim2.new(0, 2, 0.5, -6);
+            Size = UDim2.new(0, 12, 0, 12);
+            Image = 'rbxassetid://1419621057';
+            ImageColor3 = Color3.fromRGB(160, 160, 160);
+            ZIndex = 7;
+            Parent = PickOuter;
         });
+
+        local DisplayLabel = Library:CreateLabel({
+            Position = UDim2.new(0, 16, 0, 0);
+            Size = UDim2.new(1, -30, 1, 0);
+            TextSize = 12;
+            Text = Info.Default == 'None' and 'create keybind' or Info.Default;
+            TextXAlignment = Enum.TextXAlignment.Left;
+            TextWrapped = false;
+            ZIndex = 7;
+            Parent = PickOuter;
+        });
+
+        -- gear icon (opens key popup)
+        local GearBtn = Library:Create('ImageButton', {
+            BackgroundTransparency = 1;
+            AnchorPoint = Vector2.new(1, 0.5);
+            Position = UDim2.new(1, -2, 0.5, 0);
+            Size = UDim2.new(0, 12, 0, 12);
+            Image = 'rbxassetid://7059346386';
+            ImageColor3 = Color3.fromRGB(160, 160, 160);
+            ZIndex = 8;
+            Parent = PickOuter;
+        });
+
+        -- key popup (shown when gear is clicked)
+        local KeyPopup = Library:Create('Frame', {
+            BackgroundColor3 = Library.BackgroundColor;
+            BorderColor3 = Library.OutlineColor;
+            Position = UDim2.fromOffset(0, 0); -- set dynamically
+            Size = UDim2.new(0, 110, 0, 42);
+            Visible = false;
+            ZIndex = 50;
+            Parent = ScreenGui;
+        });
+        Library:AddToRegistry(KeyPopup, {
+            BackgroundColor3 = 'BackgroundColor';
+            BorderColor3 = 'OutlineColor';
+        });
+
+        local KeyPopupTitle = Library:CreateLabel({
+            Position = UDim2.new(0, 6, 0, 4);
+            Size = UDim2.new(1, -12, 0, 14);
+            TextSize = 12;
+            Text = 'create keybind';
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = 51;
+            Parent = KeyPopup;
+        });
+
+        local KeyRowOuter = Library:Create('Frame', {
+            BackgroundColor3 = Library.MainColor;
+            BorderColor3 = Library.OutlineColor;
+            Position = UDim2.new(0, 6, 0, 20);
+            Size = UDim2.new(1, -12, 0, 16);
+            ZIndex = 51;
+            Parent = KeyPopup;
+        });
+        Library:AddToRegistry(KeyRowOuter, {
+            BackgroundColor3 = 'MainColor';
+            BorderColor3 = 'OutlineColor';
+        });
+
+        local KeyRowLabel = Library:CreateLabel({
+            Position = UDim2.new(0, 4, 0, 0);
+            Size = UDim2.new(0, 25, 1, 0);
+            TextSize = 11;
+            Text = 'key';
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = 52;
+            Parent = KeyRowOuter;
+        });
+
+        local KeyValueLabel = Library:CreateLabel({
+            AnchorPoint = Vector2.new(1, 0.5);
+            Position = UDim2.new(1, -4, 0.5, 0);
+            Size = UDim2.new(0, 55, 1, 0);
+            TextSize = 11;
+            Text = Info.Default;
+            TextXAlignment = Enum.TextXAlignment.Right;
+            ZIndex = 52;
+            Parent = KeyRowOuter;
+        });
+
+        GearBtn.MouseButton1Click:Connect(function()
+            if KeyPopup.Visible then
+                KeyPopup.Visible = false
+                return
+            end
+            -- position popup above/beside the gear button
+            local absPos = GearBtn.AbsolutePosition
+            KeyPopup.Position = UDim2.fromOffset(absPos.X - 100, absPos.Y + 16)
+            KeyPopup.Visible = true
+        end)
+
+        -- clicking the key row starts picking
+        KeyRowOuter.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                KeyValueLabel.Text = '...'
+                local Break = false
+                local Event
+                Event = InputService.InputBegan:Connect(function(Input2)
+                    local Key
+                    if Input2.UserInputType == Enum.UserInputType.Keyboard then
+                        Key = Input2.KeyCode.Name
+                    elseif Input2.UserInputType == Enum.UserInputType.MouseButton1 then
+                        Key = 'MB1'
+                    elseif Input2.UserInputType == Enum.UserInputType.MouseButton2 then
+                        Key = 'MB2'
+                    end
+                    if Key then
+                        Break = true
+                        KeyValueLabel.Text = Key
+                        DisplayLabel.Text = Key
+                        KeyPicker.Value = Key
+                        Library:SafeCallback(KeyPicker.ChangedCallback, Input2.KeyCode or Input2.UserInputType)
+                        Library:SafeCallback(KeyPicker.Changed, Input2.KeyCode or Input2.UserInputType)
+                        Library:AttemptSave()
+                        Event:Disconnect()
+                        KeyPopup.Visible = false
+                    end
+                end)
+            end
+        end)
+
+        -- close popup on click outside
+        Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 and KeyPopup.Visible then
+                local p, s = KeyPopup.AbsolutePosition, KeyPopup.AbsoluteSize
+                if Mouse.X < p.X or Mouse.X > p.X + s.X or Mouse.Y < p.Y or Mouse.Y > p.Y + s.Y then
+                    KeyPopup.Visible = false
+                end
+            end
+        end))
 
         local ModeSelectOuter = Library:Create('Frame', {
             BorderColor3 = Color3.new(0, 0, 0);
@@ -1182,6 +1311,10 @@ do
 
             local State = KeyPicker:GetState();
 
+            -- sync display labels
+            DisplayLabel.Text = KeyPicker.Value == 'None' and 'create keybind' or KeyPicker.Value;
+            KeyValueLabel.Text = KeyPicker.Value;
+
             ContainerLabel.Text = string.format('[%s] %s (%s)', KeyPicker.Value, Info.Text, KeyPicker.Mode);
 
             ContainerLabel.Visible = true;
@@ -1257,56 +1390,9 @@ do
 
         local Picking = false;
 
+        -- picking now handled via gear icon popup (KeyRowOuter.InputBegan above)
         PickOuter.InputBegan:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.MouseButton1 and not Library:MouseIsOverOpenedFrame() then
-                Picking = true;
-
-                DisplayLabel.Text = '';
-
-                local Break;
-                local Text = '';
-
-                task.spawn(function()
-                    while (not Break) do
-                        if Text == '...' then
-                            Text = '';
-                        end;
-
-                        Text = Text .. '.';
-                        DisplayLabel.Text = Text;
-
-                        wait(0.4);
-                    end;
-                end);
-
-                wait(0.2);
-
-                local Event;
-                Event = InputService.InputBegan:Connect(function(Input)
-                    local Key;
-
-                    if Input.UserInputType == Enum.UserInputType.Keyboard then
-                        Key = Input.KeyCode.Name;
-                    elseif Input.UserInputType == Enum.UserInputType.MouseButton1 then
-                        Key = 'MB1';
-                    elseif Input.UserInputType == Enum.UserInputType.MouseButton2 then
-                        Key = 'MB2';
-                    end;
-
-                    Break = true;
-                    Picking = false;
-
-                    DisplayLabel.Text = Key;
-                    KeyPicker.Value = Key;
-
-                    Library:SafeCallback(KeyPicker.ChangedCallback, Input.KeyCode or Input.UserInputType)
-                    Library:SafeCallback(KeyPicker.Changed, Input.KeyCode or Input.UserInputType)
-
-                    Library:AttemptSave();
-
-                    Event:Disconnect();
-                end);
-            elseif Input.UserInputType == Enum.UserInputType.MouseButton2 and not Library:MouseIsOverOpenedFrame() then
+            if Input.UserInputType == Enum.UserInputType.MouseButton2 and not Library:MouseIsOverOpenedFrame() then
                 ModeSelectOuter.Visible = true;
             end;
         end);
