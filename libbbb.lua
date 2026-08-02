@@ -8,7 +8,6 @@ local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
-print("bro face iq")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
@@ -1306,17 +1305,29 @@ do
             end
         end)
 
-        -- "create keybind" row click
-        KeyPopupTitleRow.InputBegan:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.MouseButton1 and not _blockingClose then
-                ShowKeyRow()
-            end
+        -- "create keybind" row click - use TextButton overlay to consume click before blocker
+        local TitleBtn = Library:Create('TextButton', {
+            BackgroundTransparency = 1;
+            Size = UDim2.new(1, 0, 1, 0);
+            Text = '';
+            ZIndex = 53;
+            Parent = KeyPopupTitleRow;
+        });
+        TitleBtn.MouseButton1Click:Connect(function()
+            ShowKeyRow()
         end)
 
         -- Key row click: pick a key
         local _pickEvent
-        KeyRowOuter.InputBegan:Connect(function(Input)
-            if Input.UserInputType ~= Enum.UserInputType.MouseButton1 or _picking or _blockingClose then return end
+        local KeyRowBtn = Library:Create('TextButton', {
+            BackgroundTransparency = 1;
+            Size = UDim2.new(1, 0, 1, 0);
+            Text = '';
+            ZIndex = 53;
+            Parent = KeyRowOuter;
+        });
+        KeyRowBtn.MouseButton1Click:Connect(function()
+            if _picking then return end
             _picking = true
             KeyValueLabel.Text = '...'
             task.delay(0.08, function()
@@ -1346,22 +1357,25 @@ do
         end)
 
         -- Delete row click
-        DeleteRowOuter.InputBegan:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.MouseButton1 and not _blockingClose then
-                _hasKeybind = false
-                KeyPicker.Value = 'None'
-                KeyValueLabel.Text = 'None'
-                DisplayLabel.Text = 'None'
-                Library:AttemptSave()
-                ClosePopup(false)
-            end
+        local DeleteBtn = Library:Create('TextButton', {
+            BackgroundTransparency = 1;
+            Size = UDim2.new(1, 0, 1, 0);
+            Text = '';
+            ZIndex = 53;
+            Parent = DeleteRowOuter;
+        });
+        DeleteBtn.MouseButton1Click:Connect(function()
+            _hasKeybind = false
+            KeyPicker.Value = 'None'
+            KeyValueLabel.Text = 'None'
+            DisplayLabel.Text = 'None'
+            Library:AttemptSave()
+            ClosePopup(false)
         end)
 
-        -- Blocker click = close
+        -- Blocker click = close (blocker is behind popup so popup buttons consume clicks first)
         Blocker.MouseButton1Click:Connect(function()
-            if not _blockingClose then
-                ClosePopup(false)
-            end
+            ClosePopup(false)
         end)
 
         -- close popup on click outside
@@ -4118,3 +4132,4 @@ Players.PlayerRemoving:Connect(OnPlayerChange);
 
 getgenv().Library = Library
 return Library
+print("bro this shit better work")
