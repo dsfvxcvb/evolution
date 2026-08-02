@@ -1630,6 +1630,15 @@ pcall(function()
         lookAt = true
     end
 
+    -- compute target CFrame using attach offset (respects dropdown)
+    local spoofCF
+    if not lookAt then
+        spoofCF = rawCF
+    else
+        local attachCF = rawCF * offset
+        spoofCF = CFrame.lookAt(attachCF.Position, rawCF.Position)
+    end
+
     if getgenv().AutoKillSpoof then
         local o = root.CFrame
         local originalVel = root.AssemblyLinearVelocity
@@ -1637,7 +1646,7 @@ pcall(function()
         local originalSubject = cam.CameraSubject
         getgenv().AutoKillSetback.CFrame = CFrame.new(o.Position)
         cam.CameraSubject = getgenv().AutoKillSetback
-        root.CFrame = targetRoot.CFrame * CFrame.new(0, 0, 1)
+        root.CFrame = spoofCF
         root.AssemblyLinearVelocity = Vector3.zero
         root.AssemblyAngularVelocity = Vector3.zero
         RunService.RenderStepped:Wait()
@@ -1646,12 +1655,7 @@ pcall(function()
         root.AssemblyLinearVelocity = originalVel
         cam.CameraSubject = originalSubject
     else
-        if not lookAt then
-            root.CFrame = rawCF
-        else
-            local attachCF = rawCF * offset
-            root.CFrame = CFrame.lookAt(attachCF.Position, rawCF.Position)
-        end
+        root.CFrame = spoofCF
         root.AssemblyLinearVelocity = Vector3.zero
         root.AssemblyAngularVelocity = Vector3.zero
         AutoKill.TryStab()
@@ -12444,4 +12448,3 @@ SaveManager:LoadAutoloadConfig()
 if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then
 Toggles.KnifeHitboxToggle:SetValue(true)
 end
-print("fully done?")
