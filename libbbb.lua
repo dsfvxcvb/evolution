@@ -1153,9 +1153,9 @@ do
         end
 
         -- Row: "+ create keybind" (when no keybind) OR "+ edit keybind" (when has keybind)
-        local CreateRow, CreateBtn = MakeSimpleRow('+ create keybind', nil);
+        local CreateRow, CreateBtn = MakeSimpleRow('create keybind', 'rbxassetid://108529772374237');
         -- Row: "trash delete keybind" (only when has keybind)
-        local DeleteRow, DeleteBtn = MakeSimpleRow('delete keybind', 'rbxassetid://90865958932830');
+        local DeleteRow, DeleteBtn = MakeSimpleRow('delete keybind', 'rbxassetid://117997203195317');
         -- Row: "key | none" (hidden until create/edit clicked)
         local KeyRow = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
@@ -1265,7 +1265,7 @@ do
             CreateRow.Visible = true
             -- update create row label
             local createLabel = CreateRow:FindFirstChildOfClass('TextLabel')
-            if createLabel then createLabel.Text = _hasKeybind and '+ edit keybind' or '+ create keybind' end
+            if createLabel then createLabel.Text = _hasKeybind and 'edit keybind' or 'create keybind' end
             DeleteRow.Visible = _hasKeybind
             KeyRow.Visible = false
             local targetH = LayoutAndGetH()
@@ -1344,7 +1344,7 @@ do
                         pcall(function() _pickEvent:Disconnect() end)
                         -- update create label, show delete, keep open
                         local createLabel = CreateRow:FindFirstChildOfClass('TextLabel')
-                        if createLabel then createLabel.Text = '+ edit keybind' end
+                        if createLabel then createLabel.Text = 'edit keybind' end
                         DeleteRow.Visible = true
                         local targetH = LayoutAndGetH()
                         AnimPopup(targetH)
@@ -1362,7 +1362,7 @@ do
             DisplayLabel.Text = 'None'
             Library:AttemptSave()
             local createLabel = CreateRow:FindFirstChildOfClass('TextLabel')
-            if createLabel then createLabel.Text = '+ create keybind' end
+            if createLabel then createLabel.Text = 'create keybind' end
             DeleteRow.Visible = false
             KeyRow.Visible = false
             local targetH = LayoutAndGetH()
