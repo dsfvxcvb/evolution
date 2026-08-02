@@ -1052,23 +1052,33 @@ do
             Info.Mode = 'Toggle'
         end
 
-        -- "+ create keybind" label on the right of the toggle label
+        -- gear icon on right of toggle label
         local PickOuter = Library:Create('Frame', {
             BackgroundTransparency = 1;
             BorderSizePixel = 0;
             AnchorPoint = Vector2.new(1, 0.5);
             Position = UDim2.new(1, 0, 0.5, 0);
-            Size = UDim2.new(0, 95, 0, 15);
+            Size = UDim2.new(0, 14, 0, 14);
             ZIndex = 6;
             Parent = ToggleLabel;
         });
 
         local DisplayLabel = Library:CreateLabel({
-            Size = UDim2.new(1, 0, 1, 0);
+            Size = UDim2.new(0, 0, 0, 0);
             TextSize = 12;
-            Text = Info.Default == 'None' and '+ create keybind' or '[' .. Info.Default .. ']';
-            TextXAlignment = Enum.TextXAlignment.Right;
+            Text = Info.Default;
+            Visible = false;
+            ZIndex = 6;
+            Parent = PickOuter;
+        });
+
+        Library:Create('ImageButton', {
+            BackgroundTransparency = 1;
+            Size = UDim2.new(1, 0, 1, 0);
+            Image = 'rbxassetid://7059346373';
+            ImageColor3 = Color3.fromRGB(160, 160, 160);
             ZIndex = 7;
+            Name = 'GearBtn';
             Parent = PickOuter;
         });
 
@@ -1263,9 +1273,9 @@ do
             DeleteRow.Visible = _hasKeybind
             EditRow.Visible = false
             local targetH = LayoutPopup()
-            -- position
+            -- position beside gear
             local p = PickOuter.AbsolutePosition
-            KeyPopup.Position = UDim2.fromOffset(p.X + PickOuter.AbsoluteSize.X - POPUP_W, p.Y + 18)
+            KeyPopup.Position = UDim2.fromOffset(p.X + 14 - POPUP_W, p.Y + 16)
             KeyPopup.Size = UDim2.new(0, POPUP_W, 0, 0)
             KeyPopup.Visible = true
             Blocker.Visible = true
@@ -1295,15 +1305,9 @@ do
             end)
         end
 
-        -- Click label to open popup
-        local PickBtn = Library:Create('TextButton', {
-            BackgroundTransparency = 1;
-            Size = UDim2.new(1, 0, 1, 0);
-            Text = '';
-            ZIndex = 8;
-            Parent = PickOuter;
-        });
-        PickBtn.MouseButton1Click:Connect(function()
+        -- Gear click to open popup
+        local GearBtn = PickOuter:FindFirstChild('GearBtn')
+        GearBtn.MouseButton1Click:Connect(function()
             if _popupOpen then ClosePopup() else OpenPopup() end
         end)
 
@@ -1354,7 +1358,7 @@ do
             _hasKeybind = false
             KeyPicker.Value = 'None'
             KeyValueLabel.Text = 'None'
-            DisplayLabel.Text = '+ create keybind'
+            DisplayLabel.Text = 'None'
             Library:AttemptSave()
             ClosePopup()
         end)
@@ -1425,7 +1429,7 @@ do
         function KeyPicker:Update()
             if Info.NoUI then return end
             local State = KeyPicker:GetState();
-            DisplayLabel.Text = _hasKeybind and ('[' .. KeyPicker.Value .. ']') or '+ create keybind';
+            DisplayLabel.Text = KeyPicker.Value;
             ContainerLabel.Text = string.format('[%s] %s (%s)', KeyPicker.Value, Info.Text, KeyPicker.Mode or 'Toggle');
             ContainerLabel.Visible = true;
             ContainerLabel.TextColor3 = State and Library.AccentColor or Library.FontColor;
@@ -1464,7 +1468,7 @@ do
             Callback(KeyPicker.Value)
         end
 
-        table.insert(ParentObj.Addons, KeyPicker)
+        if ParentObj.Addons then table.insert(ParentObj.Addons, KeyPicker) end
 
         function KeyPicker:DoClick()
             if ParentObj.Type == 'Toggle' and KeyPicker.SyncToggleState then
