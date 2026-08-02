@@ -8,7 +8,6 @@ local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
-print("devonte")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
@@ -1095,6 +1094,7 @@ do
 
         -- Popup
         local POPUP_W = 130;
+        local ROW_H = 20;
 
         local KeyPopup = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
@@ -1108,48 +1108,66 @@ do
         });
         Library:AddToRegistry(KeyPopup, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
 
-        -- Top row: "edit keybind" or "create keybind" text
-        local TopRow = Library:Create('Frame', {
-            BackgroundColor3 = Library.BackgroundColor;
-            BorderSizePixel = 0;
-            Size = UDim2.new(1, 0, 0, 22);
-            ZIndex = 51;
-            Parent = KeyPopup;
-        });
-        Library:AddToRegistry(TopRow, { BackgroundColor3 = 'BackgroundColor' });
-        local TopLabel = Library:CreateLabel({
-            Position = UDim2.new(0, 8, 0, 0);
-            Size = UDim2.new(1, -8, 1, 0);
-            TextSize = 12;
-            Text = 'create keybind';
-            TextXAlignment = Enum.TextXAlignment.Left;
-            ZIndex = 52;
-            Parent = TopRow;
-        });
+        -- Helper: make a simple text row
+        local function MakeSimpleRow(text, icon)
+            local row = Library:Create('Frame', {
+                BackgroundColor3 = Library.BackgroundColor;
+                BorderSizePixel = 0;
+                Size = UDim2.new(1, 0, 0, ROW_H);
+                ZIndex = 51;
+                Visible = false;
+                Parent = KeyPopup;
+            });
+            Library:AddToRegistry(row, { BackgroundColor3 = 'BackgroundColor' });
+            local xOffset = 8
+            if icon then
+                Library:Create('ImageLabel', {
+                    BackgroundTransparency = 1;
+                    Position = UDim2.new(0, 6, 0.5, -7);
+                    Size = UDim2.new(0, 14, 0, 14);
+                    Image = icon;
+                    ImageColor3 = Color3.fromRGB(160, 160, 160);
+                    ZIndex = 52;
+                    Parent = row;
+                });
+                xOffset = 24
+            end
+            Library:CreateLabel({
+                Position = UDim2.new(0, xOffset, 0, 0);
+                Size = UDim2.new(1, -xOffset-4, 1, 0);
+                TextSize = 12;
+                Text = text;
+                TextXAlignment = Enum.TextXAlignment.Left;
+                ZIndex = 52;
+                Parent = row;
+            });
+            local btn = Library:Create('TextButton', {
+                BackgroundTransparency = 1;
+                Size = UDim2.new(1, 0, 1, 0);
+                Text = '';
+                ZIndex = 53;
+                Parent = row;
+            });
+            return row, btn;
+        end
 
-        -- Divider
-        Library:Create('Frame', {
-            BackgroundColor3 = Library.OutlineColor;
-            BorderSizePixel = 0;
-            Position = UDim2.new(0, 0, 0, 22);
-            Size = UDim2.new(1, 0, 0, 1);
-            ZIndex = 51;
-            Parent = KeyPopup;
-        });
-
-        -- Key row: "key" on left, value on right (clickable to change)
+        -- Row: "+ create keybind" (when no keybind) OR "+ edit keybind" (when has keybind)
+        local CreateRow, CreateBtn = MakeSimpleRow('+ create keybind', nil);
+        -- Row: "trash delete keybind" (only when has keybind)
+        local DeleteRow, DeleteBtn = MakeSimpleRow('delete keybind', 'rbxassetid://2804603877');
+        -- Row: "key | none" (hidden until create/edit clicked)
         local KeyRow = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
             BorderSizePixel = 0;
-            Position = UDim2.new(0, 0, 0, 23);
-            Size = UDim2.new(1, 0, 0, 20);
+            Size = UDim2.new(1, 0, 0, ROW_H);
             ZIndex = 51;
+            Visible = false;
             Parent = KeyPopup;
         });
         Library:AddToRegistry(KeyRow, { BackgroundColor3 = 'BackgroundColor' });
         Library:CreateLabel({
             Position = UDim2.new(0, 8, 0, 0);
-            Size = UDim2.new(0, 30, 1, 0);
+            Size = UDim2.new(0, 25, 1, 0);
             TextSize = 11;
             Text = 'key';
             TextXAlignment = Enum.TextXAlignment.Left;
@@ -1159,7 +1177,7 @@ do
         local KeyValueLabel = Library:CreateLabel({
             AnchorPoint = Vector2.new(1, 0.5);
             Position = UDim2.new(1, -6, 0.5, 0);
-            Size = UDim2.new(0, 70, 1, 0);
+            Size = UDim2.new(0, 75, 1, 0);
             TextSize = 11;
             Text = Info.Default;
             TextXAlignment = Enum.TextXAlignment.Right;
@@ -1172,56 +1190,6 @@ do
             Text = '';
             ZIndex = 53;
             Parent = KeyRow;
-        });
-
-        -- Divider 2 (only shown when keybind exists)
-        local Divider2 = Library:Create('Frame', {
-            BackgroundColor3 = Library.OutlineColor;
-            BorderSizePixel = 0;
-            Position = UDim2.new(0, 0, 0, 43);
-            Size = UDim2.new(1, 0, 0, 1);
-            ZIndex = 51;
-            Visible = false;
-            Parent = KeyPopup;
-        });
-        Library:AddToRegistry(Divider2, { BackgroundColor3 = 'OutlineColor' });
-
-        -- Delete row (only when keybind exists)
-        local DeleteRow = Library:Create('Frame', {
-            BackgroundColor3 = Library.BackgroundColor;
-            BorderSizePixel = 0;
-            Position = UDim2.new(0, 0, 0, 44);
-            Size = UDim2.new(1, 0, 0, 20);
-            ZIndex = 51;
-            Visible = false;
-            Parent = KeyPopup;
-        });
-        Library:AddToRegistry(DeleteRow, { BackgroundColor3 = 'BackgroundColor' });
-        -- trash icon
-        Library:Create('ImageLabel', {
-            BackgroundTransparency = 1;
-            Position = UDim2.new(0, 6, 0.5, -7);
-            Size = UDim2.new(0, 14, 0, 14);
-            Image = 'rbxassetid://2804603877';
-            ImageColor3 = Color3.fromRGB(180, 180, 180);
-            ZIndex = 52;
-            Parent = DeleteRow;
-        });
-        Library:CreateLabel({
-            Position = UDim2.new(0, 24, 0, 0);
-            Size = UDim2.new(1, -24, 1, 0);
-            TextSize = 11;
-            Text = 'delete keybind';
-            TextXAlignment = Enum.TextXAlignment.Left;
-            ZIndex = 52;
-            Parent = DeleteRow;
-        });
-        local DeleteBtn = Library:Create('TextButton', {
-            BackgroundTransparency = 1;
-            Size = UDim2.new(1, 0, 1, 0);
-            Text = '';
-            ZIndex = 53;
-            Parent = DeleteRow;
         });
 
         -- Blocker
@@ -1237,6 +1205,7 @@ do
         local _hasKeybind = (Info.Default ~= 'None');
         local _picking = false;
         local _popupOpen = false;
+        local _keyRowVisible = false;
         local _typeConn = nil;
 
         local function StopTypewriter()
@@ -1255,15 +1224,23 @@ do
             end)
         end
 
-        local function GetPopupH()
-            return _hasKeybind and 65 or 44
-        end
-
-        local function RefreshPopupState()
-            TopLabel.Text = _hasKeybind and 'edit keybind' or 'create keybind'
-            KeyValueLabel.Text = KeyPicker.Value
-            Divider2.Visible = _hasKeybind
-            DeleteRow.Visible = _hasKeybind
+        -- Stack visible rows top to bottom with a 1px divider between them
+        local function LayoutAndGetH()
+            local rows = {CreateRow, DeleteRow, KeyRow}
+            local y = 0
+            local first = true
+            for _, row in ipairs(rows) do
+                if row.Visible then
+                    if not first then
+                        -- 1px divider
+                        y = y + 1
+                    end
+                    row.Position = UDim2.new(0, 0, 0, y)
+                    y = y + ROW_H
+                    first = false
+                end
+            end
+            return y
         end
 
         local function AnimPopup(targetH)
@@ -1280,21 +1257,31 @@ do
 
         local function OpenPopup()
             _picking = false
+            _keyRowVisible = false
             StopTypewriter()
-            RefreshPopupState()
+            -- reset visibility
+            KeyValueLabel.Text = KeyPicker.Value
+            CreateRow.Visible = true
+            -- update create row label
+            local createLabel = CreateRow:FindFirstChildOfClass('TextLabel')
+            if createLabel then createLabel.Text = _hasKeybind and '+ edit keybind' or '+ create keybind' end
+            DeleteRow.Visible = _hasKeybind
+            KeyRow.Visible = false
+            local targetH = LayoutAndGetH()
             local p = PickOuter.AbsolutePosition
             KeyPopup.Position = UDim2.fromOffset(p.X + 14 - POPUP_W, p.Y + 16)
             KeyPopup.Size = UDim2.new(0, POPUP_W, 0, 0)
             KeyPopup.Visible = true
             Blocker.Visible = true
             _popupOpen = true
-            AnimPopup(GetPopupH())
+            AnimPopup(targetH)
         end
 
         local function ClosePopup()
             if not _popupOpen then return end
             _popupOpen = false
             _picking = false
+            _keyRowVisible = false
             StopTypewriter()
             Blocker.Visible = false
             local startH = KeyPopup.Size.Y.Offset
@@ -1312,13 +1299,22 @@ do
             end)
         end
 
-        -- Gear click
         local GearBtn = PickOuter:FindFirstChild('GearBtn')
         GearBtn.MouseButton1Click:Connect(function()
             if _popupOpen then ClosePopup() else OpenPopup() end
         end)
 
-        -- Key row click: start picking
+        -- "create/edit keybind" row clicked -> show key row
+        CreateBtn.MouseButton1Click:Connect(function()
+            if _keyRowVisible then return end
+            _keyRowVisible = true
+            KeyRow.Visible = true
+            KeyValueLabel.Text = KeyPicker.Value
+            local targetH = LayoutAndGetH()
+            AnimPopup(targetH)
+        end)
+
+        -- Key row clicked -> start picking
         local _pickEvent
         KeyRowBtn.MouseButton1Click:Connect(function()
             if _picking then return end
@@ -1345,23 +1341,31 @@ do
                         Library:SafeCallback(KeyPicker.Changed, Input2.KeyCode or Input2.UserInputType)
                         Library:AttemptSave()
                         pcall(function() _pickEvent:Disconnect() end)
-                        -- update popup in place, don't close
-                        RefreshPopupState()
-                        AnimPopup(GetPopupH())
+                        -- update create label, show delete, keep open
+                        local createLabel = CreateRow:FindFirstChildOfClass('TextLabel')
+                        if createLabel then createLabel.Text = '+ edit keybind' end
+                        DeleteRow.Visible = true
+                        local targetH = LayoutAndGetH()
+                        AnimPopup(targetH)
                     end
                 end)
             end)
         end)
 
-        -- Delete
+        -- Delete row clicked
         DeleteBtn.MouseButton1Click:Connect(function()
             _hasKeybind = false
+            _keyRowVisible = false
             KeyPicker.Value = 'None'
             KeyValueLabel.Text = 'None'
             DisplayLabel.Text = 'None'
             Library:AttemptSave()
-            RefreshPopupState()
-            AnimPopup(GetPopupH())
+            local createLabel = CreateRow:FindFirstChildOfClass('TextLabel')
+            if createLabel then createLabel.Text = '+ create keybind' end
+            DeleteRow.Visible = false
+            KeyRow.Visible = false
+            local targetH = LayoutAndGetH()
+            AnimPopup(targetH)
         end)
 
         Blocker.MouseButton1Click:Connect(function()
