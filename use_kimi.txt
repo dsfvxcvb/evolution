@@ -5222,7 +5222,7 @@ end}):AddColorPicker('TargetStrafeIndicatorColor',{Title = "Indicator Color",
 Default = Color3.fromRGB(193, 247, 255),
 Callback = function(Value)
 TargetStrafeConfig.IndicatorColor = Value or Color3.fromRGB(193, 247, 255)
-end}):AddColorPicker('TargetStrafeIndicatorGlowColor',{Title = "Glow Color",
+end}):AddColorPicker('TargetStrafeIndicatorGlowColor',{Title = "Outline Color",
 Default = Color3.fromRGB(193, 247, 255),
 Callback = function(Value)
 TargetStrafeConfig.IndicatorGlowColor = Value or Color3.fromRGB(193, 247, 255)
@@ -5239,6 +5239,7 @@ local indicatorObjects = {
 circle = nil,
 image = nil,
 glow = nil,
+outline = nil,
 visible = false
 }
 local indicatorLastPos = nil
@@ -5254,6 +5255,10 @@ end
 if indicatorObjects.glow then
 indicatorObjects.glow:Remove()
 indicatorObjects.glow = nil
+end
+if indicatorObjects.outline then
+indicatorObjects.outline:Remove()
+indicatorObjects.outline = nil
 end
 indicatorObjects.visible = false
 indicatorLastPos = nil
@@ -5294,6 +5299,14 @@ indicatorObjects.image.ZIndex = 3
 indicatorObjects.image.Visible = false
 indicatorObjects.image.Position = Vector2.new(0, 0)
 indicatorObjects.image.Size = Vector2.new(29, 29)
+indicatorObjects.outline = Drawing.new("Circle")
+indicatorObjects.outline.Filled = false
+indicatorObjects.outline.Color = TargetStrafeConfig.IndicatorGlowColor
+indicatorObjects.outline.Thickness = 2
+indicatorObjects.outline.Transparency = 0
+indicatorObjects.outline.NumSides = 64
+indicatorObjects.outline.ZIndex = 4
+indicatorObjects.outline.Visible = false
 end
 local pos, onScreen = Camera:WorldToViewportPoint(worldPosition)
 if not indicatorLastPos then
@@ -5308,6 +5321,7 @@ if indicatorObjects.visible then
 indicatorObjects.circle.Visible = false
 indicatorObjects.image.Visible = false
 indicatorObjects.glow.Visible = false
+if indicatorObjects.outline then indicatorObjects.outline.Visible = false end
 indicatorObjects.visible = false
 end
 return
@@ -5331,6 +5345,12 @@ indicatorObjects.image.Color = TargetStrafeConfig.IndicatorColor
 indicatorObjects.glow.Visible = true
 indicatorObjects.circle.Visible = true
 indicatorObjects.image.Visible = true
+if indicatorObjects.outline then
+indicatorObjects.outline.Position = screenPos
+indicatorObjects.outline.Radius = size / 2
+indicatorObjects.outline.Color = TargetStrafeConfig.IndicatorGlowColor
+indicatorObjects.outline.Visible = true
+end
 indicatorObjects.visible = true
 end
 local function TargetStrafe(dt)
