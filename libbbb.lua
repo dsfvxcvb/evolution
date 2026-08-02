@@ -8,8 +8,6 @@ local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
-print("settings")
-print("why not working ddddddddddddddddd")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
@@ -1080,7 +1078,7 @@ do
         local GearBtn = Library:Create('ImageButton', {
             BackgroundTransparency = 1;
             Size = UDim2.new(1, 0, 1, 0);
-            Image = 'rbxassetid://7059346386';
+            Image = 'rbxassetid://7059346373';
             ImageColor3 = Color3.fromRGB(160, 160, 160);
             ZIndex = 7;
             Parent = PickOuter;
@@ -1114,12 +1112,11 @@ do
             BackgroundTransparency = 1;
             Position = UDim2.new(0, 0, 0.5, -6);
             Size = UDim2.new(0, 12, 0, 12);
-            Image = 'rbxassetid://7059346386';
+            Image = 'rbxassetid://1419621057';
             ImageColor3 = Color3.fromRGB(160, 160, 160);
             ZIndex = 52;
             Parent = KeyPopupTitleRow;
         });
-        print("should work")
 
         Library:CreateLabel({
             Position = UDim2.new(0, 15, 0, 0);
