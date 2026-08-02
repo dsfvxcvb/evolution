@@ -1,5 +1,5 @@
 -- Trail Addon for evolution
--- Relies on Tabs global set by use_kimi.txt
+-- Run AFTER use_kimi.txt has loaded
 
 if not getgenv().Tabs then
     warn("[Trail Addon] Tabs global not found - make sure use_kimi.txt loaded first")
@@ -9,6 +9,8 @@ end
 local VisualsTrail = getgenv().Tabs.Visuals:AddRightGroupbox("Trail")
 
 local _trailAtt0, _trailAtt1, _trailMain, _trailGlow
+local _trailWidth = 0.07
+local _trailHeight = 0.4  -- controls attachment spread (visual height)
 
 local function _destroyTrail()
     if _trailMain then _trailMain:Destroy() _trailMain = nil end
@@ -23,11 +25,11 @@ local function _buildTrail(char)
     if not hrp then return end
 
     _trailAtt0 = Instance.new("Attachment")
-    _trailAtt0.Position = Vector3.new(0, 0.2, 0)
+    _trailAtt0.Position = Vector3.new(0, _trailHeight, 0)
     _trailAtt0.Parent = hrp
 
     _trailAtt1 = Instance.new("Attachment")
-    _trailAtt1.Position = Vector3.new(0, -0.2, 0)
+    _trailAtt1.Position = Vector3.new(0, -_trailHeight, 0)
     _trailAtt1.Parent = hrp
 
     local c1 = Options.TrailColorBeginning and Options.TrailColorBeginning.Value or Color3.fromRGB(0, 255, 255)
@@ -49,8 +51,8 @@ local function _buildTrail(char)
         ColorSequenceKeypoint.new(1, c3),
     })
     _trailMain.WidthScale = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.07),
-        NumberSequenceKeypoint.new(0.85, 0.07),
+        NumberSequenceKeypoint.new(0, _trailWidth),
+        NumberSequenceKeypoint.new(0.85, _trailWidth),
         NumberSequenceKeypoint.new(1, 0),
     })
     _trailMain.Transparency = NumberSequence.new({
@@ -74,8 +76,8 @@ local function _buildTrail(char)
         ColorSequenceKeypoint.new(1, c3),
     })
     _trailGlow.WidthScale = NumberSequence.new({
-        NumberSequenceKeypoint.new(0, 0.28),
-        NumberSequenceKeypoint.new(0.85, 0.28),
+        NumberSequenceKeypoint.new(0, _trailWidth * 4),
+        NumberSequenceKeypoint.new(0.85, _trailWidth * 4),
         NumberSequenceKeypoint.new(1, 0),
     })
     _trailGlow.Transparency = NumberSequence.new({
@@ -126,18 +128,46 @@ VisualsTrail:AddToggle('TrailUse', {
     Callback = function() _refreshTrail() end
 })
 
-VisualsTrail:AddDropdown('TrailStyle', {
-    Text = 'Style',
-    Values = {'Flame'},
-    Default = 'Flame',
-    Callback = function(Value) end
+VisualsTrail:AddDropdown('TrailWidth', {
+    Text = 'Width',
+    Values = {'Thin', 'Normal', 'Wide', 'Thick'},
+    Default = 'Normal',
+    Callback = function(Value)
+        if Value == 'Thin' then _trailWidth = 0.03
+        elseif Value == 'Normal' then _trailWidth = 0.07
+        elseif Value == 'Wide' then _trailWidth = 0.15
+        elseif Value == 'Thick' then _trailWidth = 0.28
+        end
+        if _trailMain then
+            _trailMain.WidthScale = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, _trailWidth),
+                NumberSequenceKeypoint.new(0.85, _trailWidth),
+                NumberSequenceKeypoint.new(1, 0),
+            })
+        end
+        if _trailGlow then
+            _trailGlow.WidthScale = NumberSequence.new({
+                NumberSequenceKeypoint.new(0, _trailWidth * 4),
+                NumberSequenceKeypoint.new(0.85, _trailWidth * 4),
+                NumberSequenceKeypoint.new(1, 0),
+            })
+        end
+    end
 })
 
-VisualsTrail:AddDropdown('TrailFlat', {
-    Text = 'Flat',
-    Values = {'Off', 'On'},
-    Default = 'Off',
-    Callback = function(Value) end
+VisualsTrail:AddDropdown('TrailHeight', {
+    Text = 'Height',
+    Values = {'Short', 'Normal', 'Tall', 'Extra Tall'},
+    Default = 'Normal',
+    Callback = function(Value)
+        if Value == 'Short' then _trailHeight = 0.1
+        elseif Value == 'Normal' then _trailHeight = 0.2
+        elseif Value == 'Tall' then _trailHeight = 0.4
+        elseif Value == 'Extra Tall' then _trailHeight = 0.7
+        end
+        -- rebuild so attachment positions update
+        _refreshTrail()
+    end
 })
 
 VisualsTrail:AddSlider('TrailLifetime', {
@@ -151,5 +181,34 @@ VisualsTrail:AddSlider('TrailLifetime', {
         if _trailGlow then _trailGlow.Lifetime = Value end
     end
 })
+
+-- ===== Indicator Outline Color =====
+-- Renames "Glow Color" to "Outline Color" and makes it control
+-- the OuterBorder frame of the target indicator
+task.spawn(function()
+    task.wait(2) -- wait for targetui to be created
+    local ui = Library and Library._targetUIInstance
+    if not ui then return end
+
+    local outerBorder = Library._targetUIOuterBorder
+    if not outerBorder then return end
+
+    -- Add UIStroke to the main frame for a cleaner outline effect
+    local mainFrame = ui:FindFirstChildOfClass("Frame")
+    if not mainFrame then return end
+
+    local stroke = Instance.new("UIStroke")
+    stroke.Color = getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
+    stroke.Thickness = 1.5
+    stroke.Transparency = 0
+    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    stroke.Parent = mainFrame
+
+    -- expose so color picker can update it
+    getgenv()._indicatorStroke = stroke
+
+    -- hide the old OuterBorder since UIStroke replaces it
+    outerBorder.BackgroundTransparency = 1
+end)
 
 print("[Trail Addon] Loaded successfully")
