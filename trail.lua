@@ -21,6 +21,7 @@ local function _destroyTrail()
     if _trailAtt0 then _trailAtt0:Destroy() _trailAtt0 = nil end
     if _trailAtt1 then _trailAtt1:Destroy() _trailAtt1 = nil end
 end
+print("outline")
 
 local function _buildTrail(char)
     _destroyTrail()
