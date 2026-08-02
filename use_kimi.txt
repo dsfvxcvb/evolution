@@ -2,14 +2,14 @@
 -- MAIN SCRIPT
 -- ============================================
 print("bro")
-local repo = 'https://raw.githubusercontent.com/dsfvxcvb/evolution/refs/heads/main/draggable.lua'
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
 pcall(function() Library:Unload() end)
 end
-local Library = loadstring(game:HttpGet(repo .. 'Library.lua'))()
+local Library = loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/evolution/refs/heads/main/draggable.lua'))()
 getgenv().Library = Library
-local ThemeManager = loadstring(game:HttpGet(repo .. 'addons/ThemeManager.lua'))()
-local SaveManager = loadstring(game:HttpGet(repo .. 'addons/SaveManager.lua'))()
+local _linoria = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
+local ThemeManager = loadstring(game:HttpGet(_linoria .. 'addons/ThemeManager.lua'))()
+local SaveManager = loadstring(game:HttpGet(_linoria .. 'addons/SaveManager.lua'))()
 pcall(function()
 local old = game:GetService("CoreGui"):FindFirstChild("AutoKillStatusUI")
 if old then old:Destroy() end
@@ -3471,7 +3471,10 @@ ColorSequenceKeypoint.new(1, endCol),
 })
 end
 local connection
+local _tuiFrame = 0
 connection = game:GetService("RunService").RenderStepped:Connect(function()
+_tuiFrame = _tuiFrame + 1
+if _tuiFrame % 2 ~= 0 then return end
 if not IndicatorUI or not IndicatorUI.Parent then
 if connection then connection:Disconnect() end
 return
@@ -4233,7 +4236,10 @@ for _, player in ipairs(Players:GetPlayers()) do
 setupRespawnHandling(player)
 end
 Players.PlayerAdded:Connect(setupRespawnHandling)
+local _targetFrame = 0
 RunService.RenderStepped:Connect(function()
+_targetFrame = _targetFrame + 1
+if _targetFrame % 2 ~= 0 then return end
 do
 local mousePos = UserInputService:GetMouseLocation()
 local showFOV = FOVCircleConfig.Enabled or GetFlag("TargetAimShowFOV")
@@ -5354,7 +5360,12 @@ end
 disableHook()
 end
 end
-RunService.Heartbeat:Connect(TargetStrafe)
+local _strafeFrame = 0
+RunService.Heartbeat:Connect(function(dt)
+    _strafeFrame = _strafeFrame + 1
+    if _strafeFrame % 2 ~= 0 then return end
+    TargetStrafe(dt)
+end)
 Players.PlayerRemoving:Connect(function(player)
 if player == LocalPlayer then
 if bodyClone then
@@ -5424,7 +5435,10 @@ end
 end)
 end
 end)
+local _ammoFrame = 0
 AmmoConnections.UIConnection = game:GetService("RunService").RenderStepped:Connect(function()
+_ammoFrame = _ammoFrame + 1
+if _ammoFrame % 3 ~= 0 then return end
 if InfiniteAmmoEnabled and u11.AmmoFrame.Visible then
 for i, frame in pairs(u11.AmmoFrame.Frame:GetChildren()) do
 if frame:IsA('ImageLabel') then
@@ -6417,7 +6431,10 @@ return Vector2.new(pos.X, pos.Y), on or pos.Z > 0
 end
 local elapsed = 0
 local conn
+local _tracerF = 0
 conn = RunService.RenderStepped:Connect(function(dt)
+_tracerF = _tracerF + 1
+if _tracerF % 2 ~= 0 then return end
 elapsed = elapsed + dt
 local s, onS = getScreen(startPos)
 local e, onE = getScreen(endPos)
@@ -7338,7 +7355,10 @@ outlines[i].Visible = true
 end
 local elapsed = 0
 local conn
+local _hitmarkerF = 0
 conn = RunService.RenderStepped:Connect(function(dt)
+_hitmarkerF = _hitmarkerF + 1
+if _hitmarkerF % 2 ~= 0 then return end
 elapsed = elapsed + dt
 local pos, onScreen = cam:WorldToViewportPoint(worldPos)
 if onScreen then
@@ -8170,7 +8190,10 @@ return nil
 end
 local function startAutoReload()
 if autoReloadConnection then autoReloadConnection:Disconnect() end
+local _reloadFrame = 0
 autoReloadConnection = RunService.RenderStepped:Connect(function()
+_reloadFrame = _reloadFrame + 1
+if _reloadFrame % 3 ~= 0 then return end
 local char = player.Character
 if not char then return end
 local tool = char:FindFirstChildOfClass("Tool")
@@ -8609,7 +8632,10 @@ forceHead(desc)
 end
 applyPart(desc)
 end))
+local _cbFrame = 0
 table.insert(ClientBody.CharConnections, RunService.RenderStepped:Connect(function()
+_cbFrame = _cbFrame + 1
+if _cbFrame % 3 ~= 0 then return end
 if not ClientBody.Enabled then return end
 for _, part in ipairs(char:GetDescendants()) do
 if part:IsA("BasePart") or part:IsA("MeshPart") then
@@ -10004,7 +10030,10 @@ local blurEffect = Instance.new('BlurEffect')
 blurEffect.Size = 0
 blurEffect.Enabled = false
 blurEffect.Parent = Lighting
+local _blurFrame = 0
 addConn(RunService.RenderStepped:Connect(function(dt)
+_blurFrame = _blurFrame + 1
+if _blurFrame % 2 ~= 0 then return end
 local motionToggle = Toggles.AddonMotionBlur
 local blurSizeOpt = Options.AddonBlurSize
 local blurSpeedOpt = Options.AddonBlurSpeed
@@ -10493,7 +10522,10 @@ weld.Parent = part
 end
 end
 KnifeSkinData[tool] = {Clone = clone, Connections = {}, Tracks = {}}
+local _knifeFrame = 0
 table.insert(KnifeSkinData[tool].Connections, RunService.RenderStepped:Connect(function()
+_knifeFrame = _knifeFrame + 1
+if _knifeFrame % 3 ~= 0 then return end
 local currentHandle = tool:FindFirstChild('Handle')
 if not currentHandle or not currentHandle:IsA('BasePart') or not tool:IsDescendantOf(LocalPlayer.Character) then
 RemoveKnifeSkin(tool)
