@@ -1,7 +1,7 @@
 -- ============================================
 -- MAIN SCRIPT
 -- ============================================
-print("brochacho")
+print("bro")
 local repo = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
 pcall(function() Library:Unload() end)
@@ -1600,7 +1600,6 @@ end
 local hum = LocalPlayer.Character:FindFirstChildOfClass("Humanoid")
 local savedCF = root.CFrame
 local savedVel = root.AssemblyLinearVelocity
-local savedCamOffset = hum and hum.CameraOffset
 local rawCF = targetRoot.CFrame
 local userId = target.UserId
 local lastValid = AC.lastValid[userId]
@@ -1637,15 +1636,19 @@ else
     targetCF = CFrame.lookAt(attachCF.Position, rawCF.Position)
 end
 if getgenv().AutoKillSpoof then
-    -- move to target, offset camera so client doesn't see it, stab, restore
+    local o = root.CFrame
+    local originalVel = root.AssemblyLinearVelocity
+    -- move to target
     root.CFrame = targetCF
     root.AssemblyLinearVelocity = Vector3.zero
     root.AssemblyAngularVelocity = Vector3.zero
-    if hum then hum.CameraOffset = savedCF.Position - root.Position end
+    -- stab immediately
     AutoKill.TryStab()
-    if hum then hum.CameraOffset = savedCamOffset end
-    root.CFrame = savedCF
-    root.AssemblyLinearVelocity = savedVel
+    -- restore on next task step before any rendering happens
+    task.defer(function()
+        root.CFrame = o
+        root.AssemblyLinearVelocity = originalVel
+    end)
 else
     root.CFrame = targetCF
     root.AssemblyLinearVelocity = Vector3.zero
@@ -1819,7 +1822,7 @@ end
 end
 return false
 end
-function AutoKill.TryStab()
+function AutoKill.TryStab(targetPos)
 local now = tick()
 if now - AutoKill.LastKnifeStab < 0.01 then return end
 AutoKill.LastKnifeStab = now
@@ -1830,9 +1833,28 @@ if not knife then
 AutoKill.TryEquipKnife()
 return
 end
-pcall(function()
-knife:Activate()
-end)
+if targetPos and getgenv().AutoKillSpoof then
+    -- move just the hitbox to the target so Touched fires server-side
+    local handle = knife:FindFirstChild("Handle")
+    local hitbox = handle and handle:FindFirstChild("HITBOX_PART")
+    if hitbox then
+        local savedHitboxCF = hitbox.CFrame
+        pcall(function()
+            hitbox.CFrame = CFrame.new(targetPos)
+        end)
+        pcall(function() knife:Activate() end)
+        RunService.RenderStepped:Wait()
+        pcall(function()
+            hitbox.CFrame = savedHitboxCF
+        end)
+    else
+        pcall(function() knife:Activate() end)
+    end
+else
+    pcall(function()
+        knife:Activate()
+    end)
+end
 end
 function AutoKill.OwnPart(part)
 if part and part:IsA("BasePart") then
@@ -1910,28 +1932,19 @@ GM.PlatformPart = nil
 end
 end
 function AutoKill.HideCharacter()
+if getgenv().AutoKillSpoof then
+AutoKill.GunMethod.IsHiding = true
+return
+end
 local char = LocalPlayer.Character
 if not char then return end
 local root = char:FindFirstChild("HumanoidRootPart")
 if not root then return end
-local hum = char:FindFirstChildOfClass("Humanoid")
 AutoKill.CreateVoidPlatform()
 local platformPos = AutoKill.GunMethod.VoidPosition + Vector3.new(0, 5, 0)
-if getgenv().AutoKillSpoof then
-local savedCF = root.CFrame
-local savedVel = root.AssemblyLinearVelocity
-local savedCamOffset = hum and hum.CameraOffset
-root.CFrame = CFrame.new(platformPos)
-if hum then hum.CameraOffset = savedCF.Position - root.Position end
-RunService.RenderStepped:Wait()
-if hum then hum.CameraOffset = savedCamOffset end
-root.CFrame = savedCF
-root.AssemblyLinearVelocity = savedVel
-else
 root.CFrame = CFrame.new(platformPos)
 root.Velocity = Vector3.new(0, 0, 0)
 root.RotVelocity = Vector3.new(0, 0, 0)
-end
 for _, part in pairs(char:GetDescendants()) do
 if part:IsA("BasePart") then
 if part:GetAttribute("AutoKill_OriginalLTM") == nil then
@@ -1943,27 +1956,15 @@ end
 AutoKill.GunMethod.IsHiding = true
 end
 function AutoKill.KeepHidden()
+if getgenv().AutoKillSpoof then return end
 local char = LocalPlayer.Character
 if not char then return end
 local root = char:FindFirstChild("HumanoidRootPart")
 if not root then return end
-local hum = char:FindFirstChildOfClass("Humanoid")
 local platformPos = AutoKill.GunMethod.VoidPosition + Vector3.new(0, 5, 0)
-if getgenv().AutoKillSpoof then
-local savedCF = root.CFrame
-local savedVel = root.AssemblyLinearVelocity
-local savedCamOffset = hum and hum.CameraOffset
-root.CFrame = CFrame.new(platformPos)
-if hum then hum.CameraOffset = savedCF.Position - root.Position end
-RunService.RenderStepped:Wait()
-if hum then hum.CameraOffset = savedCamOffset end
-root.CFrame = savedCF
-root.AssemblyLinearVelocity = savedVel
-else
 root.CFrame = CFrame.new(platformPos)
 root.Velocity = Vector3.new(0, 0, 0)
 root.RotVelocity = Vector3.new(0, 0, 0)
-end
 end
 function AutoKill.UnhideCharacter()
 local char = LocalPlayer.Character
@@ -2061,7 +2062,6 @@ local hum = char:FindFirstChildOfClass("Humanoid")
 AutoKill.UnhideCharacter()
 local savedCF = root.CFrame
 local savedVel = root.AssemblyLinearVelocity
-local savedCamOffset = hum and hum.CameraOffset
 local offset, lookAt = AutoKill.GetAttachOffset()
 local targetCF
 if not lookAt then
@@ -2070,14 +2070,7 @@ else
     local attachCF = targetRoot.CFrame * offset
     targetCF = CFrame.lookAt(attachCF.Position, targetRoot.Position)
 end
-if getgenv().AutoKillSpoof then
-    root.CFrame = targetCF
-    if hum then hum.CameraOffset = savedCF.Position - root.Position end
-    RunService.RenderStepped:Wait()
-    if hum then hum.CameraOffset = savedCamOffset end
-    root.CFrame = savedCF
-    root.AssemblyLinearVelocity = savedVel
-else
+if not getgenv().AutoKillSpoof then
     root.CFrame = targetCF
     root.Velocity = Vector3.new(0, 0, 0)
 end
@@ -12442,3 +12435,4 @@ SaveManager:LoadAutoloadConfig()
 if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then
 Toggles.KnifeHitboxToggle:SetValue(true)
 end
+print("nigger boo")
