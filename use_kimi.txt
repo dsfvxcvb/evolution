@@ -2631,6 +2631,7 @@ getgenv().AutoKillSetback.Parent = workspace
 
 getgenv().CombatAutoKill = CombatAutoKill
 getgenv().AutoKill = AutoKill
+getgenv().Targeting = Targeting
 getgenv().Toggles = Toggles
 getgenv().RunService = RunService
 getgenv().ReplicatedStorage = ReplicatedStorage
@@ -12566,3 +12567,4 @@ if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then
 Toggles.KnifeHitboxToggle:SetValue(true)
 end
 print("accent liner ass nigga")
+print("new ass updatye nigger")
