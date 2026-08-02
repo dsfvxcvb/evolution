@@ -1173,92 +1173,226 @@ do
             Parent = KeyRowOuter;
         });
 
-        -- hide key row by default, only show after "create keybind" clicked
+        -- State
+        local _hasKeybind = (Info.Default ~= 'None')
+        local _picking = false
+        local _popupOpen = false
+        local _animating = false
+
+        -- Title label ref so we can update text
+        local TitleLabel = KeyPopupTitleRow:FindFirstChildOfClass('TextLabel')
+
+        -- Delete row (hidden until keybind exists)
+        local DeleteRowOuter = Library:Create('Frame', {
+            BackgroundColor3 = Library.MainColor;
+            BorderColor3 = Library.OutlineColor;
+            Position = UDim2.new(0, 6, 0, 52);
+            Size = UDim2.new(1, -12, 0, 16);
+            ZIndex = 51;
+            Visible = false;
+            Parent = KeyPopup;
+        });
+        Library:AddToRegistry(DeleteRowOuter, {
+            BackgroundColor3 = 'MainColor';
+            BorderColor3 = 'OutlineColor';
+        });
+        local DeleteLabel = Library:CreateLabel({
+            Position = UDim2.new(0, 4, 0, 0);
+            Size = UDim2.new(1, -8, 1, 0);
+            TextSize = 11;
+            Text = 'delete keybind';
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = 52;
+            Parent = DeleteRowOuter;
+        });
+
+        -- Blocker: prevents clicking ui behind popup
+        local Blocker = Library:Create('TextButton', {
+            BackgroundTransparency = 1;
+            Size = UDim2.new(1, 0, 1, 0);
+            Text = '';
+            ZIndex = 49;
+            Visible = false;
+            Parent = ScreenGui;
+        });
+
         KeyRowOuter.Visible = false
-        KeyRowOuter.Position = UDim2.new(0, 6, 0, 22) -- start just below divider (collapsed)
+        KeyRowOuter.Size = UDim2.new(1, -12, 0, 0)
 
-        local _keyRowShown = false
+        local function GetPopupHeight()
+            -- base = 24 (title only)
+            -- +28 for key row
+            -- +20 for delete row (if has keybind)
+            local h = 24
+            if KeyRowOuter.Visible then h = h + 28 end
+            if DeleteRowOuter.Visible then h = h + 20 end
+            return h
+        end
 
-        local function ShowKeyRow()
-            if _keyRowShown then return end
-            _keyRowShown = true
-            KeyRowOuter.Visible = true
-            KeyRowOuter.Size = UDim2.new(1, -12, 0, 0)
-            KeyRowOuter.Position = UDim2.new(0, 6, 0, 28)
-            -- animate height from 0 to 16
+        local function UpdateTitleLabel()
+            if TitleLabel then
+                TitleLabel.Text = _hasKeybind and 'create keybind' or 'create keybind'
+            end
+        end
+
+        local function AnimatePopupHeight(targetH, callback)
+            if _animating then return end
+            _animating = true
+            local startH = KeyPopup.Size.Y.Offset
             local start = tick()
-            local dur = 0.18
+            local dur = 0.15
             local conn
             conn = RenderStepped:Connect(function()
                 local t = math.min((tick() - start) / dur, 1)
-                local eased = 1 - (1 - t)^3
-                KeyRowOuter.Size = UDim2.new(1, -12, 0, math.floor(16 * eased))
-                KeyPopup.Size = UDim2.new(0, 130, 0, math.floor(24 + 28 * eased))
+                local e = 1 - (1 - t)^3
+                KeyPopup.Size = UDim2.new(0, 130, 0, math.floor(startH + (targetH - startH) * e))
                 if t >= 1 then
-                    KeyRowOuter.Size = UDim2.new(1, -12, 0, 16)
-                    KeyPopup.Size = UDim2.new(0, 130, 0, 52)
+                    KeyPopup.Size = UDim2.new(0, 130, 0, targetH)
+                    _animating = false
+                    conn:Disconnect()
+                    if callback then callback() end
+                end
+            end)
+        end
+
+        local function OpenPopup()
+            -- reset
+            _picking = false
+            KeyRowOuter.Visible = false
+            KeyRowOuter.Size = UDim2.new(1, -12, 0, 0)
+            DeleteRowOuter.Visible = false
+            KeyPopup.Size = UDim2.new(0, 130, 0, 24)
+
+            -- position beside gear
+            local absPos = GearBtn.AbsolutePosition
+            KeyPopup.Position = UDim2.fromOffset(absPos.X - 116, absPos.Y + 16)
+            KeyPopup.Visible = true
+            Blocker.Visible = true
+            _popupOpen = true
+
+            -- fade popup in (transparency 1→0)
+            KeyPopup.BackgroundTransparency = 1
+            local start = tick()
+            local dur = 0.12
+            local conn
+            conn = RenderStepped:Connect(function()
+                local t = math.min((tick() - start) / dur, 1)
+                KeyPopup.BackgroundTransparency = 1 - t
+                if t >= 1 then
+                    KeyPopup.BackgroundTransparency = 0
                     conn:Disconnect()
                 end
             end)
         end
 
-        -- clicking title row = "create keybind" action
+        local function ClosePopup()
+            _popupOpen = false
+            _picking = false
+            Blocker.Visible = false
+            -- fade out
+            local start = tick()
+            local dur = 0.1
+            local conn
+            conn = RenderStepped:Connect(function()
+                local t = math.min((tick() - start) / dur, 1)
+                KeyPopup.BackgroundTransparency = t
+                if t >= 1 then
+                    KeyPopup.Visible = false
+                    KeyPopup.BackgroundTransparency = 0
+                    conn:Disconnect()
+                end
+            end)
+        end
+
+        local function ShowKeyRow()
+            if KeyRowOuter.Visible then return end
+            -- show delete row too if keybind exists
+            DeleteRowOuter.Visible = _hasKeybind
+            KeyRowOuter.Visible = true
+            KeyRowOuter.Size = UDim2.new(1, -12, 0, 0)
+            DeleteRowOuter.Position = UDim2.new(0, 6, 0, 52)
+            local targetH = _hasKeybind and 72 or 52
+            AnimatePopupHeight(targetH, nil)
+            -- also animate key row height
+            local start = tick()
+            local dur = 0.15
+            local conn
+            conn = RenderStepped:Connect(function()
+                local t = math.min((tick() - start) / dur, 1)
+                local e = 1 - (1 - t)^3
+                KeyRowOuter.Size = UDim2.new(1, -12, 0, math.floor(16 * e))
+                if t >= 1 then
+                    KeyRowOuter.Size = UDim2.new(1, -12, 0, 16)
+                    conn:Disconnect()
+                end
+            end)
+        end
+
+        -- Gear click: toggle popup
+        GearBtn.MouseButton1Click:Connect(function()
+            if _popupOpen then
+                ClosePopup()
+            else
+                OpenPopup()
+            end
+        end)
+
+        -- "create keybind" title row click
         KeyPopupTitleRow.InputBegan:Connect(function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 then
                 ShowKeyRow()
             end
         end)
 
-        GearBtn.MouseButton1Click:Connect(function()
-            if KeyPopup.Visible then
-                KeyPopup.Visible = false
-                _keyRowShown = false
-                KeyRowOuter.Visible = false
-                KeyRowOuter.Size = UDim2.new(1, -12, 0, 0)
-                KeyPopup.Size = UDim2.new(0, 130, 0, 24)
-                return
-            end
-            -- reset state each open
-            _keyRowShown = false
-            KeyRowOuter.Visible = false
-            KeyRowOuter.Size = UDim2.new(1, -12, 0, 0)
-            KeyPopup.Size = UDim2.new(0, 130, 0, 24)
-            -- position popup beside gear
-            local absPos = GearBtn.AbsolutePosition
-            KeyPopup.Position = UDim2.fromOffset(absPos.X - 116, absPos.Y + 16)
-            KeyPopup.Visible = true
-        end)
-
-        -- clicking the key value starts picking
+        -- Key row click: start picking (ignore MB1 as the trigger)
+        local _pickEvent
         KeyRowOuter.InputBegan:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.MouseButton1 then
-                KeyValueLabel.Text = '...'
-                local Event
-                Event = InputService.InputBegan:Connect(function(Input2)
+            if Input.UserInputType ~= Enum.UserInputType.MouseButton1 or _picking then return end
+            _picking = true
+            KeyValueLabel.Text = '...'
+            -- wait one frame so this MB1 doesn't get captured
+            task.delay(0.05, function()
+                if _pickEvent then _pickEvent:Disconnect() end
+                _pickEvent = InputService.InputBegan:Connect(function(Input2)
+                    if not _picking then return end
                     local Key
                     if Input2.UserInputType == Enum.UserInputType.Keyboard then
                         Key = Input2.KeyCode.Name
-                    elseif Input2.UserInputType == Enum.UserInputType.MouseButton1 then
-                        Key = 'MB1'
                     elseif Input2.UserInputType == Enum.UserInputType.MouseButton2 then
                         Key = 'MB2'
                     end
+                    -- ignore MB1 entirely as a keybind
                     if Key then
+                        _picking = false
+                        _hasKeybind = true
                         KeyValueLabel.Text = Key
                         DisplayLabel.Text = Key
                         KeyPicker.Value = Key
                         Library:SafeCallback(KeyPicker.ChangedCallback, Input2.KeyCode or Input2.UserInputType)
                         Library:SafeCallback(KeyPicker.Changed, Input2.KeyCode or Input2.UserInputType)
                         Library:AttemptSave()
-                        Event:Disconnect()
-                        KeyPopup.Visible = false
-                        _keyRowShown = false
-                        KeyRowOuter.Visible = false
-                        KeyRowOuter.Size = UDim2.new(1, -12, 0, 0)
-                        KeyPopup.Size = UDim2.new(0, 130, 0, 24)
+                        _pickEvent:Disconnect()
+                        ClosePopup()
                     end
                 end)
+            end)
+        end)
+
+        -- Delete keybind row click
+        DeleteRowOuter.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                _hasKeybind = false
+                KeyPicker.Value = 'None'
+                KeyValueLabel.Text = 'None'
+                DisplayLabel.Text = 'None'
+                Library:AttemptSave()
+                ClosePopup()
             end
+        end)
+
+        -- Blocker click = close popup
+        Blocker.MouseButton1Click:Connect(function()
+            ClosePopup()
         end)
 
         -- close popup on click outside
