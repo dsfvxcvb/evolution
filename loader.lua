@@ -52,7 +52,7 @@ end
 
 local PROTECTED_URL = "https://raw.githubusercontent.com/dsfvxcvb/evolution/main/protected.lua"
 local UI_URL        = "https://raw.githubusercontent.com/dsfvxcvb/evolution/main/use_kimi.txt"
-local TRAIL_URL     = "https://raw.githubusercontent.com/dsfvxcvb/evolution/main/trail_addon.lua"
+local TRAIL_URL     = "https://raw.githubusercontent.com/dsfvxcvb/evolution/refs/heads/main/trail.lua"
 
 loadUrl(PROTECTED_URL)
 loadUrl(UI_URL)
