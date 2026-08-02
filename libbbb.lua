@@ -1155,7 +1155,7 @@ do
         -- Row: "+ create keybind" (when no keybind) OR "+ edit keybind" (when has keybind)
         local CreateRow, CreateBtn = MakeSimpleRow('create keybind', 'rbxassetid://108529772374237');
         -- Row: "trash delete keybind" (only when has keybind)
-        local DeleteRow, DeleteBtn = MakeSimpleRow('delete keybind', 'rbxassetid://117997203195317');
+        local DeleteRow, DeleteBtn = MakeSimpleRow('delete keybind', 'rbxassetid://111704740561400');
         -- Row: "key | none" (hidden until create/edit clicked)
         local KeyRow = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
