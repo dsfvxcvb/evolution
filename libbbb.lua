@@ -8,9 +8,6 @@ local TweenService = game:GetService('TweenService');
 local RenderStepped = RunService.RenderStepped;
 local LocalPlayer = Players.LocalPlayer;
 local Mouse = LocalPlayer:GetMouse();
-print("texture id")
-print("texture id nigga 2")
-print("NIGGIGIGIGER")
 
 local ProtectGui = protectgui or (syn and syn.protect_gui) or (function() end);
 
@@ -1092,7 +1089,7 @@ do
             BackgroundColor3 = Library.BackgroundColor;
             BorderColor3 = Library.OutlineColor;
             Position = UDim2.fromOffset(0, 0);
-            Size = UDim2.new(0, 130, 0, 52);
+            Size = UDim2.new(0, 130, 0, 24);
             Visible = false;
             ZIndex = 50;
             Parent = ScreenGui;
@@ -1115,7 +1112,7 @@ do
             BackgroundTransparency = 1;
             Position = UDim2.new(0, 0, 0.5, -6);
             Size = UDim2.new(0, 12, 0, 12);
-            Image = 'rbxassetid://108529772374237';
+            Image = 'rbxassetid://1419621057';
             ImageColor3 = Color3.fromRGB(160, 160, 160);
             ZIndex = 52;
             Parent = KeyPopupTitleRow;
@@ -1176,22 +1173,66 @@ do
             Parent = KeyRowOuter;
         });
 
+        -- hide key row by default, only show after "create keybind" clicked
+        KeyRowOuter.Visible = false
+        KeyRowOuter.Position = UDim2.new(0, 6, 0, 22) -- start just below divider (collapsed)
+
+        local _keyRowShown = false
+
+        local function ShowKeyRow()
+            if _keyRowShown then return end
+            _keyRowShown = true
+            KeyRowOuter.Visible = true
+            KeyRowOuter.Size = UDim2.new(1, -12, 0, 0)
+            KeyRowOuter.Position = UDim2.new(0, 6, 0, 28)
+            -- animate height from 0 to 16
+            local start = tick()
+            local dur = 0.18
+            local conn
+            conn = RenderStepped:Connect(function()
+                local t = math.min((tick() - start) / dur, 1)
+                local eased = 1 - (1 - t)^3
+                KeyRowOuter.Size = UDim2.new(1, -12, 0, math.floor(16 * eased))
+                KeyPopup.Size = UDim2.new(0, 130, 0, math.floor(24 + 28 * eased))
+                if t >= 1 then
+                    KeyRowOuter.Size = UDim2.new(1, -12, 0, 16)
+                    KeyPopup.Size = UDim2.new(0, 130, 0, 52)
+                    conn:Disconnect()
+                end
+            end)
+        end
+
+        -- clicking title row = "create keybind" action
+        KeyPopupTitleRow.InputBegan:Connect(function(Input)
+            if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                ShowKeyRow()
+            end
+        end)
+
         GearBtn.MouseButton1Click:Connect(function()
             if KeyPopup.Visible then
                 KeyPopup.Visible = false
+                _keyRowShown = false
+                KeyRowOuter.Visible = false
+                KeyRowOuter.Size = UDim2.new(1, -12, 0, 0)
+                KeyPopup.Size = UDim2.new(0, 130, 0, 24)
                 return
             end
-            -- position popup above/beside the gear button
+            -- reset state each open
+            _keyRowShown = false
+            KeyRowOuter.Visible = false
+            KeyRowOuter.Size = UDim2.new(1, -12, 0, 0)
+            KeyPopup.Size = UDim2.new(0, 130, 0, 24)
+            -- position popup beside gear
             local absPos = GearBtn.AbsolutePosition
-            KeyPopup.Position = UDim2.fromOffset(absPos.X - 100, absPos.Y + 16)
+            KeyPopup.Position = UDim2.fromOffset(absPos.X - 116, absPos.Y + 16)
             KeyPopup.Visible = true
         end)
 
-        -- clicking the key row starts picking
+        -- clicking the key value starts picking
         KeyRowOuter.InputBegan:Connect(function(Input)
             if Input.UserInputType == Enum.UserInputType.MouseButton1 then
                 KeyValueLabel.Text = '...'
-                local Break = false
                 local Event
                 Event = InputService.InputBegan:Connect(function(Input2)
                     local Key
@@ -1203,7 +1244,6 @@ do
                         Key = 'MB2'
                     end
                     if Key then
-                        Break = true
                         KeyValueLabel.Text = Key
                         DisplayLabel.Text = Key
                         KeyPicker.Value = Key
@@ -1212,6 +1252,10 @@ do
                         Library:AttemptSave()
                         Event:Disconnect()
                         KeyPopup.Visible = false
+                        _keyRowShown = false
+                        KeyRowOuter.Visible = false
+                        KeyRowOuter.Size = UDim2.new(1, -12, 0, 0)
+                        KeyPopup.Size = UDim2.new(0, 130, 0, 24)
                     end
                 end)
             end
@@ -3194,7 +3238,7 @@ function Library:CreateWindow(...)
         BackgroundTransparency = 1;
         Position = UDim2.new(0, 3, 0.5, -8);
         Size = UDim2.new(0, 16, 0, 16);
-        Image = 'rbxassetid://118685771787843';
+        Image = 'rbxassetid://2804603877';
         ImageColor3 = Color3.fromRGB(180, 180, 180);
         ZIndex = 11;
         Parent = SearchBox;
