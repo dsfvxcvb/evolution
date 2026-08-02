@@ -3860,4 +3860,3 @@ Players.PlayerRemoving:Connect(OnPlayerChange);
 
 getgenv().Library = Library
 return Library
-print("faceiq mogger")
