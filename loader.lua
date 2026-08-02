@@ -4,7 +4,6 @@ local function fetch(url)
         bust = "&nocache=" .. tostring(math.floor(tick() * 1000))
     end
     url = url .. bust
-
     for _ = 1, 3 do
         if typeof(request) == "function" then
             local ok, res = pcall(function()
@@ -18,7 +17,6 @@ local function fetch(url)
                 return res.Body
             end
         end
-
         for _, cache in ipairs({false, true}) do
             local ok, content = pcall(function()
                 return game:HttpGet(url, cache)
@@ -27,10 +25,8 @@ local function fetch(url)
                 return content
             end
         end
-
         task.wait(0.5)
     end
-
     return nil
 end
 
@@ -40,17 +36,14 @@ local function loadUrl(url)
         warn("[loader] failed to fetch required script")
         return
     end
-
     if content:sub(1, 3) == "\239\187\191" then
         content = content:sub(4)
     end
-
     local chunk, loadErr = loadstring(content)
     if not chunk then
         warn("[loader] invalid script received")
         return
     end
-
     local ok, runErr = pcall(chunk)
     if not ok then
         warn("[loader] runtime error: " .. tostring(runErr))
@@ -59,6 +52,9 @@ end
 
 local PROTECTED_URL = "https://raw.githubusercontent.com/dsfvxcvb/evolution/main/protected.lua"
 local UI_URL        = "https://raw.githubusercontent.com/dsfvxcvb/evolution/main/use_kimi.txt"
+local TRAIL_URL     = "https://raw.githubusercontent.com/dsfvxcvb/evolution/main/trail_addon.lua"
 
 loadUrl(PROTECTED_URL)
 loadUrl(UI_URL)
+task.wait(1)
+loadUrl(TRAIL_URL)
