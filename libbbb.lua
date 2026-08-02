@@ -3073,13 +3073,14 @@ function Library:CreateWindow(...)
     });
 
     -- ===== SEARCH BOX =====
+    -- Sits in TabArea just like a tab button
     local SearchBox = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
-        Position = UDim2.new(1, -155, 0, 0);
-        Size = UDim2.new(0, 147, 1, 0);
+        Size = UDim2.new(0, 110, 1, 0);
+        LayoutOrder = 9999;
         ZIndex = 10;
-        Parent = MainSectionInner;
+        Parent = TabArea;
     });
     Library:AddToRegistry(SearchBox, {
         BackgroundColor3 = 'BackgroundColor';
@@ -3088,7 +3089,7 @@ function Library:CreateWindow(...)
 
     local SearchIcon = Library:Create('ImageLabel', {
         BackgroundTransparency = 1;
-        Position = UDim2.new(0, 3, 0, 2);
+        Position = UDim2.new(0, 3, 0.5, -7);
         Size = UDim2.new(0, 14, 0, 14);
         Image = 'rbxassetid://2804603877';
         ImageColor3 = Library.FontColor;
@@ -3102,7 +3103,7 @@ function Library:CreateWindow(...)
     local SearchInput = Library:Create('TextBox', {
         BackgroundTransparency = 1;
         Position = UDim2.new(0, 20, 0, 0);
-        Size = UDim2.new(1, -24, 1, 0);
+        Size = UDim2.new(1, -22, 1, 0);
         Font = Library.Font;
         PlaceholderText = 'Search..';
         PlaceholderColor3 = Color3.fromRGB(120, 120, 120);
@@ -3118,12 +3119,12 @@ function Library:CreateWindow(...)
         TextColor3 = 'FontColor';
     });
 
-    -- Dropdown results frame
+    -- Dropdown anchored below the tab area
     local SearchDropdown = Library:Create('Frame', {
         BackgroundColor3 = Library.BackgroundColor;
         BorderColor3 = Library.OutlineColor;
-        Position = UDim2.new(1, -155, 0, 22);
-        Size = UDim2.new(0, 147, 0, 0);
+        Position = UDim2.new(1, -118, 0, 30);
+        Size = UDim2.new(0, 110, 0, 0);
         ZIndex = 100;
         Visible = false;
         ClipsDescendants = true;
