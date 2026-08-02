@@ -10,6 +10,23 @@ pcall(function() Library:Unload() end)
 end
 local Library = loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/evolution/refs/heads/main/libbbb.lua'))()
 getgenv().Library = Library
+-- Style the keybind list frame
+task.spawn(function()
+    task.wait(0.5)
+    if Library.KeybindFrame then
+        local frame = Library.KeybindFrame
+        -- accent top bar
+        local bar = Instance.new('Frame')
+        bar.Name = 'KeybindAccentBar'
+        bar.BackgroundColor3 = Library.AccentColor
+        bar.BorderSizePixel = 0
+        bar.Size = UDim2.new(1, 0, 0, 1)
+        bar.ZIndex = frame.ZIndex + 1
+        bar.Parent = frame
+        -- register for theme updates
+        Library:AddToRegistry(bar, { BackgroundColor3 = 'AccentColor' })
+    end
+end)
 local _linoria = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
 local ThemeManager = loadstring(game:HttpGet(_linoria .. 'addons/ThemeManager.lua'))()
 local SaveManager = loadstring(game:HttpGet(_linoria .. 'addons/SaveManager.lua'))()
@@ -735,14 +752,14 @@ local function setDesyncMode(mode)
 desync.mode = mode
 end
 local DesyncSection = CombatAntiAim
-DesyncSection:AddToggle('DesyncToggle',{Text = "desynchronization",
+DesyncSection:AddToggle('DesyncToggle',{Text = "Desync",
 Default = false,
 Callback = function(Value)
 desync.toggleEnabled = (Toggles.DesyncToggle and Toggles.DesyncToggle.Value)
 if not desync.toggleEnabled then
 toggleDesync(false)
 end
-end}):AddKeyPicker('DesyncKeybind',{Text = "desynchronization",
+end}):AddKeyPicker('DesyncKeybind',{Text = "Desync",
 Default = 'V',
 Callback = function(Value)
 if not desync.toggleEnabled or UserInputService:GetFocusedTextBox() then return end
@@ -4687,7 +4704,7 @@ end)
 end
 TargetAimSection:AddToggle('TargetAim',{Text = "Target Aim",
 Default = false,
-Callback = toggleTargetAim}):AddKeyPicker('TargetAimKeybind',{Text = "Target Closest",
+Callback = toggleTargetAim}):AddKeyPicker('TargetAimKeybind',{Text = "Target Aim",
 Default = 'None',
 Callback = onTargetKeybindPressed,
 Mode = 'Toggle'})
@@ -5140,17 +5157,7 @@ if not TargetStrafeConfig.Enabled then
 bodyClone:SetPrimaryPartCFrame(CFrame.new(9999,9999,9999))
 disableHook()
 end
-end}):AddKeyPicker('BulletTPKeybind',{Text = "Bullet TP Toggle",
-Default = 'None',
-Callback = function(Value)
-Toggles.TargetStrafeEnabled:SetValue(not Toggles.TargetStrafeEnabled.Value)
-TargetStrafeConfig.Enabled = (Toggles.TargetStrafeEnabled and Toggles.TargetStrafeEnabled.Value)
-if not TargetStrafeConfig.Enabled then
-bodyClone:SetPrimaryPartCFrame(CFrame.new(9999,9999,9999))
-disableHook()
-end
-end,
-Mode = 'Toggle'})
+end})
 targetstrafe:AddDropdown('StrafeType',{Text = "Strafe Type",
 Values = {"Strafe", "Roll", "Tween", "Random"},
 Default = "Strafe",
@@ -5626,7 +5633,7 @@ end
 end
 WalkableSection:AddToggle('TeleportAway',{Text = "Godmode",
 Default = false,
-Callback = toggleTeleportAway}):AddKeyPicker('TeleportKeybind',{Text = "Godmode Keybind",
+Callback = toggleTeleportAway}):AddKeyPicker('TeleportKeybind',{Text = "Godmode",
 Default = 'None',
 Callback = onTeleportKeybind,
 Mode = 'Toggle'})
@@ -8086,7 +8093,7 @@ do
 getgenv().cframeSpeedEnabled = false
 getgenv().cframeSpeedKeybindActive = false
 getgenv().cframeSpeed = 10
-MiscMovementSection:AddToggle('CFrameSpeedToggle',{Text = "CframeSpeed",
+MiscMovementSection:AddToggle('CFrameSpeedToggle',{Text = "CFrame Speed",
 Default = false,
 Callback = function(Value)
 getgenv().cframeSpeedEnabled = (Toggles.CFrameSpeedToggle and Toggles.CFrameSpeedToggle.Value)
@@ -8201,7 +8208,7 @@ Default = false,
 Callback = function(Value)
 getgenv().FlightEnabled = (Toggles.FlightToggle and Toggles.FlightToggle.Value)
 if not getgenv().FlightEnabled then StopFly() end
-end}):AddKeyPicker('FlightKeybindPicker',{Text = "Flight Keybind",
+end}):AddKeyPicker('FlightKeybindPicker',{Text = "Flight",
 Default = 'None',
 Callback = function(Value)
 if UserInputService:GetFocusedTextBox() then return end
@@ -9592,18 +9599,16 @@ end
 local MenuGroup = Tabs['UI Settings']:AddLeftGroupbox('Menu')
 MenuGroup:AddButton({Text = 'Unload', Func = function() Library:Unload() end})
 MenuGroup:AddLabel('Menu bind'):AddKeyPicker('MenuKeybind', {Default = 'End', NoUI = true, Text = 'Menu keybind'})
-MenuGroup:AddToggle('ModernUI', {
-Text = 'Modern UI',
-Default = false,
+MenuGroup:AddToggle('KeybindList', {
+Text = 'Keybind List',
+Default = true,
 Callback = function(Value)
-if Library.SetModern then
-Library:SetModern(Value)
+if Library.KeybindFrame then
+Library.KeybindFrame.Visible = Value
 end
-task.delay(0.05, function()
-if UpdateMenuGlow then
-UpdateMenuGlow()
+if UpdateKeybindGlow then
+UpdateKeybindGlow()
 end
-end)
 end
 })
 Library.ToggleKeybind = Options.MenuKeybind
@@ -9689,12 +9694,36 @@ end
 end
 -- Apply the initial glow settings now
 UpdateMenuGlow()
+-- Keybind list glow (mirrors menu glow onto KeybindFrame)
+local function UpdateKeybindGlow()
+    if not Library.KeybindFrame then return end
+    local frame = Library.KeybindFrame
+    local oldGlow = frame:FindFirstChild('KeybindGlow')
+    if oldGlow then oldGlow:Destroy() end
+    if not (getgenv().MenuGlowEnabled ~= false) then return end
+    if not (Toggles.KeybindList and Toggles.KeybindList.Value) then return end
+    local glowColor = getgenv().MenuGlowColor or Color3.fromRGB(0, 85, 255)
+    local newGlow = Instance.new('ImageLabel')
+    newGlow.Name = 'KeybindGlow'
+    newGlow.BackgroundTransparency = 1
+    newGlow.Image = 'http://www.roblox.com/asset/?id=18245826428'
+    newGlow.ScaleType = Enum.ScaleType.Slice
+    newGlow.SliceCenter = Rect.new(Vector2.new(21, 21), Vector2.new(79, 79))
+    newGlow.ImageColor3 = glowColor
+    newGlow.ImageTransparency = 1 - (getgenv().MenuGlowTransparency or 0.85)
+    newGlow.Position = UDim2.new(0, -20, 0, -20)
+    newGlow.Size = UDim2.new(1, 40, 1, 40)
+    newGlow.ZIndex = 0
+    newGlow.Parent = frame
+end
+UpdateKeybindGlow()
 MenuGroup:AddToggle('MenuGlowEnabled', {
 Text = "Enable Menu Glow",
 Default = getgenv().MenuGlowEnabled,
 Callback = function(Value)
 getgenv().MenuGlowEnabled = Value
 UpdateMenuGlow()
+UpdateKeybindGlow()
 end
 }):AddColorPicker('MenuGlowColor', {
 Title = "Glow Color",
@@ -9702,6 +9731,7 @@ Default = getgenv().MenuGlowColor,
 Callback = function(Value)
 getgenv().MenuGlowColor = Value
 UpdateMenuGlow()
+UpdateKeybindGlow()
 end
 })
 MenuGroup:AddSlider('MenuGlowTransparency', {
@@ -9713,6 +9743,7 @@ Rounding = 0,
 Callback = function(Value)
 getgenv().MenuGlowTransparency = Value / 100
 UpdateMenuGlow()
+UpdateKeybindGlow()
 end
 })
 -- Hood Customs Addons integration for existing Linoria UI
