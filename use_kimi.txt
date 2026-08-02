@@ -5,7 +5,7 @@ print("bro")
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
 pcall(function() Library:Unload() end)
 end
-local Library = loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/evolution/refs/heads/main/draggable.lua'))()
+local Library = loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/evolution/refs/heads/main/librarrry.lua'))()
 getgenv().Library = Library
 local _linoria = 'https://raw.githubusercontent.com/violin-suzutsuki/LinoriaLib/main/'
 local ThemeManager = loadstring(game:HttpGet(_linoria .. 'addons/ThemeManager.lua'))()
@@ -2394,6 +2394,30 @@ AutoKill.StartCycle()
 end
 end
 })
+
+CombatAutoKill:AddToggle('AutoKillSelectionTarget', {
+Text = "Selection Target",
+Default = false,
+Tooltip = "Use the Target Aim target as the Auto Kill target",
+Callback = function(Value)
+    getgenv().AutoKillSelectionTarget = Value
+end
+})
+
+-- Selection Target sync loop
+RunService.Heartbeat:Connect(function()
+    if not getgenv().AutoKillSelectionTarget then return end
+    local aimTarget = Targeting.Target
+    if aimTarget ~= AutoKill.Target then
+        AutoKill.Target = aimTarget
+        if AutoKill.Enabled then
+            AutoKill.StopCycle()
+            if aimTarget then
+                AutoKill.StartCycle()
+            end
+        end
+    end
+end)
 CombatAutoKill:AddDropdown('AutoKillMethod', {
 Text = "Method",
 Values = {"Knife", "Gun"},
@@ -12480,3 +12504,4 @@ SaveManager:LoadAutoloadConfig()
 if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then
 Toggles.KnifeHitboxToggle:SetValue(true)
 end
+print("accent line")
