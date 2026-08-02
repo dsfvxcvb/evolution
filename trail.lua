@@ -1,16 +1,19 @@
--- Trail Addon for evolution
+-- Trail + Indicator Outline Addon for evolution
 -- Run AFTER use_kimi.txt has loaded
 
 if not getgenv().Tabs then
-    warn("[Trail Addon] Tabs global not found - make sure use_kimi.txt loaded first")
+    warn("[Addon] Tabs global not found")
     return
 end
 
+-- =============================================
+-- TRAIL
+-- =============================================
 local VisualsTrail = getgenv().Tabs.Visuals:AddRightGroupbox("Trail")
 
 local _trailAtt0, _trailAtt1, _trailMain, _trailGlow
 local _trailWidth = 0.07
-local _trailHeight = 0.4  -- controls attachment spread (visual height)
+local _trailHeight = 0.2
 
 local function _destroyTrail()
     if _trailMain then _trailMain:Destroy() _trailMain = nil end
@@ -165,7 +168,6 @@ VisualsTrail:AddDropdown('TrailHeight', {
         elseif Value == 'Tall' then _trailHeight = 0.4
         elseif Value == 'Extra Tall' then _trailHeight = 0.7
         end
-        -- rebuild so attachment positions update
         _refreshTrail()
     end
 })
@@ -182,33 +184,79 @@ VisualsTrail:AddSlider('TrailLifetime', {
     end
 })
 
--- ===== Indicator Outline Color =====
--- Renames "Glow Color" to "Outline Color" and makes it control
--- the OuterBorder frame of the target indicator
+-- =============================================
+-- INDICATOR OUTLINE COLOR
+-- Adds an "Outline Color" picker to the Combat
+-- Target Indicators section and wires it to a
+-- UIStroke on the indicator frame
+-- =============================================
+local _indicatorStroke = nil
+
+local function _applyOutlineColor(color)
+    getgenv().TargetUIBorderColor = color
+    getgenv().TargetUIGlowColor = color
+    -- update the live OuterBorder if indicator is already open
+    if Library and Library._targetUIOuterBorder then
+        Library._targetUIOuterBorder.BackgroundColor3 = color
+    end
+    if Library and Library._targetUITopBar then
+        Library._targetUITopBar.BackgroundColor3 = color
+    end
+    if Library and Library._targetUIGlow then
+        if Library._targetUIGlow.ImageColor3 ~= nil then
+            Library._targetUIGlow.ImageColor3 = color
+        else
+            -- modern style glow holder (frames)
+            for _, child in ipairs(Library._targetUIGlow:GetChildren()) do
+                if child:IsA("Frame") then
+                    child.BackgroundColor3 = color
+                end
+            end
+        end
+    end
+    if _indicatorStroke then
+        _indicatorStroke.Color = color
+    end
+end
+
+-- inject UIStroke once indicator is created
 task.spawn(function()
-    task.wait(2) -- wait for targetui to be created
+    -- wait for the indicator to be built (it's created when targetui() is called)
+    local timeout = tick() + 15
+    repeat task.wait(0.5) until (Library and Library._targetUIInstance) or tick() > timeout
+
     local ui = Library and Library._targetUIInstance
     if not ui then return end
 
-    local outerBorder = Library._targetUIOuterBorder
-    if not outerBorder then return end
-
-    -- Add UIStroke to the main frame for a cleaner outline effect
     local mainFrame = ui:FindFirstChildOfClass("Frame")
     if not mainFrame then return end
 
-    local stroke = Instance.new("UIStroke")
-    stroke.Color = getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
-    stroke.Thickness = 1.5
-    stroke.Transparency = 0
-    stroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
-    stroke.Parent = mainFrame
+    -- add UIStroke for clean outline
+    _indicatorStroke = Instance.new("UIStroke")
+    _indicatorStroke.Color = getgenv().TargetUIBorderColor or Color3.fromRGB(27, 206, 203)
+    _indicatorStroke.Thickness = 1.5
+    _indicatorStroke.Transparency = 0
+    _indicatorStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+    _indicatorStroke.Parent = mainFrame
 
-    -- expose so color picker can update it
-    getgenv()._indicatorStroke = stroke
-
-    -- hide the old OuterBorder since UIStroke replaces it
-    outerBorder.BackgroundTransparency = 1
+    -- hide old OuterBorder (replaced by UIStroke)
+    if Library._targetUIOuterBorder then
+        Library._targetUIOuterBorder.BackgroundTransparency = 1
+    end
 end)
 
-print("[Trail Addon] Loaded successfully")
+-- Add Outline Color picker to Combat > Target Indicators
+local CombatTargetIndicators = getgenv().Tabs and getgenv().Tabs.Combat
+if CombatTargetIndicators then
+    -- AddRightGroupbox so it appears on the right side of Combat tab
+    local OutlineGroup = getgenv().Tabs.Combat:AddRightGroupbox("Indicator Outline")
+    OutlineGroup:AddLabel("Outline Color"):AddColorPicker('IndicatorOutlineColor', {
+        Title = 'Outline Color',
+        Default = Color3.fromRGB(27, 206, 203),
+        Callback = function(Value)
+            _applyOutlineColor(Value)
+        end
+    })
+end
+
+print("[Addon] Trail + Indicator Outline loaded")
