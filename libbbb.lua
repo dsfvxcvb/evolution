@@ -1118,6 +1118,7 @@ do
             ZIndex = 52;
             Parent = KeyPopupTitleRow;
         });
+        print("should work")
 
         Library:CreateLabel({
             Position = UDim2.new(0, 15, 0, 0);
