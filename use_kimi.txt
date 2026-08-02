@@ -41,6 +41,7 @@ Misc = Window:AddTab('Misc'),
 ['UI Settings'] = Window:AddTab('UI Settings'),
 }
 getgenv().Tabs = Tabs
+getgenv().Tabs = Tabs
 local CombatTargetAim = Tabs.Combat:AddLeftGroupbox('Target Aim')
 local CombatProtectPlayer = Tabs.Combat:AddLeftGroupbox('Protect Player')
 local CombatFOV = Tabs.Combat:AddLeftGroupbox('FOV Circle')
