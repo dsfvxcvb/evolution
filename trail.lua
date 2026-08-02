@@ -1,11 +1,5 @@
 -- Trail Addon for evolution
 -- Run AFTER use_kimi.txt has loaded
-
-if not getgenv().Tabs then
-    warn("[Trail Addon] Tabs global not found")
-    return
-end
-
 local VisualsTrail = getgenv().Tabs.Visuals:AddRightGroupbox("Trail")
 
 local _trailAtt0, _trailAtt1, _trailMain, _trailGlow
@@ -222,5 +216,3 @@ if Library and Library.targetui then
         return result
     end
 end
-
-print("[Trail Addon] Loaded")
