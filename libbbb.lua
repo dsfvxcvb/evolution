@@ -1040,11 +1040,10 @@ do
         local KeyPicker = {
             Value = Info.Default;
             Toggled = false;
-            Mode = Info.Mode or 'Toggle'; -- Always, Toggle, Hold
+            Mode = Info.Mode or 'Toggle';
             Type = 'KeyPicker';
             Callback = Info.Callback or function(Value) end;
             ChangedCallback = Info.ChangedCallback or function(New) end;
-
             SyncToggleState = Info.SyncToggleState or false;
         };
 
@@ -1053,40 +1052,39 @@ do
             Info.Mode = 'Toggle'
         end
 
-        -- === KEYBIND: just a gear icon by default ===
+        -- "+ create keybind" label on the right of the toggle label
         local PickOuter = Library:Create('Frame', {
             BackgroundTransparency = 1;
             BorderSizePixel = 0;
             AnchorPoint = Vector2.new(1, 0.5);
             Position = UDim2.new(1, 0, 0.5, 0);
-            Size = UDim2.new(0, 14, 0, 14);
+            Size = UDim2.new(0, 95, 0, 15);
             ZIndex = 6;
             Parent = ToggleLabel;
         });
 
-        -- hidden display label still needed for internal Update() calls
         local DisplayLabel = Library:CreateLabel({
-            Size = UDim2.new(0, 0, 0, 0);
-            TextSize = 12;
-            Text = Info.Default;
-            Visible = false;
-            ZIndex = 6;
-            Parent = PickOuter;
-        });
-
-        -- gear icon button
-        local GearBtn = Library:Create('ImageButton', {
-            BackgroundTransparency = 1;
             Size = UDim2.new(1, 0, 1, 0);
-            Image = 'rbxassetid://7059346373';
-            ImageColor3 = Color3.fromRGB(160, 160, 160);
+            TextSize = 12;
+            Text = Info.Default == 'None' and '+ create keybind' or '[' .. Info.Default .. ']';
+            TextXAlignment = Enum.TextXAlignment.Right;
             ZIndex = 7;
             Parent = PickOuter;
         });
 
-        -- key popup
-        local ROW_H = 22
-        local POPUP_W = 140
+        -- ContainerLabel for keybind list panel
+        local ContainerLabel = Library:CreateLabel({
+            TextXAlignment = Enum.TextXAlignment.Left;
+            Size = UDim2.new(1, 0, 0, 18);
+            TextSize = 13;
+            Visible = false;
+            ZIndex = 110;
+            Parent = Library.KeybindContainer;
+        }, true);
+
+        -- Popup
+        local POPUP_W = 140;
+        local ROW_H = 22;
 
         local KeyPopup = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
@@ -1098,41 +1096,45 @@ do
             ClipsDescendants = true;
             Parent = ScreenGui;
         });
-        Library:AddToRegistry(KeyPopup, {
-            BackgroundColor3 = 'BackgroundColor';
-            BorderColor3 = 'OutlineColor';
-        });
+        Library:AddToRegistry(KeyPopup, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
 
-        local function MakeRow(yPos, labelText)
+        local function MakeRow(icon, label)
             local row = Library:Create('Frame', {
                 BackgroundColor3 = Library.MainColor;
                 BorderSizePixel = 0;
-                Position = UDim2.new(0, 0, 0, yPos);
                 Size = UDim2.new(1, 0, 0, ROW_H);
                 ZIndex = 51;
                 Parent = KeyPopup;
             });
             Library:AddToRegistry(row, { BackgroundColor3 = 'MainColor' });
-            -- accent line on top
-            local accent = Library:Create('Frame', {
+            Library:Create('Frame', {
                 BackgroundColor3 = Library.AccentColor;
                 BorderSizePixel = 0;
                 Size = UDim2.new(1, 0, 0, 2);
                 ZIndex = 52;
                 Parent = row;
             });
-            Library:AddToRegistry(accent, { BackgroundColor3 = 'AccentColor' });
-            -- label
+            if icon ~= '' then
+                Library:Create('ImageLabel', {
+                    BackgroundTransparency = 1;
+                    Position = UDim2.new(0, 4, 0.5, -7);
+                    Size = UDim2.new(0, 14, 0, 14);
+                    Image = icon;
+                    ImageColor3 = Color3.fromRGB(180, 180, 180);
+                    ZIndex = 53;
+                    Parent = row;
+                });
+            end
             Library:CreateLabel({
-                Position = UDim2.new(0, 8, 0, 2);
+                Position = UDim2.new(0, icon ~= '' and 22 or 8, 0, 2);
                 Size = UDim2.new(1, -8, 1, -2);
                 TextSize = 12;
-                Text = labelText;
+                Text = label;
                 TextXAlignment = Enum.TextXAlignment.Left;
                 ZIndex = 53;
                 Parent = row;
             });
-            -- click button overlay
+            Library:AddToRegistry(row, { BackgroundColor3 = 'MainColor' });
             local btn = Library:Create('TextButton', {
                 BackgroundTransparency = 1;
                 Size = UDim2.new(1, 0, 1, 0);
@@ -1140,24 +1142,60 @@ do
                 ZIndex = 54;
                 Parent = row;
             });
-            return row, btn
+            return row, btn;
         end
 
-        local CreateRow, CreateBtn = MakeRow(0, 'create keybind')
-        local DeleteRow, DeleteBtn = MakeRow(ROW_H, 'delete keybind')
-        DeleteRow.Visible = false
+        -- Row 1: create keybind (always shown when popup opens)
+        local CreateRow, CreateBtn = MakeRow('rbxassetid://108529772374237', 'create keybind');
 
-        -- key value label inside CreateRow (right side)
+        -- Row 2: delete keybind (only shown when keybind exists, no edit open)
+        local DeleteRow, DeleteBtn = MakeRow('rbxassetid://2804603877', 'delete keybind');
+        DeleteRow.Visible = false;
+
+        -- Row 3: edit keybind (shown after clicking edit)
+        -- "key" label + value on right
+        local EditRow = Library:Create('Frame', {
+            BackgroundColor3 = Library.MainColor;
+            BorderSizePixel = 0;
+            Size = UDim2.new(1, 0, 0, ROW_H);
+            ZIndex = 51;
+            Parent = KeyPopup;
+        });
+        Library:AddToRegistry(EditRow, { BackgroundColor3 = 'MainColor' });
+        Library:Create('Frame', {
+            BackgroundColor3 = Library.AccentColor;
+            BorderSizePixel = 0;
+            Size = UDim2.new(1, 0, 0, 2);
+            ZIndex = 52;
+            Parent = EditRow;
+        });
+        Library:CreateLabel({
+            Position = UDim2.new(0, 8, 0, 2);
+            Size = UDim2.new(0, 30, 1, -2);
+            TextSize = 12;
+            Text = 'key';
+            TextXAlignment = Enum.TextXAlignment.Left;
+            ZIndex = 53;
+            Parent = EditRow;
+        });
         local KeyValueLabel = Library:CreateLabel({
             AnchorPoint = Vector2.new(1, 0.5);
-            Position = UDim2.new(1, -8, 0.5, 0);
-            Size = UDim2.new(0, 60, 1, -4);
+            Position = UDim2.new(1, -6, 0.5, 0);
+            Size = UDim2.new(0, 80, 1, -4);
             TextSize = 11;
             Text = Info.Default;
             TextXAlignment = Enum.TextXAlignment.Right;
-            ZIndex = 55;
-            Parent = CreateRow;
+            ZIndex = 53;
+            Parent = EditRow;
         });
+        local EditRowBtn = Library:Create('TextButton', {
+            BackgroundTransparency = 1;
+            Size = UDim2.new(1, 0, 1, 0);
+            Text = '';
+            ZIndex = 54;
+            Parent = EditRow;
+        });
+        EditRow.Visible = false;
 
         -- Blocker
         local Blocker = Library:Create('TextButton', {
@@ -1169,72 +1207,77 @@ do
             Parent = ScreenGui;
         });
 
-        local _hasKeybind = (Info.Default ~= 'None')
-        local _picking = false
-        local _popupOpen = false
-        local _typewriterConn = nil
+        local _hasKeybind = (Info.Default ~= 'None');
+        local _editOpen = false;
+        local _picking = false;
+        local _popupOpen = false;
+        local _typeConn = nil;
 
         local function StopTypewriter()
-            if _typewriterConn then
-                _typewriterConn:Disconnect()
-                _typewriterConn = nil
-            end
+            if _typeConn then _typeConn:Disconnect() _typeConn = nil end
         end
 
         local function StartTypewriter()
             StopTypewriter()
-            local dots = 0
-            local last = tick()
-            _typewriterConn = RenderStepped:Connect(function()
-                if tick() - last >= 0.4 then
+            local dots = 0; local last = tick()
+            _typeConn = RenderStepped:Connect(function()
+                if tick()-last >= 0.4 then
                     last = tick()
-                    dots = (dots % 3) + 1
+                    dots = (dots%3)+1
                     KeyValueLabel.Text = string.rep('.', dots)
                 end
             end)
         end
 
-        local function GetTargetH()
-            return _hasKeybind and (ROW_H * 2) or ROW_H
+        -- Layout rows in popup (only visible ones stacked)
+        local function LayoutPopup()
+            local y = 0
+            for _, row in ipairs({CreateRow, DeleteRow, EditRow}) do
+                if row.Visible then
+                    row.Position = UDim2.new(0, 0, 0, y)
+                    y = y + ROW_H
+                end
+            end
+            return y
         end
 
-        local function AnimPopup(targetH, onDone)
+        local function AnimPopup(targetH)
             local startH = KeyPopup.Size.Y.Offset
-            local s = tick()
-            local dur = 0.15
+            local s = tick(); local dur = 0.15
             local conn
             conn = RenderStepped:Connect(function()
                 local t = math.min((tick()-s)/dur, 1)
                 local e = 1-(1-t)^3
                 KeyPopup.Size = UDim2.new(0, POPUP_W, 0, math.floor(startH+(targetH-startH)*e))
-                if t >= 1 then
-                    KeyPopup.Size = UDim2.new(0, POPUP_W, 0, targetH)
-                    conn:Disconnect()
-                    if onDone then onDone() end
-                end
+                if t>=1 then KeyPopup.Size=UDim2.new(0,POPUP_W,0,targetH) conn:Disconnect() end
             end)
         end
 
         local function OpenPopup()
             _picking = false
+            _editOpen = false
             StopTypewriter()
+            -- set state
             KeyValueLabel.Text = KeyPicker.Value
-            -- show/hide delete row
+            CreateRow.Visible = true
             DeleteRow.Visible = _hasKeybind
-            -- position beside gear
-            local p = GearBtn.AbsolutePosition
-            KeyPopup.Position = UDim2.fromOffset(p.X - POPUP_W + 14, p.Y + 16)
+            EditRow.Visible = false
+            local targetH = LayoutPopup()
+            -- position
+            local p = PickOuter.AbsolutePosition
+            KeyPopup.Position = UDim2.fromOffset(p.X + PickOuter.AbsoluteSize.X - POPUP_W, p.Y + 18)
             KeyPopup.Size = UDim2.new(0, POPUP_W, 0, 0)
             KeyPopup.Visible = true
             Blocker.Visible = true
             _popupOpen = true
-            AnimPopup(GetTargetH(), nil)
+            AnimPopup(targetH)
         end
 
         local function ClosePopup()
             if not _popupOpen then return end
             _popupOpen = false
             _picking = false
+            _editOpen = false
             StopTypewriter()
             Blocker.Visible = false
             local startH = KeyPopup.Size.Y.Offset
@@ -1243,23 +1286,39 @@ do
             conn = RenderStepped:Connect(function()
                 local t = math.min((tick()-s)/dur, 1)
                 local e = 1-(1-t)^3
-                KeyPopup.Size = UDim2.new(0, POPUP_W, 0, math.floor(startH*(1-e)))
-                if t >= 1 then
+                KeyPopup.Size = UDim2.new(0,POPUP_W,0, math.floor(startH*(1-e)))
+                if t>=1 then
                     KeyPopup.Visible = false
-                    KeyPopup.Size = UDim2.new(0, POPUP_W, 0, 0)
+                    KeyPopup.Size = UDim2.new(0,POPUP_W,0,0)
                     conn:Disconnect()
                 end
             end)
         end
 
-        -- Gear: toggle popup
-        GearBtn.MouseButton1Click:Connect(function()
+        -- Click label to open popup
+        local PickBtn = Library:Create('TextButton', {
+            BackgroundTransparency = 1;
+            Size = UDim2.new(1, 0, 1, 0);
+            Text = '';
+            ZIndex = 8;
+            Parent = PickOuter;
+        });
+        PickBtn.MouseButton1Click:Connect(function()
             if _popupOpen then ClosePopup() else OpenPopup() end
         end)
 
-        -- "create keybind" row: start picking
-        local _pickEvent
+        -- "create keybind" row: show edit row to pick key
         CreateBtn.MouseButton1Click:Connect(function()
+            if _editOpen then return end
+            _editOpen = true
+            EditRow.Visible = true
+            local targetH = LayoutPopup()
+            AnimPopup(targetH)
+        end)
+
+        -- Edit row: click to pick key
+        local _pickEvent
+        EditRowBtn.MouseButton1Click:Connect(function()
             if _picking then return end
             _picking = true
             StartTypewriter()
@@ -1278,7 +1337,7 @@ do
                         _hasKeybind = true
                         StopTypewriter()
                         KeyValueLabel.Text = Key
-                        DisplayLabel.Text = Key
+                        DisplayLabel.Text = '[' .. Key .. ']'
                         KeyPicker.Value = Key
                         Library:SafeCallback(KeyPicker.ChangedCallback, Input2.KeyCode or Input2.UserInputType)
                         Library:SafeCallback(KeyPicker.Changed, Input2.KeyCode or Input2.UserInputType)
@@ -1290,70 +1349,166 @@ do
             end)
         end)
 
-        -- "delete keybind" row
+        -- "delete keybind"
         DeleteBtn.MouseButton1Click:Connect(function()
             _hasKeybind = false
             KeyPicker.Value = 'None'
             KeyValueLabel.Text = 'None'
-            DisplayLabel.Text = 'None'
+            DisplayLabel.Text = '+ create keybind'
             Library:AttemptSave()
             ClosePopup()
         end)
 
-        -- Blocker = close
+        -- Blocker
         Blocker.MouseButton1Click:Connect(function()
             ClosePopup()
         end)
-        -- picking now handled via gear icon popup (KeyRowOuter.InputBegan above)
-        PickOuter.InputBegan:Connect(function(Input)
-            if Input.UserInputType == Enum.UserInputType.MouseButton2 and not Library:MouseIsOverOpenedFrame() then
-                ModeSelectOuter.Visible = true;
-            end;
-        end);
+
+        -- Mode select (right click on label, kept for compatibility)
+        local Modes = Info.Modes or { 'Always', 'Toggle', 'Hold' };
+        local ModeSelectOuter = Library:Create('Frame', {
+            BorderColor3 = Color3.new(0, 0, 0);
+            Position = UDim2.fromOffset(0, 0);
+            Size = UDim2.new(0, 60, 0, #Modes * 15 + 2);
+            Visible = false;
+            ZIndex = 14;
+            Parent = ScreenGui;
+        });
+        local ModeSelectInner = Library:Create('Frame', {
+            BackgroundColor3 = Library.BackgroundColor;
+            BorderColor3 = Library.OutlineColor;
+            BorderMode = Enum.BorderMode.Inset;
+            Size = UDim2.new(1, 0, 1, 0);
+            ZIndex = 15;
+            Parent = ModeSelectOuter;
+        });
+        Library:AddToRegistry(ModeSelectInner, { BackgroundColor3 = 'BackgroundColor'; BorderColor3 = 'OutlineColor'; });
+        Library:Create('UIListLayout', {
+            FillDirection = Enum.FillDirection.Vertical;
+            SortOrder = Enum.SortOrder.LayoutOrder;
+            Parent = ModeSelectInner;
+        });
+
+        local ModeButtons = {};
+        for _, Mode in next, Modes do
+            local ModeButton = {};
+            local Label = Library:CreateLabel({
+                Active = false;
+                Size = UDim2.new(1, 0, 0, 15);
+                TextSize = 13;
+                Text = Mode;
+                ZIndex = 16;
+                Parent = ModeSelectInner;
+            });
+            Library:AddToRegistry(Label, { TextColor3 = 'FontColor' });
+            function ModeButton:Select()
+                for _, B in next, ModeButtons do B:Deselect() end
+                KeyPicker.Mode = Mode;
+                Label.TextColor3 = Library.AccentColor;
+                Library.RegistryMap[Label].Properties.TextColor3 = 'AccentColor';
+                ModeSelectOuter.Visible = false;
+            end
+            function ModeButton:Deselect()
+                KeyPicker.Mode = nil;
+                Label.TextColor3 = Library.FontColor;
+                Library.RegistryMap[Label].Properties.TextColor3 = 'FontColor';
+            end
+            Label.InputBegan:Connect(function(Input)
+                if Input.UserInputType == Enum.UserInputType.MouseButton1 then
+                    ModeButton:Select(); Library:AttemptSave();
+                end
+            end)
+            if Mode == KeyPicker.Mode then ModeButton:Select() end
+            ModeButtons[Mode] = ModeButton;
+        end
+
+        function KeyPicker:Update()
+            if Info.NoUI then return end
+            local State = KeyPicker:GetState();
+            DisplayLabel.Text = _hasKeybind and ('[' .. KeyPicker.Value .. ']') or '+ create keybind';
+            ContainerLabel.Text = string.format('[%s] %s (%s)', KeyPicker.Value, Info.Text, KeyPicker.Mode or 'Toggle');
+            ContainerLabel.Visible = true;
+            ContainerLabel.TextColor3 = State and Library.AccentColor or Library.FontColor;
+            Library.RegistryMap[ContainerLabel].Properties.TextColor3 = State and 'AccentColor' or 'FontColor';
+            local YSize = 0; local XSize = 0;
+            for _, Label in next, Library.KeybindContainer:GetChildren() do
+                if Label:IsA('TextLabel') and Label.Visible then
+                    YSize = YSize + 18;
+                    if Label.TextBounds.X > XSize then XSize = Label.TextBounds.X end
+                end
+            end
+            Library.KeybindFrame.Size = UDim2.new(0, math.max(XSize+10, 210), 0, YSize+23);
+        end
+
+        function KeyPicker:GetState()
+            if KeyPicker.Mode == 'Always' then return true
+            elseif KeyPicker.Mode == 'Hold' then
+                if KeyPicker.Value == 'None' then return false end
+                if KeyPicker.Value == 'MB1' then return InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton1)
+                elseif KeyPicker.Value == 'MB2' then return InputService:IsMouseButtonPressed(Enum.UserInputType.MouseButton2)
+                else return InputService:IsKeyDown(Enum.KeyCode[KeyPicker.Value]) end
+            end
+            return KeyPicker.Toggled;
+        end
+
+        function KeyPicker:SetValue(Data)
+            local Key, Mode = Data[1], Data[2];
+            KeyPicker.Value = Key;
+            if Mode and ModeButtons[Mode] then ModeButtons[Mode]:Select() end
+            KeyPicker:Update();
+        end
+
+        function KeyPicker:OnClick(Callback) KeyPicker.Clicked = Callback end
+        function KeyPicker:OnChanged(Callback)
+            KeyPicker.Changed = Callback
+            Callback(KeyPicker.Value)
+        end
+
+        table.insert(ParentObj.Addons, KeyPicker)
+
+        function KeyPicker:DoClick()
+            if ParentObj.Type == 'Toggle' and KeyPicker.SyncToggleState then
+                ParentObj:SetValue(KeyPicker.Toggled)
+            end
+            Library:SafeCallback(KeyPicker.Callback, KeyPicker.Toggled)
+        end
+
+        local Picking = false;
 
         Library:GiveSignal(InputService.InputBegan:Connect(function(Input)
-            if (not Picking) then
+            if not Picking then
                 if KeyPicker.Mode == 'Toggle' then
                     local Key = KeyPicker.Value;
-
                     if Key == 'MB1' or Key == 'MB2' then
                         if Key == 'MB1' and Input.UserInputType == Enum.UserInputType.MouseButton1
                         or Key == 'MB2' and Input.UserInputType == Enum.UserInputType.MouseButton2 then
                             KeyPicker.Toggled = not KeyPicker.Toggled
                             KeyPicker:DoClick()
-                        end;
+                        end
                     elseif Input.UserInputType == Enum.UserInputType.Keyboard then
                         if Input.KeyCode.Name == Key then
                             KeyPicker.Toggled = not KeyPicker.Toggled;
                             KeyPicker:DoClick()
-                        end;
-                    end;
-                end;
-
+                        end
+                    end
+                end
                 KeyPicker:Update();
-            end;
-
+            end
             if Input.UserInputType == Enum.UserInputType.MouseButton1 then
                 local AbsPos, AbsSize = ModeSelectOuter.AbsolutePosition, ModeSelectOuter.AbsoluteSize;
-
                 if Mouse.X < AbsPos.X or Mouse.X > AbsPos.X + AbsSize.X
-                    or Mouse.Y < (AbsPos.Y - 20 - 1) or Mouse.Y > AbsPos.Y + AbsSize.Y then
-
+                    or Mouse.Y < (AbsPos.Y-20-1) or Mouse.Y > AbsPos.Y + AbsSize.Y then
                     ModeSelectOuter.Visible = false;
-                end;
-            end;
+                end
+            end
         end))
 
         Library:GiveSignal(InputService.InputEnded:Connect(function(Input)
-            if (not Picking) then
-                KeyPicker:Update();
-            end;
+            if not Picking then KeyPicker:Update() end
         end))
 
         KeyPicker:Update();
-
         Options[Idx] = KeyPicker;
-
         return self;
     end;
 
