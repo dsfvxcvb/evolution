@@ -1155,8 +1155,7 @@ do
         -- Row: "+ create keybind" (when no keybind) OR "+ edit keybind" (when has keybind)
         local CreateRow, CreateBtn = MakeSimpleRow('create keybind', 'rbxassetid://108529772374237');
         -- Row: "trash delete keybind" (only when has keybind)
-        local DeleteRow, DeleteBtn = MakeSimpleRow('delete keybind', 'rbxassetid://111704740561400');
-        print("helloo")
+        local DeleteRow, DeleteBtn = MakeSimpleRow('delete keybind', 'rbxassetid://117997203195317');
         -- Row: "key | none" (hidden until create/edit clicked)
         local KeyRow = Library:Create('Frame', {
             BackgroundColor3 = Library.BackgroundColor;
@@ -1435,10 +1434,18 @@ do
             if Info.NoUI then return end
             local State = KeyPicker:GetState();
             DisplayLabel.Text = KeyPicker.Value;
-            ContainerLabel.Text = string.format('[%s] %s (%s)', KeyPicker.Value, Info.Text, KeyPicker.Mode or 'Toggle');
-            ContainerLabel.Visible = true;
-            ContainerLabel.TextColor3 = State and Library.AccentColor or Library.FontColor;
-            Library.RegistryMap[ContainerLabel].Properties.TextColor3 = State and 'AccentColor' or 'FontColor';
+            -- only show in keybind list if key is bound AND parent toggle is on
+            local hasBind = KeyPicker.Value and KeyPicker.Value ~= 'None'
+            local parentOn = true
+            if ParentObj and ParentObj.Type == 'Toggle' then
+                parentOn = ParentObj.Value == true
+            end
+            ContainerLabel.Text = string.format('[%s] %s', KeyPicker.Value, Info.Text);
+            ContainerLabel.Visible = hasBind and parentOn;
+            if hasBind then
+                ContainerLabel.TextColor3 = State and Library.AccentColor or Library.FontColor;
+                Library.RegistryMap[ContainerLabel].Properties.TextColor3 = State and 'AccentColor' or 'FontColor';
+            end
             local YSize = 0; local XSize = 0;
             for _, Label in next, Library.KeybindContainer:GetChildren() do
                 if Label:IsA('TextLabel') and Label.Visible then
