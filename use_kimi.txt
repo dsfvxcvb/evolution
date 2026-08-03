@@ -1,6 +1,10 @@
 -- ============================================
 -- MAIN SCRIPT
 -- ============================================
+print("bro")
+print("sososso")
+print("outline slave")
+print("los pollos")
 if typeof(Library) == "table" and typeof(Library.Unload) == "function" then
 pcall(function() Library:Unload() end)
 end
@@ -79,6 +83,7 @@ local VisualsCrosshair = Tabs.Visuals:AddRightGroupbox('Crosshair')
 local VisualsClient = Tabs.Visuals:AddRightGroupbox('Client')
 local VisualsGunMaterial = Tabs.Visuals:AddRightGroupbox('Gun Material')
 local VisualsAspectRatio = Tabs.Visuals:AddRightGroupbox('Aspect Ratio')
+
 -- ===== ESP UI Controls =====
 do
 local function GetEspTable()
@@ -2636,6 +2641,7 @@ getgenv().Players = Players
 getgenv().AutoStompEnabled = true
 
 loadstring(game:HttpGet('https://raw.githubusercontent.com/dsfvxcvb/hvh-test/refs/heads/main/hvh7.lua'))()
+print("testing hvh")
 
 do
 AutoKill.StandConfig = {
@@ -12561,3 +12567,4 @@ SaveManager:LoadAutoloadConfig()
 if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then
 Toggles.KnifeHitboxToggle:SetValue(true)
 end
+print("accent liner ass nigga")
