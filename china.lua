@@ -108,12 +108,13 @@ local function _buildHat()
         for i = 1, BRIM_SEGMENTS do
             local angle = (i / BRIM_SEGMENTS) * math.pi * 2
             local world = hatCF:PointToWorldSpace(Vector3.new(math.cos(angle)*_hatWidth, 0, math.sin(angle)*_hatWidth))
-            local sp, _, z = cam:WorldToViewportPoint(world)
-            table.insert(brimPoints, {screen = Vector2.new(sp.X, sp.Y), z = z})
+            local sp, onScreen = cam:WorldToViewportPoint(world)
+            table.insert(brimPoints, {screen = Vector2.new(sp.X, sp.Y), z = sp.Z, onScreen = onScreen})
         end
 
         local tipWorld = hatCF:PointToWorldSpace(Vector3.new(0, _hatHeight, 0))
-        local tsp, _, tipZ = cam:WorldToViewportPoint(tipWorld)
+        local tsp, tipOnScreen = cam:WorldToViewportPoint(tipWorld)
+        local tipZ = tsp.Z
         local tipScreen = Vector2.new(tsp.X, tsp.Y)
         if tipZ <= 0 then setAllVisible(false) return end
 
@@ -140,8 +141,9 @@ local function _buildHat()
         for i = 1, RIB_COUNT do
             local angle = (i / RIB_COUNT) * math.pi * 2
             local world = hatCF:PointToWorldSpace(Vector3.new(math.cos(angle)*_hatWidth, 0, math.sin(angle)*_hatWidth))
-            local sp, _, z = cam:WorldToViewportPoint(world)
+            local sp = cam:WorldToViewportPoint(world)
             local screen = Vector2.new(sp.X, sp.Y)
+            local z = sp.Z
             local ribDir = (world - cam.CFrame.Position).Unit
             local dot = ribDir:Dot(cam.CFrame.LookVector)
             _ribLines[i].From = tipScreen
