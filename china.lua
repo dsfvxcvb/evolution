@@ -203,4 +203,4 @@ VisualsChinaHat:AddSlider('ChinaHatWidth', {
     Callback = function(Value) _hatWidth = Value / 10 end
 })
 
-print("[China Hat] Loaded")
+print("Peakka boob")
