@@ -1666,17 +1666,22 @@ pcall(function()
         local o = root.CFrame
         local originalVel = root.AssemblyLinearVelocity
         local cam = workspace.CurrentCamera
-        local originalSubject = cam.CameraSubject
+        getgenv()._spoofing = true
         getgenv().AutoKillSetback.CFrame = CFrame.new(o.Position)
         cam.CameraSubject = getgenv().AutoKillSetback
         root.CFrame = spoofCF
         root.AssemblyLinearVelocity = Vector3.zero
         root.AssemblyAngularVelocity = Vector3.zero
         RunService.RenderStepped:Wait()
-        AutoKill.TryStab()
+        pcall(function() AutoKill.TryStab() end)
         root.CFrame = o
         root.AssemblyLinearVelocity = originalVel
-        cam.CameraSubject = originalSubject
+        if cam.CameraSubject == getgenv().AutoKillSetback then
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            cam.CameraSubject = hum or cam.CameraSubject
+        end
+        getgenv()._spoofing = false
     else
         root.CFrame = spoofCF
         root.AssemblyLinearVelocity = Vector3.zero
@@ -2084,7 +2089,7 @@ if getgenv().AutoKillSpoof then
     local o = root.CFrame
     local originalVel = root.AssemblyLinearVelocity
     local cam = workspace.CurrentCamera
-    local originalSubject = cam.CameraSubject
+    getgenv()._spoofing = true
     getgenv().AutoKillSetback.CFrame = CFrame.new(o.Position)
     cam.CameraSubject = getgenv().AutoKillSetback
     root.CFrame = targetCF
@@ -2092,7 +2097,12 @@ if getgenv().AutoKillSpoof then
     RunService.RenderStepped:Wait()
     root.CFrame = o
     root.AssemblyLinearVelocity = originalVel
-    cam.CameraSubject = originalSubject
+    if cam.CameraSubject == getgenv().AutoKillSetback then
+        local char = LocalPlayer.Character
+        local hum = char and char:FindFirstChildOfClass("Humanoid")
+        cam.CameraSubject = hum or cam.CameraSubject
+    end
+    getgenv()._spoofing = false
 else
     root.CFrame = targetCF
     root.Velocity = Vector3.new(0, 0, 0)
@@ -2366,6 +2376,17 @@ AutoKill.GunMethod.IsKilling = false
 AutoKill.StopAutoStomp()
 AutoKill.UnhideCharacter()
 AutoKill.RemoveVoidPlatform()
+-- restore camera subject if spoof left it on the setback
+pcall(function()
+    local cam = workspace.CurrentCamera
+    if getgenv().AutoKillSpoof and getgenv().AutoKillSetback then
+        if cam.CameraSubject == getgenv().AutoKillSetback then
+            local char = LocalPlayer.Character
+            local hum = char and char:FindFirstChildOfClass("Humanoid")
+            if hum then cam.CameraSubject = hum end
+        end
+    end
+end)
 pcall(function()
 local char = LocalPlayer.Character
 local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -2392,6 +2413,10 @@ AutoKill.UpdateUI("off")
 end
 function AutoKill.StartCycle()
 if not AutoKill.Enabled then return end
+-- wait for any in-progress spoof frame to finish before starting
+if getgenv()._spoofing then
+    task.wait(0.05)
+end
 if not AutoKill.Target then
 AutoKill.AdvanceTarget()
 end
@@ -2600,6 +2625,9 @@ CombatAutoKill:AddToggle('SpectateAutoKillTarget', {
 
 RunService.RenderStepped:Connect(function()
     if not (Toggles.SpectateAutoKillTarget and Toggles.SpectateAutoKillTarget.Value) then return end
+    -- don't override camera subject during spoof frame
+    if getgenv()._spoofing then return end
+    if getgenv().AutoKillSpoof and getgenv().AutoKillSetback and workspace.CurrentCamera.CameraSubject == getgenv().AutoKillSetback then return end
     local target = AutoKill.Target
     if target and target.Character then
         local hum = target.Character:FindFirstChildOfClass("Humanoid")
@@ -12568,3 +12596,4 @@ if Toggles.KnifeHitboxToggle and not Toggles.KnifeHitboxToggle.Value then
 Toggles.KnifeHitboxToggle:SetValue(true)
 end
 print("accent liner ass nigga")
+print("spoof all auto kill")
