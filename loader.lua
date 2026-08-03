@@ -53,6 +53,7 @@ local BASE = "https://raw.githubusercontent.com/dsfvxcvb/evolution/refs/heads/ma
 
 loadUrl(BASE .. "protected.lua")
 loadUrl(BASE .. "use_kimi.txt")
+loadUrl(BASE .. "esp.lua")
 task.wait(1)
 loadUrl(BASE .. "trail.lua")
 loadUrl(BASE .. "china.lua")
