@@ -18,6 +18,7 @@ local _hatWidth = 1.4
 local BRIM_SEGMENTS = 48
 local RIB_COUNT = 18
 local HEAD_Y_OFFSET = 0
+print("0 offset")
 
 local _fillTris = {}
 local _brimLines = {}
