@@ -17,9 +17,9 @@ local _hatWidth = 1.4
 
 local BRIM_SEGMENTS = 48
 local RIB_COUNT = 18
-local HEAD_Y_OFFSET = 0
-print("0 offset")
-print("brororororo")
+local _brimSegments = 48
+local _ribCount = 18
+local HEAD_Y_OFFSET = 0.75
 
 local _fillTris = {}
 local _brimLines = {}
@@ -41,6 +41,8 @@ end
 local function _buildHat()
     _destroyHat()
 
+    BRIM_SEGMENTS = _brimSegments
+    RIB_COUNT = _ribCount
     for i = 1, BRIM_SEGMENTS do
         local t = Drawing.new("Triangle")
         t.Color = _hatColor1
@@ -205,4 +207,29 @@ VisualsChinaHat:AddSlider('ChinaHatWidth', {
     Callback = function(Value) _hatWidth = Value / 10 end
 })
 
-print("Peakka boob")
+VisualsChinaHat:AddSlider('ChinaHatSides', {
+    Text = 'Sides',
+    Min = 3,
+    Max = 64,
+    Default = 48,
+    Rounding = 0,
+    Callback = function(Value)
+        _brimSegments = Value
+        if _hatEnabled then _buildHat() end
+    end
+})
+
+VisualsChinaHat:AddSlider('ChinaHatRibs', {
+    Text = 'Ribs',
+    Min = 3,
+    Max = 64,
+    Default = 18,
+    Rounding = 0,
+    Callback = function(Value)
+        _ribCount = Value
+        if _hatEnabled then _buildHat() end
+    end
+})
+
+print("[China Hat] Loaded")
+print("brutal")
