@@ -19,6 +19,7 @@ local BRIM_SEGMENTS = 48
 local RIB_COUNT = 18
 local HEAD_Y_OFFSET = 0
 print("0 offset")
+print("brororororo")
 
 local _fillTris = {}
 local _brimLines = {}
