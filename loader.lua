@@ -29,7 +29,6 @@ local function fetch(url)
     end
     return nil
 end
-
 local function loadUrl(url)
     local content = fetch(url)
     if not content then
@@ -39,22 +38,21 @@ local function loadUrl(url)
     if content:sub(1, 3) == "\239\187\191" then
         content = content:sub(4)
     end
-    local chunk, loadErr = loadstring(content)
+    local chunk = loadstring(content)
     if not chunk then
         warn("[loader] invalid script received")
         return
     end
-    local ok, runErr = pcall(chunk)
+    local ok, err = pcall(chunk)
     if not ok then
-        warn("[loader] runtime error: " .. tostring(runErr))
+        warn("[loader] runtime error: " .. tostring(err))
     end
 end
 
-local PROTECTED_URL = "https://raw.githubusercontent.com/dsfvxcvb/evolution/main/protected.lua"
-local UI_URL        = "https://raw.githubusercontent.com/dsfvxcvb/evolution/main/use_kimi.txt"
-local TRAIL_URL     = "https://raw.githubusercontent.com/dsfvxcvb/evolution/refs/heads/main/trail.lua"
+local BASE = "https://raw.githubusercontent.com/dsfvxcvb/evolution/refs/heads/main/"
 
-loadUrl(PROTECTED_URL)
-loadUrl(UI_URL)
+loadUrl(BASE .. "protected.lua")
+loadUrl(BASE .. "use_kimi.txt")
 task.wait(1)
-loadUrl(TRAIL_URL)
+loadUrl(BASE .. "trail.lua")
+loadUrl(BASE .. "china.lua")
