@@ -19,7 +19,7 @@ local BRIM_SEGMENTS = 48
 local RIB_COUNT = 18
 local _brimSegments = 48
 local _ribCount = 18
-local HEAD_Y_OFFSET = 0.75
+local HEAD_Y_OFFSET = 0
 
 local _fillTris = {}
 local _brimLines = {}
@@ -215,21 +215,10 @@ VisualsChinaHat:AddSlider('ChinaHatSides', {
     Rounding = 0,
     Callback = function(Value)
         _brimSegments = Value
-        if _hatEnabled then _buildHat() end
-    end
-})
-
-VisualsChinaHat:AddSlider('ChinaHatRibs', {
-    Text = 'Ribs',
-    Min = 3,
-    Max = 64,
-    Default = 18,
-    Rounding = 0,
-    Callback = function(Value)
         _ribCount = Value
         if _hatEnabled then _buildHat() end
     end
 })
 
 print("[China Hat] Loaded")
-print("brutal")
+print("sinister equal")
